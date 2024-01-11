@@ -1,0 +1,37 @@
+
+# Task name - used to pick the class to load
+task_name: ${task.name}
+
+# seed - set to -1 to choose random seed
+seed: 42
+# set to True for deterministic performance
+torch_deterministic: False
+
+
+# RLGames Arguments
+# test - if set, run policy in inference mode (requires setting checkpoint to load)
+test: False
+# used to set checkpoint path
+checkpoint: ''
+# set sigma when restoring network
+sigma: ''
+# set to True to use multi-gpu training
+multi_gpu: False
+
+wandb_activate: False
+
+
+# set default task and default training config based on task
+defaults:
+  - task: pushT
+  - train: ${task}PPO
+  - pbt: no_pbt
+  - override hydra/job_logging: disabled
+  - _self_
+
+# set the directory where the output files get saved
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
