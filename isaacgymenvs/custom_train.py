@@ -127,22 +127,34 @@ def launch_rlg_hydra(cfg: DictConfig):
     
     # Creating a new function to return a pushT environment. This will then be added to rl_games env_configurations so that an env can be created from its name in the config
     from custom_envs.pusht_single_env import PushTEnv
-    from custom_envs.customenv_utils import CustomEnv
+    from custom_envs.customenv_utils import CustomRayVecEnv
+    import gym
     def create_pusht_env(**kwargs):
         env =  PushTEnv()
+        # env = gym.make('LunarLanderContinuous-v2')
         return env
+
+
+    ### Explanation: env_configurations is a dictionary with env_name: dict(env config). This dict contains the type of vecenv and a creator function
+    # vecenv.register is used to register a new environment TYPE and its creator function. For gym like environments, registering is most likely not
+    # needed as they can simply use the existing TYPE "RAY". To do this, just add the env and its creator to env_configurations. This is what is done here.
+    # Isaacgym environments also need a new env TYPE because they are not gym like. RLGPU is the registered name for these. 
+
 
     # env_configurations.register adds the env to the list of rl_games envs. create_isaacgym_env returns a VecTask environment. But rl_games also accepts gym envs. 
     env_configurations.register('pushT', {
-        'vecenv_type': 'RLGPU',
+        'vecenv_type': 'TESTRAY',
         'env_creator': lambda **kwargs: create_pusht_env(**kwargs),
     })
 
     # vecenv register calls the following lambda function which then returns an instance of RLGPUEnv. 
-    # In short, any new env must have the same functions as RLGPUEnv
+    # In short, any new env must have the same functions as RLGPUEnv (or the same ones as in RayVecEnv from rl_games)
     # A simpler version of this is defined in this file as CustomEnv
     # once registered, the environment is instantiated automatically within the algorithm class in rl_games
-    vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: CustomEnv(config_name, num_actors, **kwargs))
+    # vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: CustomEnv(config_name, num_actors, **kwargs))
+
+    vecenv.register('TESTRAY', lambda config_name, num_actors, **kwargs: CustomRayVecEnv(env_configurations.configurations, config_name, num_actors, **kwargs))
+
 
     rlg_config_dict = omegaconf_to_dict(cfg.train)
     # rlg_config_dict = preprocess_train_config(cfg, rlg_config_dict)
