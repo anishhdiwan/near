@@ -134,6 +134,7 @@ class PushTEnv(gym.Env):
 
         observation = self._get_obs()
         info = self._get_info()
+        info['scores'] = reward
 
         return observation, reward, done, info
 

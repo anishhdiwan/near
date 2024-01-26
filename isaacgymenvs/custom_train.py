@@ -129,6 +129,8 @@ def launch_rlg_hydra(cfg: DictConfig):
     from custom_envs.pusht_single_env import PushTEnv
     from custom_envs.customenv_utils import CustomRayVecEnv
     import gym
+    from custom_envs.customenv_utils import PushTAlgoObserver
+
     def create_pusht_env(**kwargs):
         env =  PushTEnv()
         # env = gym.make('LunarLanderContinuous-v2')
@@ -162,7 +164,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # register new AMP network builder and agent
     def build_runner():
-        runner = Runner()
+        runner = Runner(algo_observer=PushTAlgoObserver())
         return runner
 
     # convert CLI arguments into dictionary
@@ -183,7 +185,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     runner.run({
         'train': not cfg.test,
         'play': cfg.test,
-        'checkpoint': cfg.checkpoint,
+        # 'checkpoint': cfg.checkpoint,
         # 'sigma': cfg.sigma if cfg.sigma != '' else None
     })
 

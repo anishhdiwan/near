@@ -45,16 +45,16 @@ params:
     tau: 0.9
 
     learning_rate: 1e-3
-    score_to_win: 300
+    score_to_win: 10 # Training stops if reached
 
     grad_norm: 0.5
     entropy_coef: 0.0
     truncate_grads: True
     e_clip: 0.2
     clip_value: True
-    num_actors: 16
+    num_actors: 16 # num_envs to run
     horizon_length: 128
-    minibatch_size: 1024
+    minibatch_size: 1024 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
     mini_epochs: 4
     critic_coef: 1
     lr_schedule:  adaptive

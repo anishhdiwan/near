@@ -1,10 +1,44 @@
 from rl_games.common.tr_helpers import dicts_to_dict_with_arrays
 from rl_games.common.ivecenv import IVecEnv
+from rl_games.common.algo_observer import AlgoObserver
 import numpy as np
 import gym
 import random
 from time import sleep
 import torch
+
+
+class PushTAlgoObserver(AlgoObserver):
+    def __init__(self):
+        self.scores = 0
+
+    def after_init(self, algo):
+        self.algo = algo
+        # self.game_scores = torch_ext.AverageMeter(1, self.algo.games_to_track).to(self.algo.ppo_device)  
+        self.writer = self.algo.writer
+
+    def process_infos(self, infos, done_indices):
+        if not infos:
+            return
+
+        # done_indices = done_indices.cpu().numpy()
+
+        if isinstance(infos, dict):
+            if 'scores' in infos:
+                self.scores = infos['scores'].mean()
+
+    def after_clear_stats(self):
+        self.scores = 0
+
+    def after_print_stats(self, frame, epoch_num, total_time):
+        if self.writer is not None:
+            mean_scores = self.scores
+            self.writer.add_scalar('scores/mean', mean_scores, frame)
+            self.writer.add_scalar('scores/iter', mean_scores, epoch_num)
+            self.writer.add_scalar('scores/time', mean_scores, total_time)
+
+
+
 
 class CustomRayWorker:
     def __init__(self, config_dict, config_name, config):
@@ -122,7 +156,7 @@ class CustomRayVecEnv(IVecEnv):
         res = self.workers[0].get_env_info.remote()
         env_info = self.ray.get(res)
         res = self.workers[0].can_concat_infos.remote()
-        can_concat_infos = self.ray.get(res)
+        can_concat_infos = self.ray.get(res)        
         self.use_global_obs = env_info['use_global_observations']
         self.concat_infos = can_concat_infos
         self.obs_type_dict = type(env_info.get('observation_space')) is gym.spaces.Dict
@@ -168,8 +202,10 @@ class CustomRayVecEnv(IVecEnv):
             else:
                 newobsdict["states"] = np.stack(newstates)            
             ret_obs = newobsdict
-        if self.concat_infos:
-            newinfos = dicts_to_dict_with_arrays(newinfos, False)
+        # if self.concat_infos:
+        newinfos = dicts_to_dict_with_arrays(newinfos, False)
+        
+        # print(newinfos)
         return ret_obs, self.concat_func(newrewards), self.concat_func(newdones), newinfos
 
     def get_env_info(self):
