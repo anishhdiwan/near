@@ -124,6 +124,7 @@ class PushTEnv(gym.Env):
                 self.space.step(dt)
 
         # compute reward
+        # TODO: fix shapely divide by zero errors!
         goal_body = self._get_goal_pose_body(self.goal_pose)
         goal_geom = pymunk_to_shapely(goal_body, self.block.shapes)
         block_geom = pymunk_to_shapely(self.block, self.block.shapes)
@@ -131,14 +132,34 @@ class PushTEnv(gym.Env):
         intersection_area = goal_geom.intersection(block_geom).area
         goal_area = goal_geom.area
         coverage = intersection_area / goal_area
-        reward = np.clip(coverage / self.success_threshold, 0, 1)
-        done = coverage > self.success_threshold
+        reward = np.clip(coverage / self.reward_threshold, 0, 1)
 
+        # If the current reward threshold is mostly met (0.9) then increase it until it reaches the success_threshold
+        if reward > 0.9 and self.reward_threshold < self.success_threshold:
+            self.reward_threshold += 0.1
+
+        dist_to_goal = -(np.linalg.norm(np.absolute(self.goal_pose[:2]) - np.absolute(np.array(self.block.position))))/725
+        # print(f"Dist to goal {dist_to_goal}")
+        # orientation_error = -(self.goal_pose[2] - self.block.angle)
+
+        dist_to_block = -(np.linalg.norm(np.absolute(self.agent.position) - np.absolute(np.array(self.block.position))))/363
+        # print(f"Dist to block {dist_to_block}")
+
+        dist_reward = dist_to_goal + dist_to_block   
+        reward = reward + dist_reward
+        # print(f"reward {reward}")
+        
+        done = coverage > self.success_threshold
         observation = self._get_obs()
         info = self._get_info()
 
         # Rewards need to be in the info to get logged by the observer
         info['scores'] = reward
+
+        #Env stops after a certain number of steps
+        self.env_steps += 1
+        if self.env_steps >= self.max_env_steps:
+            done = True
 
         return observation, reward, done, info
 
@@ -318,7 +339,15 @@ class PushTEnv(gym.Env):
         self.n_contact_points = 0
 
         self.max_score = 50 * 100
+
+        # success_threshold is the threshold after which env is done. reward_threshold gradually goes up to incrementally provide a reward signal
+        self.reward_threshold = 0.1
         self.success_threshold = 0.95    # 95% coverage.
+
+        # Counting the number of steps
+        self.env_steps = 0
+        # Step returns done after this
+        self.max_env_steps = 150
 
     def _add_segment(self, a, b, radius):
         shape = pymunk.Segment(self.space.static_body, a, b, radius)

@@ -7,7 +7,7 @@ params:
 
   network:
     name: actor_critic
-    separate: True
+    separate: False
     space:
       continuous:
         mu_activation: None
@@ -20,31 +20,27 @@ params:
           val: 0
         fixed_sigma: True
     mlp:
-      units: [64]
+      units: [256, 128, 64]
       activation: relu
       initializer:
           name: default
           scale: 2
-    rnn:
-      name: 'lstm'
-      units: 64
-      layers: 1
 
   load_checkpoint: False
   load_path: path
 
   config:
-    name: ${resolve_default:pushT, ''}
+    name: ${resolve_default:pushT_v2, ''}
     full_experiment_name: ${.name}
-    max_epochs: ${resolve_default:50, ''}
+    max_epochs: ${resolve_default:250, ''}
     env_name:  pushT
     reward_shaper:
       scale_value: 0.1
     normalize_advantage: True
-    gamma: 0.99
+    gamma: 0.95
     tau: 0.9
 
-    learning_rate: 1e-3
+    learning_rate: 1e-4
     score_to_win: 10 # Training stops if reached
 
     grad_norm: 0.5
@@ -53,7 +49,7 @@ params:
     e_clip: 0.2
     clip_value: True
     num_actors: 16 # num_envs to run
-    horizon_length: 128
+    horizon_length: 256
     minibatch_size: 1024 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
     mini_epochs: 4
     critic_coef: 1
@@ -66,3 +62,4 @@ params:
     player:
       render: True
       render_sleep: 0.1 # Determines frame rate (how many seconds to wait between two frames)
+      games_num: 1 # Number of games to play

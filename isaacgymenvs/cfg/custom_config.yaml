@@ -3,16 +3,16 @@
 task_name: ${task.name}
 
 # seed - set to -1 to choose random seed
-seed: 42
+seed: 50
 # set to True for deterministic performance
 torch_deterministic: False
 
 
 # RLGames Arguments
 # test - if set, run policy in inference mode (requires setting checkpoint to load)
-test: False
+test: True
 # used to set checkpoint path
-checkpoint: 'runs/pushT/nn/last_pushT_ep_50_rew_-inf.pth'
+checkpoint: 'runs/pushT_v2/nn/pushT_v2.pth'
 # set sigma when restoring network
 sigma: ''
 # set to True to use multi-gpu training

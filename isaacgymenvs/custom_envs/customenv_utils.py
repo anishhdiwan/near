@@ -9,6 +9,7 @@ import torch
 
 
 class PushTAlgoObserver(AlgoObserver):
+    ## TODO: Figure out a way to record episode returns with asynchronous environments...
     def __init__(self):
         super().__init__()
         self.algo = None
@@ -56,6 +57,8 @@ class PushTAlgoObserver(AlgoObserver):
                 # self.writer.add_scalar('scores/mean', mean_scores, frame)
                 self.writer.add_scalar('scores/ep_returns', mean_ep_scores, epoch_num)
                 # self.writer.add_scalar('scores/time', mean_scores, total_time)
+
+            self.episode_cumulative_return = None
 
 
 
