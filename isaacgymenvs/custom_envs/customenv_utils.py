@@ -10,14 +10,21 @@ import torch
 
 class PushTAlgoObserver(AlgoObserver):
     def __init__(self):
-        self.scores = 0
+        super().__init__()
+        self.algo = None
+        self.writer = None
+
+        self.current_epoch = 0
+        self.episode_cumulative_return = None
+
 
     def after_init(self, algo):
         self.algo = algo
-        # self.game_scores = torch_ext.AverageMeter(1, self.algo.games_to_track).to(self.algo.ppo_device)  
         self.writer = self.algo.writer
 
+
     def process_infos(self, infos, done_indices):
+        # print(f"Current Epoch {self.current_epoch} | Done idx {done_indices}")
         if not infos:
             return
 
@@ -25,17 +32,30 @@ class PushTAlgoObserver(AlgoObserver):
 
         if isinstance(infos, dict):
             if 'scores' in infos:
-                self.scores = infos['scores'].mean()
+                # Set up the cumulative return array at first
+                if self.episode_cumulative_return is None:
+                    self.episode_cumulative_return = np.zeros(infos['scores'].shape)
+                
+                for idx in range(len(infos['scores'])):
+                    # Go through all idices. If that env is done then don't update its episode return
+                    if idx not in done_indices:
+                        self.episode_cumulative_return[idx] += infos['scores'][idx]
+
 
     def after_clear_stats(self):
-        self.scores = 0
+        self.episode_cumulative_return = None
 
     def after_print_stats(self, frame, epoch_num, total_time):
-        if self.writer is not None:
-            mean_scores = self.scores
-            self.writer.add_scalar('scores/mean', mean_scores, frame)
-            self.writer.add_scalar('scores/iter', mean_scores, epoch_num)
-            self.writer.add_scalar('scores/time', mean_scores, total_time)
+        
+        # Log episode returns only for each new epoch
+        if epoch_num > self.current_epoch:
+            # Update the current epoch 
+            self.current_epoch = epoch_num   
+            if self.writer is not None:
+                mean_ep_scores = self.episode_cumulative_return.mean()
+                # self.writer.add_scalar('scores/mean', mean_scores, frame)
+                self.writer.add_scalar('scores/ep_returns', mean_ep_scores, epoch_num)
+                # self.writer.add_scalar('scores/time', mean_scores, total_time)
 
 
 

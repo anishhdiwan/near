@@ -83,6 +83,8 @@ class PushTEnv(gym.Env):
         self.render_buffer = None
         self.latest_action = None
         self.reset_to_state = reset_to_state
+
+        
     
     def reset(self):
         seed = self._seed
@@ -134,6 +136,8 @@ class PushTEnv(gym.Env):
 
         observation = self._get_obs()
         info = self._get_info()
+
+        # Rewards need to be in the info to get logged by the observer
         info['scores'] = reward
 
         return observation, reward, done, info

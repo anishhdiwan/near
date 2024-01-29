@@ -12,14 +12,14 @@ torch_deterministic: False
 # test - if set, run policy in inference mode (requires setting checkpoint to load)
 test: False
 # used to set checkpoint path
-checkpoint: ''
+checkpoint: 'runs/pushT/nn/last_pushT_ep_50_rew_-inf.pth'
 # set sigma when restoring network
 sigma: ''
 # set to True to use multi-gpu training
 multi_gpu: False
 
 wandb_activate: False
-
+run_name: ${train.params.config.name}
 
 # set default task and default training config based on task
 defaults:

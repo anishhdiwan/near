@@ -36,7 +36,7 @@ params:
   config:
     name: ${resolve_default:pushT, ''}
     full_experiment_name: ${.name}
-    max_epochs: ${resolve_default:20, ''}
+    max_epochs: ${resolve_default:50, ''}
     env_name:  pushT
     reward_shaper:
       scale_value: 0.1
@@ -65,3 +65,4 @@ params:
 
     player:
       render: True
+      render_sleep: 0.1 # Determines frame rate (how many seconds to wait between two frames)
