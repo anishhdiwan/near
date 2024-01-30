@@ -10,9 +10,9 @@ torch_deterministic: False
 
 # RLGames Arguments
 # test - if set, run policy in inference mode (requires setting checkpoint to load)
-test: True
+test: False
 # used to set checkpoint path
-checkpoint: 'runs/pushT_v2/nn/pushT_v2.pth'
+checkpoint: ''
 # set sigma when restoring network
 sigma: ''
 # set to True to use multi-gpu training

@@ -181,6 +181,13 @@ class PushTEnv(gym.Env):
         dist_reward = dist_to_goal + dist_to_block   
         reward = reward + dist_reward
         # print(f"reward {reward}")
+
+
+        # ## PPO SANITY CHECK
+        # # Dist from agent to centre of env
+        # temp = -(np.linalg.norm(np.absolute(self.agent.position) - np.absolute(self.goal_pose[:2])))/363
+        # reward = temp
+        # ## PPO SANITY CHECK
         
         done = coverage > self.success_threshold
         observation = self._get_obs()
