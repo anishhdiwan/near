@@ -41,7 +41,7 @@ params:
     tau: 0.9
 
     learning_rate: 1e-4
-    score_to_win: 10 # Training stops if reached
+    score_to_win: 25 # Training stops if reached
 
     grad_norm: 0.5
     entropy_coef: 0.0
@@ -61,5 +61,5 @@ params:
 
     player:
       render: True
-      render_sleep: 0.08 # Determines frame rate (how many seconds to wait between two frames)
+      render_sleep: 0.05 # Determines frame rate (how many seconds to wait between two frames)
       games_num: 5 # Number of games to play

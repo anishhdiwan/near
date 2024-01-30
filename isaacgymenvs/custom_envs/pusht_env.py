@@ -25,6 +25,27 @@ def pymunk_to_shapely(body, shapes):
     geom = sg.MultiPolygon(geoms)
     return geom
 
+
+def unnormalise_action(action, window_size):
+    """Unnormalise an input action from being in the range of [-1,-1] - [1,1] to the range [0,0] - [window_size, window_size]
+
+    Given,
+    [r_min, r_max] = [-1,1] = data range
+    [t_min, t_max] = [0, window_size] = target range
+    x in data range
+
+    x_in_target_range = t_min + (x - r_min)*(t_max - t_min)/(r_max - r_min) 
+    https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range
+
+    Args:
+        action (gym.Actions): Input action in normalised range
+        window_size (float): Size of the pushT window to which the action is unnormalised
+    """
+    action = (action + 1)*(window_size)/2
+
+    return action
+
+
 class PushTEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 10}
     reward_range = (0., 1.)
@@ -55,10 +76,19 @@ class PushTEnv(gym.Env):
             dtype=np.float64
         )
 
-        # positional goal for agent
+        # # positional goal for agent
+        # self.action_space = spaces.Box(
+        #     low=np.array([0,0], dtype=np.float64),
+        #     high=np.array([ws,ws], dtype=np.float64),
+        #     shape=(2,),
+        #     dtype=np.float64
+        # )
+
+        # Normalised actions: in the range [-1,1]. Action space changed to normalised values
+        # In the step() function, actions are unnormalised again
         self.action_space = spaces.Box(
-            low=np.array([0,0], dtype=np.float64),
-            high=np.array([ws,ws], dtype=np.float64),
+            low=np.array([-1,-1], dtype=np.float64),
+            high=np.array([1,1], dtype=np.float64),
             shape=(2,),
             dtype=np.float64
         )
@@ -109,6 +139,9 @@ class PushTEnv(gym.Env):
         return observation
 
     def step(self, action):
+        # Unnormalise action before applying to the env
+        action = unnormalise_action(action, self.window_size)
+
         dt = 1.0 / self.sim_hz
         self.n_contact_points = 0
         n_steps = self.sim_hz // self.control_hz
