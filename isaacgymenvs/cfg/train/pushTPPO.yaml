@@ -26,13 +26,13 @@ params:
           name: default
           scale: 2
 
-  load_checkpoint: False
-  load_path: path
+  load_checkpoint: ${if:${...checkpoint},True,False} #Training checkpint. Set to True if the main config has a checkpoint given. Is irrelevant when playing policies
+  load_path: ${...checkpoint} # path to the checkpoint to load
 
   config:
-    name: ${resolve_default:pushT_v2, ''}
+    name: ${resolve_default:pushT,${....experiment}}
     full_experiment_name: ${.name}
-    max_epochs: ${resolve_default:250, ''}
+    max_epochs: ${resolve_default:10, ''}
     env_name:  pushT
     reward_shaper:
       scale_value: 0.1

@@ -39,13 +39,9 @@
 
 
 ### A custom version of the isaacgymenvs train script adapted for non-isaacgym environment. Emulates the rl_games runner.py script ###
-
-
 import hydra
-
 from omegaconf import DictConfig, OmegaConf
 from omegaconf import DictConfig, OmegaConf
-
 
 # Hydra decorator to pass in the config. Looks for a config file in the specified path. This file in turn has links to other configs 
 @hydra.main(version_base="1.1", config_name="custom_config", config_path="./cfg")
@@ -64,7 +60,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     from rl_games.common import env_configurations, vecenv
     from rl_games.torch_runner import Runner
-    from rl_games.algos_torch import model_builder
+    # from rl_games.algos_torch import model_builder
     # from isaacgymenvs.learning import amp_continuous
     # from isaacgymenvs.learning import amp_players
     # from isaacgymenvs.learning import amp_models
@@ -99,25 +95,26 @@ def launch_rlg_hydra(cfg: DictConfig):
         env =  PushTEnv()
         return env
 
-
-    ### Explanation: env_configurations is a dictionary with env_name: dict(env config). This dict contains the type of vecenv and a creator function
-    # vecenv.register is used to register a new environment TYPE and its creator function. For gym like environments, registering is most likely not
-    # needed as they can simply use the existing TYPE "RAY". To do this, just add the env and its creator to env_configurations. This is what is done here.
-    # Isaacgym environments also need a new env TYPE because they are not gym like. RLGPU is the registered name for these. 
-
     # env_configurations.register adds the env to the list of rl_games envs. create_isaacgym_env returns a VecTask environment. But rl_games also accepts gym envs. 
     env_configurations.register('pushT', {
         'vecenv_type': 'CUSTOMRAY',
         'env_creator': lambda **kwargs: create_pusht_env(**kwargs),
     })
 
-    # vecenv register calls the following lambda function which then returns an instance of RLGPUEnv. 
-    # In short, any new env must have the same functions as RLGPUEnv (or the same ones as in RayVecEnv from rl_games)
-    # A simpler version of this is defined in this file as CustomEnv
-    # once registered, the environment is instantiated automatically within the algorithm class in rl_games
-    # vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: CustomEnv(config_name, num_actors, **kwargs))
-
+    # vecenv register calls the following lambda function which then returns an instance of CUSTOMRAY. 
     vecenv.register('CUSTOMRAY', lambda config_name, num_actors, **kwargs: CustomRayVecEnv(env_configurations.configurations, config_name, num_actors, **kwargs))
+
+
+    #Make separate folder and dump config dict to ensure retroactive experiment checks
+    if not cfg.test:
+        cfg.train.params.config.name = cfg.task.name + '_' + cfg.train.params.config.name + '_{date:%d-%H-%M-%S}'.format(date=datetime.now())
+        cfg.train.params.config.full_experiment_name = cfg.train.params.config.name
+
+        experiment_dir = os.path.join('runs', cfg.train.params.config.name)
+
+        os.makedirs(experiment_dir, exist_ok=True)
+        with open(os.path.join(experiment_dir, 'experiment_config.yaml'), 'w') as f:
+            f.write(OmegaConf.to_yaml(cfg))
 
     # Convert to a big dictionary
     rlg_config_dict = omegaconf_to_dict(cfg.train)

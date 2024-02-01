@@ -1,6 +1,8 @@
 
 # Task name - used to pick the class to load
 task_name: ${task.name}
+# experiment name. defaults to name of training config
+experiment: ''
 
 # seed - set to -1 to choose random seed
 seed: 50
