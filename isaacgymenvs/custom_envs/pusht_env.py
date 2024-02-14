@@ -55,7 +55,8 @@ class PushTEnv(gym.Env):
             block_cog=None, damping=None,
             render_action=True,
             render_size=96,
-            reset_to_state=None
+            reset_to_state=None,
+            cfg=None
         ):
         self._seed = None
         self.seed()
@@ -75,6 +76,13 @@ class PushTEnv(gym.Env):
             shape=(5,),
             dtype=np.float64
         )
+
+        # Setting up the env observation space info used to train amp_continuous
+        if cfg != None:
+            NUM_AMP_OBS_PER_STEP = 5 # [robotY, robotY, tX, tY, tTheta]
+            self._num_amp_obs_steps = cfg["env"]["numAMPObsSteps"]
+            self.num_amp_obs = self._num_amp_obs_steps * NUM_AMP_OBS_PER_STEP
+            self._amp_obs_space = spaces.Box(np.ones(self.num_amp_obs) * -np.Inf, np.ones(self.num_amp_obs) * np.Inf)
 
         # # positional goal for agent
         # self.action_space = spaces.Box(
@@ -114,7 +122,10 @@ class PushTEnv(gym.Env):
         self.latest_action = None
         self.reset_to_state = reset_to_state
 
-        
+    # Added to provide env obs shape info to amp_continuous
+    @property
+    def amp_observation_space(self):
+        return self._amp_obs_space
     
     def reset(self):
         seed = self._seed

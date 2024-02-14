@@ -1,6 +1,6 @@
 params:
   seed: ${...seed}
-
+  
   algo:
     name: amp_continuous
 
@@ -10,7 +10,6 @@ params:
   network:
     name: amp
     separate: True
-
     space:
       continuous:
         mu_activation: None
@@ -22,19 +21,19 @@ params:
           val: -2.9
         fixed_sigma: True
         learn_sigma: False
-
+        
     mlp:
-      units: [1024, 512]
+      units: [256, 128, 64]
       activation: relu
       d2rl: False
-
+      
       initializer:
-        name: default
+          name: default
       regularizer:
         name: None
-
+        
     disc:
-      units: [1024, 512]
+      units: [256, 128, 64]
       activation: relu
 
       initializer:
@@ -42,55 +41,59 @@ params:
       regularizer:
         name: None
 
-  load_checkpoint: ${if:${...checkpoint},True,False} # flag which sets whether to load the checkpoint
+  load_checkpoint: ${if:${...checkpoint},True,False} #Training checkpint. Set to True if the main config has a checkpoint given. Is irrelevant when playing policies
   load_path: ${...checkpoint} # path to the checkpoint to load
 
   config:
-    name: ${resolve_default:HumanoidAMP,${....experiment}}
+    name: ${resolve_default:pushTAMP,${....experiment}}
     full_experiment_name: ${.name}
-    env_name: rlgpu
+    env_name:  pushT
     ppo: True
     multi_gpu: ${....multi_gpu}
     mixed_precision: False
     normalize_input: True
     normalize_value: True
     value_bootstrap: True
-    num_actors: ${....task.env.numEnvs}
+    num_actors: ${....task.env.numEnvs} #16 num_envs to run
     reward_shaper:
       scale_value: 1
     normalize_advantage: True
     gamma: 0.99
     tau: 0.95
-    learning_rate: 5e-5
-    lr_schedule: constant
+    learning_rate: 1e-4
+    lr_schedule:  constant
     kl_threshold: 0.008
-    score_to_win: 20000
-    max_epochs: ${resolve_default:5000,${....max_iterations}}
-    save_best_after: 100
-    save_frequency: 50
+    score_to_win: 25 # Training stops if reached
+    max_epochs: ${resolve_default:10, ''}
+    save_best_after: 5
+    save_frequency: 2
     print_stats: True
-    grad_norm: 1.0
+    grad_norm: 0.5
     entropy_coef: 0.0
     truncate_grads: False
     e_clip: 0.2
     horizon_length: 16
-    minibatch_size: 32768
-    mini_epochs: 6
-    critic_coef: 5
+    minibatch_size: 64 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents
+    mini_epochs: 4
+    critic_coef: 1
     clip_value: False
-    seq_len: 4
-    bounds_loss_coef: 10
-    amp_obs_demo_buffer_size: 200000
-    amp_replay_buffer_size: 1000000
+    seq_length: 4
+    bounds_loss_coef: 0
+    amp_obs_demo_buffer_size: 2000
+    amp_replay_buffer_size: 1000
     amp_replay_keep_prob: 0.01
-    amp_batch_size: 512
-    amp_minibatch_size: 4096
+    amp_batch_size: 32
+    amp_minibatch_size: 64
     disc_coef: 5
     disc_logit_reg: 0.05
     disc_grad_penalty: 5
     disc_reward_scale: 2
     disc_weight_decay: 0.0001
     normalize_amp_input: True
-
     task_reward_w: 0.0
     disc_reward_w: 1.0
+    
+    player:
+      render: True
+      render_sleep: 0.01 # Determines frame rate (how many seconds to wait between two frames)
+      games_num: 5 # Number of games to play

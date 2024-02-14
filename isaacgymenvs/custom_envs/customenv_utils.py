@@ -132,6 +132,10 @@ class CustomRayWorker:
         info = {}
         observation_space = self.env.observation_space
 
+        # Added to provide shape info to amp_continuous
+        if hasattr(self.env, "amp_observation_space"):
+            info['amp_observation_space'] = self.env.amp_observation_space
+
         #if isinstance(observation_space, gym.spaces.dict.Dict):
         #    observation_space = observation_space['observations']
 
@@ -275,3 +279,9 @@ class CustomRayVecEnv(IVecEnv):
                 newobsdict["states"] = np.stack(newstates)            
             ret_obs = newobsdict
         return ret_obs
+
+    def reset_done(self):
+        """
+        Added as a wrapper around reset() to enable compatibility with the amp_continuous algo
+        """
+        return self.reset()

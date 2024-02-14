@@ -96,6 +96,11 @@ class AMPAgent(common_agent.CommonAgent):
 
         for n in range(self.horizon_length):
             self.obs, done_env_ids = self._env_reset_done()
+            ## TESTING ###
+            print("TESTING")
+            print(f"play_steps env_reset_done obs {self.obs}")
+            quit()
+            ## TESTING ###
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
             if self.use_action_masks:

@@ -68,7 +68,7 @@ def preprocess_train_config(cfg, config_dict):
     return config_dict
 
 
-@hydra.main(version_base="1.1", config_name="amp_test_config", config_path="./cfg")
+@hydra.main(version_base="1.1", config_name="amp_gym_config", config_path="./cfg")
 def launch_rlg_hydra(cfg: DictConfig):
 
     import logging
@@ -77,19 +77,19 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # noinspection PyUnresolvedReferences
     import isaacgym
-    from isaacgymenvs.pbt.pbt import PbtAlgoObserver, initial_pbt_check
+    # from isaacgymenvs.pbt.pbt import PbtAlgoObserver, initial_pbt_check
     from isaacgymenvs.utils.rlgames_utils import multi_gpu_get_rank
     from hydra.utils import to_absolute_path
-    from isaacgymenvs.tasks import isaacgym_task_map
+    # from isaacgymenvs.tasks import isaacgym_task_map
     import gym
     from isaacgymenvs.utils.reformat import omegaconf_to_dict, print_dict
     from isaacgymenvs.utils.utils import set_np_formatting, set_seed
 
-    if cfg.pbt.enabled:
-        initial_pbt_check(cfg)
+    # if cfg.pbt.enabled:
+    #     initial_pbt_check(cfg)
 
-    from isaacgymenvs.utils.rlgames_utils import RLGPUEnv, RLGPUAlgoObserver, MultiObserver, ComplexObsRLGPUEnv
-    from isaacgymenvs.utils.wandb_utils import WandbAlgoObserver
+    # from isaacgymenvs.utils.rlgames_utils import RLGPUEnv, RLGPUAlgoObserver, MultiObserver, ComplexObsRLGPUEnv
+    # from isaacgymenvs.utils.wandb_utils import WandbAlgoObserver
     from rl_games.common import env_configurations, vecenv
     from rl_games.torch_runner import Runner
     from rl_games.algos_torch import model_builder
@@ -109,6 +109,8 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     cfg_dict = omegaconf_to_dict(cfg)
     print_dict(cfg_dict)
+    print("-----")
+
 
     # set numpy formatting for printing only
     set_np_formatting()
@@ -119,72 +121,30 @@ def launch_rlg_hydra(cfg: DictConfig):
     # sets seed. if seed is -1 will pick a random one
     cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=global_rank)
 
-    def create_isaacgym_env(**kwargs):)
-        envs = isaacgymenvs.make(
-            cfg.seed, 
-            cfg.task_name, 
-            cfg.task.env.numEnvs, 
-            cfg.sim_device,
-            cfg.rl_device,
-            cfg.graphics_device_id,
-            cfg.headless,
-            cfg.multi_gpu,
-            cfg.capture_video,
-            cfg.force_render,
-            cfg,
-            **kwargs,
-        )
-        if cfg.capture_video:
-            envs.is_vector_env = True
-            envs = gym.wrappers.RecordVideo(
-                envs,
-                f"videos/{run_name}",
-                step_trigger=lambda step: step % cfg.capture_video_freq == 0,
-                video_length=cfg.capture_video_len,
-            )
-        return envs
+    # Creating a new function to return a pushT environment. This will then be added to rl_games env_configurations so that an env can be created from its name in the config
+    from custom_envs.pusht_env import PushTEnv
+    from custom_envs.customenv_utils import CustomRayVecEnv, PushTAlgoObserver
 
-    env_configurations.register('rlgpu', {
-        'vecenv_type': 'RLGPU',
-        'env_creator': lambda **kwargs: create_isaacgym_env(**kwargs),
+    def create_pusht_env(**kwargs):
+        env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
+        return env
+
+    # env_configurations.register adds the env to the list of rl_games envs. create_isaacgym_env returns a VecTask environment. But rl_games also accepts gym envs. 
+    env_configurations.register('pushT', {
+        'vecenv_type': 'CUSTOMRAY',
+        'env_creator': lambda **kwargs: create_pusht_env(**kwargs),
     })
 
-    ige_env_cls = isaacgym_task_map[cfg.task_name]
-    dict_cls = ige_env_cls.dict_obs_cls if hasattr(ige_env_cls, 'dict_obs_cls') and ige_env_cls.dict_obs_cls else False
+    # vecenv register calls the following lambda function which then returns an instance of CUSTOMRAY. 
+    vecenv.register('CUSTOMRAY', lambda config_name, num_actors, **kwargs: CustomRayVecEnv(env_configurations.configurations, config_name, num_actors, **kwargs))
 
-    if dict_cls:
-        
-        obs_spec = {}
-        actor_net_cfg = cfg.train.params.network
-        obs_spec['obs'] = {'names': list(actor_net_cfg.inputs.keys()), 'concat': not actor_net_cfg.name == "complex_net", 'space_name': 'observation_space'}
-        if "central_value_config" in cfg.train.params.config:
-            critic_net_cfg = cfg.train.params.config.central_value_config.network
-            obs_spec['states'] = {'names': list(critic_net_cfg.inputs.keys()), 'concat': not critic_net_cfg.name == "complex_net", 'space_name': 'state_space'}
-        
-        vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: ComplexObsRLGPUEnv(config_name, num_actors, obs_spec, **kwargs))
-    else:
-
-        vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: RLGPUEnv(config_name, num_actors, **kwargs))
 
     rlg_config_dict = omegaconf_to_dict(cfg.train)
     rlg_config_dict = preprocess_train_config(cfg, rlg_config_dict)
 
-    observers = [RLGPUAlgoObserver()]
-
-    if cfg.pbt.enabled:
-        pbt_observer = PbtAlgoObserver(cfg)
-        observers.append(pbt_observer)
-
-    if cfg.wandb_activate:
-        cfg.seed += global_rank
-        if global_rank == 0:
-            # initialize wandb only once per multi-gpu run
-            wandb_observer = WandbAlgoObserver(cfg)
-            observers.append(wandb_observer)
-
-    # register new AMP network builder and agent
-    def build_runner(algo_observer):
-        runner = Runner(algo_observer)
+    # Build an rl_games runner. Register new AMP network builder and agent
+    def build_runner():
+        runner = Runner(algo_observer=PushTAlgoObserver())
         runner.algo_factory.register_builder('amp_continuous', lambda **kwargs : amp_continuous.AMPAgent(**kwargs))
         runner.player_factory.register_builder('amp_continuous', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
         model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
@@ -192,11 +152,12 @@ def launch_rlg_hydra(cfg: DictConfig):
 
         return runner
 
-    # convert CLI arguments into dictionary
+
     # create runner and set the settings
-    runner = build_runner(MultiObserver(observers))
+    runner = build_runner()
     runner.load(rlg_config_dict)
     runner.reset()
+
 
     ### TESTING AMP DATA ###
     # from isaacgymenvs.learning import amp_continuous
