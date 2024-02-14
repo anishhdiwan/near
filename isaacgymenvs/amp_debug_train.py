@@ -202,8 +202,11 @@ def launch_rlg_hydra(cfg: DictConfig):
     # from isaacgymenvs.learning import amp_continuous
     temp_params = runner.params
     amp_agent = amp_continuous.AMPAgent("amp_continuous", temp_params)
-    amp_obs_demo = amp_agent._fetch_amp_obs_demo(4)
-    print(f"AMP Demo Observation {amp_obs_demo}")
+
+    amp_agent.train()
+
+    # amp_obs_demo = amp_agent._fetch_amp_obs_demo(4)
+    # print(f"AMP Demo Observation {amp_obs_demo.shape}")
 
     ### TESTING AMP DATA ###
 

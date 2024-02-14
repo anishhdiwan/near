@@ -117,6 +117,12 @@ class AMPAgent(common_agent.CommonAgent):
             self.experience_buffer.update_data('dones', n, self.dones)
             self.experience_buffer.update_data('amp_obs', n, infos['amp_obs'])
 
+            ### TESTING ###
+            # print("TESTING")
+            # print(f"play_steps amp_obs shape {infos['amp_obs'].shape}")
+            # quit()
+            ### TESTING ###
+
             terminated = infos['terminate'].float()
             terminated = terminated.unsqueeze(-1)
             next_vals = self._eval_critic(self.obs)
@@ -146,6 +152,13 @@ class AMPAgent(common_agent.CommonAgent):
 
         mb_rewards = self.experience_buffer.tensor_dict['rewards']
         mb_amp_obs = self.experience_buffer.tensor_dict['amp_obs']
+
+        ## TESTING ###
+        # print("TESTING")
+        # print(f"play_steps mb_amp_obs shape {mb_amp_obs.shape}")
+        # quit()
+        ## TESTING ###
+
         amp_rewards = self._calc_amp_rewards(mb_amp_obs)
         mb_rewards = self._combine_rewards(mb_rewards, amp_rewards)
 
@@ -166,6 +179,14 @@ class AMPAgent(common_agent.CommonAgent):
         self.dataset.values_dict['amp_obs'] = batch_dict['amp_obs']
         self.dataset.values_dict['amp_obs_demo'] = batch_dict['amp_obs_demo']
         self.dataset.values_dict['amp_obs_replay'] = batch_dict['amp_obs_replay']
+
+        ### TESTING ###
+        # print("TESTING")
+        # print(f"prepare_dataset amp_obs shape {batch_dict['amp_obs'].shape}")
+        # print(f"prepare_dataset amp_obs_demo shape {batch_dict['amp_obs_demo'].shape}")
+        # print(f"prepare_dataset amp_obs_replay shape {batch_dict['amp_obs_replay'].shape}")
+        # quit()
+        ### TESTING ###
         return
 
     def train_epoch(self):
@@ -181,9 +202,16 @@ class AMPAgent(common_agent.CommonAgent):
         rnn_masks = batch_dict.get('rnn_masks', None)
         
         self._update_amp_demos()
-        num_obs_samples = batch_dict['amp_obs'].shape[0]
+        num_obs_samples = batch_dict['amp_obs'].shape[0]        
         amp_obs_demo = self._amp_obs_demo_buffer.sample(num_obs_samples)['amp_obs']
         batch_dict['amp_obs_demo'] = amp_obs_demo
+
+        # TESTING ###
+        # print("TESTING")
+        # print(f"train_epoch num_obs_samples {num_obs_samples}")
+        # print(f"train_epoch amp_obs_demo shape {amp_obs_demo.shape}")
+        # quit()
+        # TESTING ###
 
         if (self._amp_replay_buffer.get_total_count() == 0):
             batch_dict['amp_obs_replay'] = batch_dict['amp_obs']
@@ -471,12 +499,20 @@ class AMPAgent(common_agent.CommonAgent):
 
         for i in range(num_batches):
             curr_samples = self._fetch_amp_obs_demo(self._amp_batch_size)
+            # ### TESTING ###
+            # print("TESTING")
+            # print(f"init amp demo buffer curr_samples size {curr_samples.shape}")
+            # ### TESTING ###
             self._amp_obs_demo_buffer.store({'amp_obs': curr_samples})
 
         return
     
     def _update_amp_demos(self):
         new_amp_obs_demo = self._fetch_amp_obs_demo(self._amp_batch_size)
+        ### TESTING ###
+        # print("TESTING")
+        # print(f"update_amp_demos new_amp_obs_demo size {new_amp_obs_demo.shape}")
+        ### TESTING ###
         self._amp_obs_demo_buffer.store({'amp_obs': new_amp_obs_demo})
         return
 
