@@ -7,6 +7,7 @@ import random
 from time import sleep
 import torch
 
+from .motion_lib import MotionLib
 
 class PushTAlgoObserver(AlgoObserver):
     ## TODO: Figure out a way to record episode returns with asynchronous environments...
@@ -152,6 +153,15 @@ class CustomRayWorker:
         if hasattr(self.env, 'state_space'):
             info['state_space'] = self.env.state_space
         return info
+    
+    def get_num_amp_obs_per_step(self):
+        return self.env._num_amp_obs_per_step
+
+    def get_num_amp_obs_steps(self):
+        return self.env._num_amp_obs_steps
+
+    def get_motion_file(self):
+        return self.env._motion_file
 
 
 class CustomRayVecEnv(IVecEnv):
@@ -160,6 +170,8 @@ class CustomRayVecEnv(IVecEnv):
     def __init__(self, config_dict, config_name, num_actors, **kwargs):
         # Explicityly passing in the dictionary containing env_name: {vecenv_type, env_creator}
         self.config_dict = config_dict
+        # Pointing the env variable to the object instance. This enables running the _fetch_amp_obs_demo function without any modifications to amp_continuous
+        self.env = self
 
         self.config_name = config_name
         self.num_actors = num_actors
@@ -192,6 +204,9 @@ class CustomRayVecEnv(IVecEnv):
             self.concat_func = np.stack
         else:
             self.concat_func = np.concatenate
+
+        # Set up the motions library
+        self._setup_motions()
     
     def step(self, actions):
         newobs, newstates, newrewards, newdones, newinfos = [], [], [], [], []
@@ -285,3 +300,29 @@ class CustomRayVecEnv(IVecEnv):
         Added as a wrapper around reset() to enable compatibility with the amp_continuous algo
         """
         return self.reset()
+
+    def fetch_amp_obs_demo(self, num_samples):
+        """
+        Fetch a set of num_samples demo observations from the environment motionlib
+        """
+
+        amp_obs_demo = self._motion_lib.sample_motions(num_samples)
+
+
+    def _setup_motions(self):
+        """
+        Set up the motion library
+        """
+
+        # Pulling config data from the env
+        res = self.workers[0].get_num_amp_obs_steps.remote()
+        num_amp_obs_steps = self.ray.get(res)
+
+        res = self.workers[0].get_num_amp_obs_per_step.remote()
+        num_amp_obs_per_step = self.ray.get(res)
+
+        res = self.workers[0].get_motion_file.remote()
+        motion_file = self.ray.get(res)
+        
+        # TODO: set device=self.device
+        self._motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
