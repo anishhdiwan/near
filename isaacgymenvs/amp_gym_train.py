@@ -159,33 +159,33 @@ def launch_rlg_hydra(cfg: DictConfig):
     runner.reset()
 
 
-    ### TESTING AMP DATA ###
+    ### TESTING AMP ###
     # from isaacgymenvs.learning import amp_continuous
-    temp_params = runner.params
-    amp_agent = amp_continuous.AMPAgent("amp_continuous", temp_params)
+    # temp_params = runner.params
+    # amp_agent = amp_continuous.AMPAgent("amp_continuous", temp_params)
 
-    amp_agent.train()
+    # amp_agent.train()
 
     # amp_obs_demo = amp_agent._fetch_amp_obs_demo(4)
     # print(f"AMP Demo Observation {amp_obs_demo.shape}")
 
-    ### TESTING AMP DATA ###
+    ### TESTING AMP ###
 
-    # # dump config dict
-    # if not cfg.test:
-    #     experiment_dir = os.path.join('runs', cfg.train.params.config.name + 
-    #     '_{date:%d-%H-%M-%S}'.format(date=datetime.now()))
+    # dump config dict
+    if not cfg.test:
+        experiment_dir = os.path.join('runs', cfg.train.params.config.name + 
+        '_{date:%d-%H-%M-%S}'.format(date=datetime.now()))
 
-    #     os.makedirs(experiment_dir, exist_ok=True)
-    #     with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
-    #         f.write(OmegaConf.to_yaml(cfg))
+        os.makedirs(experiment_dir, exist_ok=True)
+        with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
+            f.write(OmegaConf.to_yaml(cfg))
 
-    # runner.run({
-    #     'train': not cfg.test,
-    #     'play': cfg.test,
-    #     'checkpoint': cfg.checkpoint,
-    #     'sigma': cfg.sigma if cfg.sigma != '' else None
-    # })
+    runner.run({
+        'train': not cfg.test,
+        'play': cfg.test,
+        'checkpoint': cfg.checkpoint,
+        'sigma': cfg.sigma if cfg.sigma != '' else None
+    })
 
 
 if __name__ == "__main__":

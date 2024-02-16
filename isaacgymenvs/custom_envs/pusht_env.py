@@ -153,6 +153,12 @@ class PushTEnv(gym.Env):
         observation = self._get_obs()
         return observation
 
+    def reset_done(self):
+        """
+        Wrapper around reset to enable compatibility with the amp_continous play method
+        """
+        return self.reset(), []
+
     def step(self, action):
         # Unnormalise action before applying to the env
         action = unnormalise_action(action, self.window_size)

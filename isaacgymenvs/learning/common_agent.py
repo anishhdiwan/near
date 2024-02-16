@@ -144,7 +144,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 if self.print_stats:
                     fps_step = curr_frames / scaled_play_time
                     fps_total = curr_frames / scaled_time
-                    print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
+                    print(f'epoch num: {epoch_num} fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
 
                 self.writer.add_scalar('performance/total_fps', curr_frames / scaled_time, frame)
                 self.writer.add_scalar('performance/step_fps', curr_frames / scaled_play_time, frame)
