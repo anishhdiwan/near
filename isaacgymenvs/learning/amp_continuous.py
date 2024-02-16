@@ -96,11 +96,6 @@ class AMPAgent(common_agent.CommonAgent):
 
         for n in range(self.horizon_length):
             self.obs, done_env_ids = self._env_reset_done()
-            # ## TESTING ###
-            # print("TESTING")
-            # print(f"play_steps env_reset_done obs {self.obs}")
-            # quit()
-            # ## TESTING ###
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
             if self.use_action_masks:
@@ -123,9 +118,10 @@ class AMPAgent(common_agent.CommonAgent):
             self.experience_buffer.update_data('amp_obs', n, infos['amp_obs'])
 
             ### TESTING ###
-            # print("TESTING")
-            # print(f"play_steps amp_obs shape {infos['amp_obs'].shape}")
-            # quit()
+            print("TESTING")
+            print(f"play_steps next_obses shape {self.obs['obs'].shape}")
+            print(f"play_steps amp_obs shape {infos['amp_obs'].shape}")
+            quit()
             ### TESTING ###
 
             terminated = infos['terminate'].float()
@@ -207,7 +203,6 @@ class AMPAgent(common_agent.CommonAgent):
         rnn_masks = batch_dict.get('rnn_masks', None)
         
         self._update_amp_demos()
-        quit()
         num_obs_samples = batch_dict['amp_obs'].shape[0]        
         amp_obs_demo = self._amp_obs_demo_buffer.sample(num_obs_samples)['amp_obs']
         batch_dict['amp_obs_demo'] = amp_obs_demo
@@ -505,10 +500,11 @@ class AMPAgent(common_agent.CommonAgent):
 
         for i in range(num_batches):
             curr_samples = self._fetch_amp_obs_demo(self._amp_batch_size)
-            # ### TESTING ###
+            ### TESTING ###
             # print("TESTING")
+            # print(f"init amp demo buffer curr_samples {curr_samples}")
             # print(f"init amp demo buffer curr_samples size {curr_samples.shape}")
-            # ### TESTING ###
+            ### TESTING ###
             self._amp_obs_demo_buffer.store({'amp_obs': curr_samples})
 
         return
@@ -516,8 +512,8 @@ class AMPAgent(common_agent.CommonAgent):
     def _update_amp_demos(self):
         new_amp_obs_demo = self._fetch_amp_obs_demo(self._amp_batch_size)
         ### TESTING ###
-        print("TESTING")
-        print(f"update_amp_demos new_amp_obs_demo size {new_amp_obs_demo.shape}")
+        # print("TESTING")
+        # print(f"update_amp_demos new_amp_obs_demo size {new_amp_obs_demo.shape}")
         ### TESTING ###
         self._amp_obs_demo_buffer.store({'amp_obs': new_amp_obs_demo})
         return

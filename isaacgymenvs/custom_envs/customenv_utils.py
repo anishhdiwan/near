@@ -163,6 +163,9 @@ class CustomRayWorker:
     def get_motion_file(self):
         return self.env._motion_file
 
+    def get_num_envs(self):
+        return self.env._num_envs
+
 
 class CustomRayVecEnv(IVecEnv):
     import ray
@@ -246,7 +249,11 @@ class CustomRayVecEnv(IVecEnv):
             ret_obs = newobsdict
         # if self.concat_infos:
         newinfos = dicts_to_dict_with_arrays(newinfos, False)
-        
+
+        # Augmenting the infos dict
+        self.post_step_procedures(ret_obs)
+        newinfos = self.augment_infos(newinfos)
+
         # print(newinfos)
         return ret_obs, self.concat_func(newrewards), self.concat_func(newdones), newinfos
 
@@ -293,13 +300,20 @@ class CustomRayVecEnv(IVecEnv):
             else:
                 newobsdict["states"] = np.stack(newstates)            
             ret_obs = newobsdict
+        
         return ret_obs
 
     def reset_done(self):
         """
         Added as a wrapper around reset() to enable compatibility with the amp_continuous algo
         """
-        return self.reset()
+        # Return the reset observations with an empty dummy dict to match the return type expected by the amp_continuous algo
+        obs = self.reset()
+
+        # Set up the history amp obs
+        self._past_amp_obs_buf[:] = torch.from_numpy(obs)
+
+        return obs, []
 
     def fetch_amp_obs_demo(self, num_samples):
         """
@@ -307,6 +321,7 @@ class CustomRayVecEnv(IVecEnv):
         """
 
         amp_obs_demo = self._motion_lib.sample_motions(num_samples)
+        return amp_obs_demo
 
 
     def _setup_motions(self):
@@ -321,8 +336,38 @@ class CustomRayVecEnv(IVecEnv):
         res = self.workers[0].get_num_amp_obs_per_step.remote()
         num_amp_obs_per_step = self.ray.get(res)
 
+        self.num_amp_obs = int(num_amp_obs_steps * num_amp_obs_per_step)
+
         res = self.workers[0].get_motion_file.remote()
         motion_file = self.ray.get(res)
+
+        res = self.workers[0].get_num_envs.remote()
+        num_envs = self.ray.get(res)
         
         # TODO: set device=self.device
         self._motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
+
+        # TODO: set device=self.device
+        # Set up the amp observations buffer. This contains s-s' pairs and has the shape [num envs, num_amp_obs_steps*num_amp_obs_per_step]
+        self._amp_obs_buf = torch.zeros((num_envs, num_amp_obs_steps, num_amp_obs_per_step), dtype=torch.float)
+        # TODO: This is currently set up only for num_amp_obs_steps = 2!!
+        self._curr_amp_obs_buf = self._amp_obs_buf[:, 0]
+        self._past_amp_obs_buf = self._amp_obs_buf[:, 1]
+
+    def post_step_procedures(self, newobs):
+        """
+        Post step procedures to compute additional quantities needed by any algos. 
+
+        Computes the observation buffer needed by amp_continuous
+        """
+        self._curr_amp_obs_buf[:] = torch.from_numpy(newobs)
+        self._amp_obs_buf[:, 0] = self._curr_amp_obs_buf
+        self._amp_obs_buf[:, 1] = self._past_amp_obs_buf
+        # self._amp_obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_amp_obs_buf, newobs), axis=1))
+        self._past_amp_obs_buf[:] = torch.from_numpy(newobs)
+        self._curr_amp_obs_buf[:] = torch.from_numpy(np.zeros_like(self._amp_obs_buf[:, 0]))
+
+    def augment_infos(self, infos):
+        infos["amp_obs"] = self._amp_obs_buf.view(-1, self.num_amp_obs)
+
+        return infos

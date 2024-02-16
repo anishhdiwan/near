@@ -66,9 +66,7 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
         return paired_data
 
 
-
-
-class MotionLib():
+class MotionDataset():
     def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, device=None):
         if device == None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -104,6 +102,36 @@ class MotionLib():
         self.normalized_train_data = normalized_train_data
         self.paired_normalized_data = paired_normalized_data
 
-    def sample_motions(num_samples):
+    def __len__(self):
+        # all possible segments of the dataset
+        return len(self.paired_normalized_data)
+
+    def __getitem__(self, idx):
+        sample = self.paired_normalized_data[idx]
+        return sample
+
+class MotionLib():
+    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, device=None):
+        self.dataset = MotionDataset(motion_file, num_amp_obs_steps, num_amp_obs_per_step, device=device)
+        self.dataloader = None
+
+
+    def sample_motions(self, num_samples):
         # TODO: sample considering episode ends
-        pass
+
+        if self.dataloader == None:
+            self._setup_dataloader(num_samples)
+
+        batch = next(iter(self.dataloader))
+        return batch
+
+    def _setup_dataloader(self, batch_size):
+        self.dataloader = torch.utils.data.DataLoader(
+            self.dataset,
+            batch_size=batch_size,
+            num_workers=1,
+            shuffle=False,
+            # accelerate cpu-gpu transfer
+            pin_memory=True,
+        )
+

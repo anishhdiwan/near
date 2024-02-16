@@ -82,6 +82,7 @@ class PushTEnv(gym.Env):
             NUM_AMP_OBS_PER_STEP = 5 # [robotY, robotY, tX, tY, tTheta]
             self._num_amp_obs_per_step = NUM_AMP_OBS_PER_STEP
             self._num_amp_obs_steps = cfg["env"]["numAMPObsSteps"]
+            self._num_envs = cfg["env"]["numEnvs"]
             self._motion_file = cfg["env"].get('motion_file', "amp_humanoid_backflip.npy")
             assert(self._num_amp_obs_steps >= 2)
             self.num_amp_obs = self._num_amp_obs_steps * NUM_AMP_OBS_PER_STEP
