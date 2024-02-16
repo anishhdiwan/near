@@ -8,7 +8,7 @@ experiment: ''
 num_envs: ''
 
 # seed - set to -1 to choose random seed
-seed: 42
+seed: -1
 # set to True for deterministic performance
 torch_deterministic: False
 
@@ -33,9 +33,9 @@ num_subscenes: 4 # Splits the simulation into N physics scenes and runs each one
 
 # RLGames Arguments
 # test - if set, run policy in inference mode (requires setting checkpoint to load)
-test: False
+test: True
 # used to set checkpoint path
-checkpoint: ''
+checkpoint: 'runs/pushTAMP_16-17-48-02/nn/pushTAMP_16-17-48-24_70.pth'
 # set sigma when restoring network
 sigma: ''
 # set to True to use multi-gpu training

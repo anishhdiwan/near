@@ -64,16 +64,16 @@ params:
     lr_schedule:  constant
     kl_threshold: 0.008
     score_to_win: 25 # Training stops if reached
-    max_epochs: ${resolve_default:250, ''}
-    save_best_after: 5
-    save_frequency: 2
+    max_epochs: ${resolve_default:100, ''}
+    save_best_after: 50
+    save_frequency: 10
     print_stats: True
     grad_norm: 0.5
     entropy_coef: 0.0
     truncate_grads: False
     e_clip: 0.2
-    horizon_length: 64
-    minibatch_size: 128 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents
+    horizon_length: 256
+    minibatch_size: 64 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents
     mini_epochs: 4
     critic_coef: 1
     clip_value: False
@@ -83,17 +83,17 @@ params:
     amp_replay_buffer_size: 10000
     amp_replay_keep_prob: 0.01
     amp_batch_size: 32
-    amp_minibatch_size: 64
+    amp_minibatch_size: 32 # amp_minibatch size <= minibatch_size 
     disc_coef: 5
     disc_logit_reg: 0.05
     disc_grad_penalty: 5
     disc_reward_scale: 2
     disc_weight_decay: 0.0001
     normalize_amp_input: True
-    task_reward_w: 0.5
-    disc_reward_w: 0.5
+    task_reward_w: 0.0
+    disc_reward_w: 1.0
     
     player:
       render: True
-      render_sleep: 0.001 # Determines frame rate (how many seconds to wait between two frames)
+      render_sleep: 0.08 # Determines frame rate (how many seconds to wait between two frames)
       games_num: 5 # Number of games to play

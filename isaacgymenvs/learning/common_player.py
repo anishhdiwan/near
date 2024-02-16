@@ -91,7 +91,7 @@ class CommonPlayer(players.PpoPlayerContinuous):
             print_game_res = False
 
             for n in range(self.max_steps):
-                obs_dict, done_env_ids = self._env_reset_done()
+                # obs_dict, done_env_ids = self._env_reset_done()
 
                 if has_masks:
                     masks = self.env.get_action_mask()
