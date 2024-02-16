@@ -171,6 +171,13 @@ class CustomRayVecEnv(IVecEnv):
     import ray
 
     def __init__(self, config_dict, config_name, num_actors, **kwargs):
+
+        # TODO: set one device globally
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Set up a dummy variable for viewer to log debug info in amp_continuous
+        self.viewer = True
+
+
         # Explicityly passing in the dictionary containing env_name: {vecenv_type, env_creator}
         self.config_dict = config_dict
         # Pointing the env variable to the object instance. This enables running the _fetch_amp_obs_demo function without any modifications to amp_continuous
@@ -252,7 +259,7 @@ class CustomRayVecEnv(IVecEnv):
 
         # Augmenting the infos dict
         self.post_step_procedures(ret_obs)
-        newinfos = self.augment_infos(newinfos)
+        newinfos = self.augment_infos(newinfos, newdones)
 
         # print(newinfos)
         return ret_obs, self.concat_func(newrewards), self.concat_func(newdones), newinfos
@@ -349,7 +356,7 @@ class CustomRayVecEnv(IVecEnv):
 
         # TODO: set device=self.device
         # Set up the amp observations buffer. This contains s-s' pairs and has the shape [num envs, num_amp_obs_steps*num_amp_obs_per_step]
-        self._amp_obs_buf = torch.zeros((num_envs, num_amp_obs_steps, num_amp_obs_per_step), dtype=torch.float)
+        self._amp_obs_buf = torch.zeros((num_envs, num_amp_obs_steps, num_amp_obs_per_step), dtype=torch.float, device=self.device)
         # TODO: This is currently set up only for num_amp_obs_steps = 2!!
         self._curr_amp_obs_buf = self._amp_obs_buf[:, 0]
         self._past_amp_obs_buf = self._amp_obs_buf[:, 1]
@@ -360,14 +367,14 @@ class CustomRayVecEnv(IVecEnv):
 
         Computes the observation buffer needed by amp_continuous
         """
-        self._curr_amp_obs_buf[:] = torch.from_numpy(newobs)
+        self._curr_amp_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
         self._amp_obs_buf[:, 0] = self._curr_amp_obs_buf
         self._amp_obs_buf[:, 1] = self._past_amp_obs_buf
         # self._amp_obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_amp_obs_buf, newobs), axis=1))
-        self._past_amp_obs_buf[:] = torch.from_numpy(newobs)
-        self._curr_amp_obs_buf[:] = torch.from_numpy(np.zeros_like(self._amp_obs_buf[:, 0]))
+        self._past_amp_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
+        self._curr_amp_obs_buf[:] = torch.zeros_like(self._amp_obs_buf[:, 0], device=self.device)
 
-    def augment_infos(self, infos):
+    def augment_infos(self, infos, dones):
         infos["amp_obs"] = self._amp_obs_buf.view(-1, self.num_amp_obs)
-
+        infos["terminate"] = torch.from_numpy(self.concat_func(dones)).to(self.device)
         return infos
