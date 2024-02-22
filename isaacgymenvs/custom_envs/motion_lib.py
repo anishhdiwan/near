@@ -3,6 +3,7 @@ import os
 import yaml
 import zarr
 import torch
+import random 
 
 # normalize data
 def get_data_stats(data):
@@ -34,11 +35,16 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
         # paired_size = data.shape[0] - len(episode_ends)*(num_amp_obs_steps - 1)
         # paired_data = torch.zeros((paired_size, num_amp_obs_steps*num_amp_obs_per_step), device=device, dtype=torch.float)
 
+        # preprocess episode ends list
         episode_ends = episode_ends.tolist()
         if data.shape[0] in episode_ends:
             episode_ends.remove(data.shape[0])
             episode_ends.append(data.shape[0]-1)
 
+        # new ends after having paired data
+        new_ends = np.array(episode_ends) - (num_amp_obs_per_step - 1)
+
+        # list of indices to delete after pairing up data
         del_list = []
         for end in episode_ends:
             for i in range(num_amp_obs_steps - 1):
@@ -46,6 +52,7 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
                     del_list.append((end - i))
         del_list = del_list + episode_ends
 
+        # make copies of original data and shift each copy progressively by one index
         shifted_copies = []
         for i in range(num_amp_obs_steps - 1):
             shifted_array = np.copy(data)
@@ -55,15 +62,19 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
             shifted_copies.append(shifted_array)
 
 
+        # delete unnecessary indices from all arrays
         data = np.delete(data, del_list, axis=0)
         for idx, arr in enumerate(shifted_copies):
             arr = np.delete(arr, del_list, axis=0)
             shifted_copies[idx] = arr
 
+        # concatenate all arrays
         shifted_copies.insert(0, data)
         paired_data = np.concatenate(shifted_copies, axis=1)
 
-        return paired_data
+        paired_episodes = np.split(paired_data, new_ends)
+
+        return paired_data, paired_episodes
 
 
 class MotionDataset():
@@ -96,18 +107,24 @@ class MotionDataset():
         for key, data in train_data.items():
             stats[key] = get_data_stats(data)
             normalized_train_data[key] = normalize_data(data, stats[key])
-        paired_normalized_data = pair_data(normalized_train_data, episode_ends, self.num_amp_obs_steps, self.num_amp_obs_per_step, self.device)
+        paired_normalized_data, paired_normalised_episodes = pair_data(normalized_train_data, episode_ends, self.num_amp_obs_steps, self.num_amp_obs_per_step, self.device)
 
         self.stats = stats
         self.normalized_train_data = normalized_train_data
         self.paired_normalized_data = paired_normalized_data
+        self.paired_normalised_episodes = paired_normalised_episodes
 
     def __len__(self):
         # all possible segments of the dataset
         return len(self.paired_normalized_data)
 
     def __getitem__(self, idx):
-        sample = self.paired_normalized_data[idx]
+        # sample = self.paired_normalized_data[idx]
+        # return sample
+
+        random_episode_idx = random.randrange(len(self.paired_normalised_episodes))
+        episode = self.paired_normalised_episodes[random_episode_idx]
+        sample = episode[idx] 
         return sample
 
 class MotionLib():
