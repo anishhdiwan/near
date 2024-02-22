@@ -1,0 +1,136 @@
+task:
+  name: pushTAMP
+  env:
+    numEnvs: ${resolve_default:16,${...num_envs}}
+    numAMPObsSteps: 2
+    motion_file: custom_envs/data/pusht/pusht_cchi_v7_replay.zarr
+train:
+  params:
+    seed: ${...seed}
+    algo:
+      name: amp_continuous
+    model:
+      name: continuous_amp
+    network:
+      name: amp
+      separate: true
+      space:
+        continuous:
+          mu_activation: None
+          sigma_activation: None
+          mu_init:
+            name: default
+          sigma_init:
+            name: const_initializer
+            val: -2.9
+          fixed_sigma: true
+          learn_sigma: false
+      mlp:
+        units:
+        - 256
+        - 128
+        - 64
+        - 32
+        activation: relu
+        d2rl: false
+        initializer:
+          name: default
+        regularizer:
+          name: None
+      disc:
+        units:
+        - 256
+        - 128
+        - 64
+        - 32
+        activation: relu
+        initializer:
+          name: default
+        regularizer:
+          name: None
+    load_checkpoint: ${if:${...checkpoint},True,False}
+    load_path: ${...checkpoint}
+    config:
+      name: ${resolve_default:pushTAMP,${....experiment}}
+      full_experiment_name: ${.name}
+      env_name: pushT
+      ppo: true
+      multi_gpu: ${....multi_gpu}
+      mixed_precision: false
+      normalize_input: true
+      normalize_value: true
+      value_bootstrap: true
+      num_actors: ${....task.env.numEnvs}
+      reward_shaper:
+        scale_value: 1
+      normalize_advantage: true
+      gamma: 0.95
+      tau: 0.95
+      learning_rate: 0.0001
+      lr_schedule: constant
+      kl_threshold: 0.008
+      score_to_win: 25
+      max_epochs: ${resolve_default:200, ''}
+      save_best_after: 50
+      save_frequency: 30
+      print_stats: true
+      grad_norm: 0.5
+      entropy_coef: 0.0
+      truncate_grads: false
+      e_clip: 0.2
+      horizon_length: 256
+      minibatch_size: 128
+      mini_epochs: 4
+      critic_coef: 1
+      clip_value: false
+      seq_length: 4
+      bounds_loss_coef: 0
+      amp_obs_demo_buffer_size: 2000
+      amp_replay_buffer_size: 10000
+      amp_replay_keep_prob: 0.05
+      amp_batch_size: 32
+      amp_minibatch_size: 32
+      disc_coef: 5
+      disc_logit_reg: 0.05
+      disc_grad_penalty: 5
+      disc_reward_scale: 2
+      disc_weight_decay: 0.0001
+      normalize_amp_input: true
+      task_reward_w: 0.5
+      disc_reward_w: 0.5
+      player:
+        render: true
+        render_sleep: 0.08
+        games_num: 5
+pbt:
+  enabled: false
+task_name: ${task.name}
+experiment: ''
+num_envs: ''
+seed: 9389
+torch_deterministic: false
+max_iterations: ''
+physics_engine: physx
+pipeline: gpu
+sim_device: cuda:0
+rl_device: cuda:0
+graphics_device_id: 0
+num_threads: 4
+solver_type: 1
+num_subscenes: 4
+test: false
+checkpoint: ''
+sigma: ''
+multi_gpu: false
+wandb_activate: false
+wandb_group: ''
+wandb_name: ${train.params.config.name}
+wandb_entity: ''
+wandb_project: isaacgymenvs
+wandb_tags: []
+wandb_logcode_dir: ''
+capture_video: false
+capture_video_freq: 1464
+capture_video_len: 100
+force_render: true
+headless: false

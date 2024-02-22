@@ -64,7 +64,7 @@ params:
     lr_schedule:  constant
     kl_threshold: 0.008
     score_to_win: 25 # Training stops if reached
-    max_epochs: ${resolve_default:200, ''}
+    max_epochs: ${resolve_default:100, ''}
     save_best_after: 50
     save_frequency: 30
     print_stats: True
@@ -90,8 +90,8 @@ params:
     disc_reward_scale: 2
     disc_weight_decay: 0.0001
     normalize_amp_input: True
-    task_reward_w: 0.5
-    disc_reward_w: 0.5
+    task_reward_w: 0.0
+    disc_reward_w: 1.0
     
     player:
       render: True

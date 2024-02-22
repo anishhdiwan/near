@@ -42,7 +42,7 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
             episode_ends.append(data.shape[0]-1)
 
         # new ends after having paired data
-        new_ends = np.array(episode_ends) - (num_amp_obs_per_step - 1)
+        new_ends = np.array(episode_ends) # - (num_amp_obs_per_step - 1)
 
         # list of indices to delete after pairing up data
         del_list = []
@@ -73,6 +73,9 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
         paired_data = np.concatenate(shifted_copies, axis=1)
 
         paired_episodes = np.split(paired_data, new_ends)
+        for idx, arr in enumerate(paired_episodes):
+            if arr.size == 0:
+                paired_episodes.pop(idx)
 
         return paired_data, paired_episodes
 
@@ -88,6 +91,8 @@ class MotionDataset():
         self.num_amp_obs_per_step = num_amp_obs_per_step
         self._load_motions(motion_file)
         
+        # Episode to load data from
+        self.episode = None
 
     def _load_motions(self, motion_file):
         dataset_root = zarr.open(motion_file, 'r')
@@ -113,6 +118,7 @@ class MotionDataset():
         self.normalized_train_data = normalized_train_data
         self.paired_normalized_data = paired_normalized_data
         self.paired_normalised_episodes = paired_normalised_episodes
+        self.num_episodes = len(paired_normalised_episodes)
 
     def __len__(self):
         # all possible segments of the dataset
@@ -122,9 +128,9 @@ class MotionDataset():
         # sample = self.paired_normalized_data[idx]
         # return sample
 
-        random_episode_idx = random.randrange(len(self.paired_normalised_episodes))
-        episode = self.paired_normalised_episodes[random_episode_idx]
-        sample = episode[idx] 
+        assert self.episode != None, "Please select an episode in the dataloader sample method"
+        sample = self.paired_normalised_episodes[self.episode][idx]
+
         return sample
 
 class MotionLib():
@@ -135,9 +141,15 @@ class MotionLib():
 
     def sample_motions(self, num_samples):
         # TODO: sample considering episode ends
-
         if self.dataloader == None:
             self._setup_dataloader(num_samples)
+
+        ep_found = False
+        while not ep_found:
+            random_episode_idx = random.randrange(self.dataset.num_episodes)
+            if len(self.dataset.paired_normalised_episodes[random_episode_idx]) < num_samples:
+                ep_found = True
+        self.dataset.episode = random_episode_idx
 
         batch = next(iter(self.dataloader))
         return batch
