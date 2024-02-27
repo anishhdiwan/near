@@ -3,7 +3,8 @@ import os
 import yaml
 import zarr
 import torch
-import random 
+import random
+import copy
 
 # normalize data
 def get_data_stats(data):
@@ -36,7 +37,7 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
         # paired_data = torch.zeros((paired_size, num_amp_obs_steps*num_amp_obs_per_step), device=device, dtype=torch.float)
 
         # new ends after having paired data
-        new_ends = np.copy(episode_ends) # - (num_amp_obs_per_step - 1)
+        new_ends = copy.deepcopy(episode_ends) # - (num_amp_obs_per_step - 1)
 
         # preprocess episode ends list
         episode_ends = episode_ends.tolist()
@@ -94,6 +95,7 @@ class MotionDataset():
         
         # Episode to load data from
         self.episode = None
+        self.offset = 0
 
     def _load_motions(self, motion_file):
         dataset_root = zarr.open(motion_file, 'r')
@@ -131,7 +133,7 @@ class MotionDataset():
 
         assert self.episode != None, "Please select an episode in the dataloader sample method"
         # try:
-        sample = self.paired_normalised_episodes[self.episode][idx]
+        sample = self.paired_normalised_episodes[self.episode][idx + self.offset]
         # except IndexError as e:
         #     print(self.paired_normalised_episodes[self.episode])
         #     raise e
@@ -155,6 +157,7 @@ class MotionLib():
             if len(self.dataset.paired_normalised_episodes[random_episode_idx]) > num_samples:
                 ep_found = True
         self.dataset.episode = random_episode_idx
+        self.dataset.offset = random.randrange((len(self.dataset.paired_normalised_episodes[random_episode_idx])) - num_samples)
 
         batch = next(iter(self.dataloader))
         return batch
