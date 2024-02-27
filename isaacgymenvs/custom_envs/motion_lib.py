@@ -35,14 +35,14 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
         # paired_size = data.shape[0] - len(episode_ends)*(num_amp_obs_steps - 1)
         # paired_data = torch.zeros((paired_size, num_amp_obs_steps*num_amp_obs_per_step), device=device, dtype=torch.float)
 
+        # new ends after having paired data
+        new_ends = np.copy(episode_ends) # - (num_amp_obs_per_step - 1)
+
         # preprocess episode ends list
         episode_ends = episode_ends.tolist()
         if data.shape[0] in episode_ends:
             episode_ends.remove(data.shape[0])
             episode_ends.append(data.shape[0]-1)
-
-        # new ends after having paired data
-        new_ends = np.array(episode_ends) # - (num_amp_obs_per_step - 1)
 
         # list of indices to delete after pairing up data
         del_list = []
@@ -72,12 +72,13 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
         shifted_copies.insert(0, data)
         paired_data = np.concatenate(shifted_copies, axis=1)
 
-        paired_episodes = np.split(paired_data, new_ends)
-        for idx, arr in enumerate(paired_episodes):
-            if arr.size == 0:
-                paired_episodes.pop(idx)
+        paired_episodes = np.split(paired_data, new_ends.tolist())
+        episodes = [] 
+        for episode in paired_episodes:
+            if episode.shape[0] > 0:
+                episodes.append(episode)
 
-        return paired_data, paired_episodes
+        return paired_data, episodes
 
 
 class MotionDataset():
@@ -129,7 +130,11 @@ class MotionDataset():
         # return sample
 
         assert self.episode != None, "Please select an episode in the dataloader sample method"
+        # try:
         sample = self.paired_normalised_episodes[self.episode][idx]
+        # except IndexError as e:
+        #     print(self.paired_normalised_episodes[self.episode])
+        #     raise e
 
         return sample
 
@@ -147,7 +152,7 @@ class MotionLib():
         ep_found = False
         while not ep_found:
             random_episode_idx = random.randrange(self.dataset.num_episodes)
-            if len(self.dataset.paired_normalised_episodes[random_episode_idx]) < num_samples:
+            if len(self.dataset.paired_normalised_episodes[random_episode_idx]) > num_samples:
                 ep_found = True
         self.dataset.episode = random_episode_idx
 

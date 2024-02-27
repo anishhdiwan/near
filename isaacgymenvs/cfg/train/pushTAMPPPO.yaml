@@ -64,7 +64,7 @@ params:
     lr_schedule:  constant
     kl_threshold: 0.008
     score_to_win: 25 # Training stops if reached
-    max_epochs: ${resolve_default:100, ''}
+    max_epochs: ${resolve_default:300, ''}
     save_best_after: 50
     save_frequency: 30
     print_stats: True
