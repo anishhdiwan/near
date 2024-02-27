@@ -33,9 +33,9 @@ num_subscenes: 4 # Splits the simulation into N physics scenes and runs each one
 
 # RLGames Arguments
 # test - if set, run policy in inference mode (requires setting checkpoint to load)
-test: True
+test: False
 # used to set checkpoint path
-checkpoint: 'runs/pushTAMP_22-16-19-58/nn/pushTAMP_22-16-20-20_300.pth'
+checkpoint: ''
 # set sigma when restoring network
 sigma: ''
 # set to True to use multi-gpu training

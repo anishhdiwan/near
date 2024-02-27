@@ -5,7 +5,7 @@ name: pushTAMP
 
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:16,${...num_envs}}
+  numEnvs: ${resolve_default:32,${...num_envs}}
   # envSpacing: 5
   # episodeLength: 300
   # cameraFollow: True # if the camera follows humanoid or not
