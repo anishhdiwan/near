@@ -1,11 +1,11 @@
 # used to create the object
 name: pushTAMP
-
+headless: ${resolve_default:False,${..headless}}
 # physics_engine: ${..physics_engine}
 
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:32,${...num_envs}}
+  numEnvs: ${resolve_default:24,${...num_envs}}
   # envSpacing: 5
   # episodeLength: 300
   # cameraFollow: True # if the camera follows humanoid or not

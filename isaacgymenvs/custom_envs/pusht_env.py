@@ -79,6 +79,7 @@ class PushTEnv(gym.Env):
 
         # Setting up the env observation space info used to train amp_continuous
         if cfg != None:
+            self._headless = cfg["headless"]
             # self.reset_called = False
             NUM_AMP_OBS_PER_STEP = 5 # [robotY, robotY, tX, tY, tTheta]
             self._num_amp_obs_per_step = NUM_AMP_OBS_PER_STEP

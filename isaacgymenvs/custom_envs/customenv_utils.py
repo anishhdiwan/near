@@ -6,6 +6,7 @@ import gym
 import random
 from time import sleep
 import torch
+import time
 
 from .motion_lib import MotionLib
 
@@ -104,7 +105,7 @@ class CustomRayWorker:
             self.env.seed(seed)
             
     def render(self):
-        self.env.render()
+        self.env.render(mode = 'human') 
 
     def reset(self):
         obs = self.env.reset()
@@ -165,6 +166,9 @@ class CustomRayWorker:
 
     def get_num_envs(self):
         return self.env._num_envs
+    
+    def get_render_mode(self):
+        return self.env._headless
 
 
 class CustomRayVecEnv(IVecEnv):
@@ -217,6 +221,11 @@ class CustomRayVecEnv(IVecEnv):
 
         # Set up the motions library
         self._setup_motions()
+
+        # cfg for visualisation
+        res = self.workers[0].get_render_mode.remote()
+        self.headless = self.ray.get(res)
+        self.done_envs = None
     
     def step(self, actions):
         newobs, newstates, newrewards, newdones, newinfos = [], [], [], [], []
@@ -262,6 +271,9 @@ class CustomRayVecEnv(IVecEnv):
         newinfos = self.augment_infos(newinfos, newdones)
 
         # print(newinfos)
+        self.done_envs = np.nonzero(newdones)[0]
+        self.last_obs = ret_obs
+
         return ret_obs, self.concat_func(newrewards), self.concat_func(newdones), newinfos
 
     def get_env_info(self):
@@ -312,15 +324,74 @@ class CustomRayVecEnv(IVecEnv):
 
     def reset_done(self):
         """
-        Added as a wrapper around reset() to enable compatibility with the amp_continuous algo
+        Reset all done envs. If none are done, return the last seens observations are the reset observations. In the first step, reset all envs normally
         """
-        # Return the reset observations with an empty dummy dict to match the return type expected by the amp_continuous algo
-        obs = self.reset()
+        if self.done_envs is None:
+            # Return the reset observations with an empty dummy dict to match the return type expected by the amp_continuous algo
+            obs = self.reset()
 
-        # Set up the history amp obs
-        self._past_amp_obs_buf[:] = torch.from_numpy(obs)
+            # Set up the history amp obs
+            self._past_amp_obs_buf[:] = torch.from_numpy(obs)
+            
+            return obs, []
+        
+        else:
 
-        return obs, []
+            # If no environments are done
+            # if not len(self.done_envs) > 0:
+            if len(self.done_envs) == 0:
+                return self.last_obs, []
+
+            # If all envs are done
+            elif len(self.done_envs) == len(self.workers):
+                # Return the reset observations with an empty dummy dict to match the return type expected by the amp_continuous algo
+                obs = self.reset()
+
+                # Set up the history amp obs
+                self._past_amp_obs_buf[:] = torch.from_numpy(obs)
+                
+                return obs, []
+
+            # If some are done and some are not
+            else:
+                # res_obs = [worker.reset.remote() for worker in self.workers]
+                # Add all results of the reset function of the done envs
+                res_obs = []
+                for idx, worker in enumerate(self.workers):
+                    if idx in self.done_envs:
+                        res_obs.append(worker.reset.remote())
+                
+                newobs, newstates = [],[]
+                for res in res_obs:
+                    cobs = self.ray.get(res)
+                    if self.use_global_obs:
+                        newobs.append(cobs["obs"])
+                        newstates.append(cobs["state"])
+                    else:
+                        newobs.append(cobs)
+
+                if self.obs_type_dict:
+                    ret_obs = dicts_to_dict_with_arrays(newobs, self.num_agents == 1)
+                else:
+                    ret_obs = self.concat_func(newobs)
+
+                if self.use_global_obs:
+                    newobsdict = {}
+                    newobsdict["obs"] = ret_obs
+                    
+                    if self.state_type_dict:
+                        newobsdict["states"] = dicts_to_dict_with_arrays(newstates, True)
+                    else:
+                        newobsdict["states"] = np.stack(newstates)            
+                    ret_obs = newobsdict
+
+                last_obs = self.last_obs
+                for idx, done_env_idx in enumerate(self.done_envs):
+                    last_obs[done_env_idx] = ret_obs[idx]
+
+                ret_obs = last_obs
+                return ret_obs, self.done_envs
+
 
     def fetch_amp_obs_demo(self, num_samples):
         """
@@ -363,7 +434,7 @@ class CustomRayVecEnv(IVecEnv):
 
     def post_step_procedures(self, newobs):
         """
-        Post step procedures to compute additional quantities needed by any algos. 
+        Post step procedures to compute additional quantities needed by any algos. Also render one of the envs (as per "headless" in cfg)
 
         Computes the observation buffer needed by amp_continuous
         """
@@ -373,6 +444,13 @@ class CustomRayVecEnv(IVecEnv):
         # self._amp_obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_amp_obs_buf, newobs), axis=1))
         self._past_amp_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
         self._curr_amp_obs_buf[:] = torch.zeros_like(self._amp_obs_buf[:, 0], device=self.device)
+
+        # Rendering
+        if not self.headless:
+            res = self.workers[0].render.remote()
+            _ = self.ray.get(res)
+
+            time.sleep(0.08) # 50 fps = 0.08s wait
 
     def augment_infos(self, infos, dones):
         infos["amp_obs"] = self._amp_obs_buf.view(-1, self.num_amp_obs)

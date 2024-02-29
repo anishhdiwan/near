@@ -15,17 +15,17 @@ mode = "human"
 num_plays = 8
 
 motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
-print(motion_lib.dataset.stats)
+# print(motion_lib.dataset.stats)
 
 for _ in range(num_plays):
     obs = env.reset()
     print("ENV RESET")
     amp_obs_demo = motion_lib.sample_motions(num_samples)
     unpaired_obs = amp_obs_demo[:, :5]
-    unpaired_obs = unnormalize_data(unpaired_obs, motion_lib.dataset.stats['obs'])
+    # unpaired_obs = unnormalize_data(unpaired_obs, motion_lib.dataset.stats['obs'])
 
     for idx, obs in enumerate(unpaired_obs):
-        print(f"step {idx} observation {obs}")
+        # print(f"step {idx} observation {obs}")
         # action = env.action_space.sample()
         # _, _, _, _ = env.step(action)
 
