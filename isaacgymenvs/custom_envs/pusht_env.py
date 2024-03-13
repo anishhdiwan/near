@@ -82,6 +82,7 @@ class PushTEnv(gym.Env):
             # General config params
             self._headless = cfg["headless"]
             self._num_envs = cfg["env"]["numEnvs"]
+            self._training_algo = cfg["training_algo"]
 
             try:
                 # Adversarial Motion Priors config params

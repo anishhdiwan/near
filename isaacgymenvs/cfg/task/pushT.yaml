@@ -1,6 +1,7 @@
 # used to create the object
 name: pushT
 headless: ${resolve_default:False,${..headless}}
-
+# TODO: this gets passed on the the env. Demo data is fetched if this equals "AMP". Not the nicest idea to pass algo details into the env
+training_algo: PPO
 env: 
   numEnvs: ${resolve_default:16,${...num_envs}}

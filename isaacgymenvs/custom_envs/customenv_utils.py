@@ -170,6 +170,9 @@ class CustomRayWorker:
     def get_render_mode(self):
         return self.env._headless
 
+    def get_training_algo(self):
+        return self.env._training_algo
+
 
 class CustomRayVecEnv(IVecEnv):
     import ray
@@ -219,8 +222,13 @@ class CustomRayVecEnv(IVecEnv):
         else:
             self.concat_func = np.concatenate
 
-        # Set up the motions library
-        self._setup_motions()
+
+        # Pulling config data from the env
+        res = self.workers[0].get_training_algo.remote()
+        self.training_algo = self.ray.get(res)
+        if self.training_algo == "AMP":
+            # Set up the motions library
+            self._setup_motions()
 
         # cfg for visualisation
         res = self.workers[0].get_render_mode.remote()
@@ -266,9 +274,10 @@ class CustomRayVecEnv(IVecEnv):
         # if self.concat_infos:
         newinfos = dicts_to_dict_with_arrays(newinfos, False)
 
-        # Augmenting the infos dict
-        self.post_step_procedures(ret_obs)
-        newinfos = self.augment_infos(newinfos, newdones)
+        if self.training_algo == "AMP":
+            # Augmenting the infos dict
+            self.post_step_procedures(ret_obs)
+            newinfos = self.augment_infos(newinfos, newdones)
 
         # print(newinfos)
         self.done_envs = np.nonzero(newdones)[0]

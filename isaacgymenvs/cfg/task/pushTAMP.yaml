@@ -1,6 +1,8 @@
 # used to create the object
 name: pushTAMP
 headless: ${resolve_default:False,${..headless}}
+# TODO: this gets passed on the the env. Demo data is fetched if this equals "AMP". Not the nicest idea to pass algo details into the env
+training_algo: AMP
 # physics_engine: ${..physics_engine}
 
 # if given, will override the device setting in gym.
