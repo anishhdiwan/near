@@ -279,6 +279,9 @@ class CustomRayVecEnv(IVecEnv):
             self.post_step_procedures(ret_obs)
             newinfos = self.augment_infos(newinfos, newdones)
 
+        # Render the environment (doesn't do anything if headless is True)
+        self.render()
+
         # print(newinfos)
         self.done_envs = np.nonzero(newdones)[0]
         self.last_obs = ret_obs
@@ -454,6 +457,10 @@ class CustomRayVecEnv(IVecEnv):
         self._past_amp_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
         self._curr_amp_obs_buf[:] = torch.zeros_like(self._amp_obs_buf[:, 0], device=self.device)
 
+    def render(self):
+        """
+        Render one (first) of the parallel environments
+        """
         # Rendering
         if not self.headless:
             res = self.workers[0].render.remote()
