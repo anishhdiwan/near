@@ -29,46 +29,15 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+
+### A custom version of the isaacgymenvs train script adapted for non-isaacgym environment. Emulates the rl_games runner.py script ###
 import hydra
-
 from omegaconf import DictConfig, OmegaConf
 from omegaconf import DictConfig, OmegaConf
 
-
-def preprocess_train_config(cfg, config_dict):
-    """
-    Adding common configuration parameters to the rl_games train config.
-    An alternative to this is inferring them in task-specific .yaml files, but that requires repeating the same
-    variable interpolations in each config.
-    """
-
-    train_cfg = config_dict['params']['config']
-
-    train_cfg['device'] = cfg.rl_device
-
-    train_cfg['population_based_training'] = cfg.pbt.enabled
-    train_cfg['pbt_idx'] = cfg.pbt.policy_idx if cfg.pbt.enabled else None
-
-    train_cfg['full_experiment_name'] = cfg.get('full_experiment_name')
-
-    print(f'Using rl_device: {cfg.rl_device}')
-    print(f'Using sim_device: {cfg.sim_device}')
-    print(train_cfg)
-
-    try:
-        model_size_multiplier = config_dict['params']['network']['mlp']['model_size_multiplier']
-        if model_size_multiplier != 1:
-            units = config_dict['params']['network']['mlp']['units']
-            for i, u in enumerate(units):
-                units[i] = u * model_size_multiplier
-            print(f'Modified MLP units by x{model_size_multiplier} to {config_dict["params"]["network"]["mlp"]["units"]}')
-    except KeyError:
-        pass
-
-    return config_dict
-
-
-@hydra.main(version_base="1.1", config_name="amp_gym_config", config_path="./cfg")
+# Hydra decorator to pass in the config. Looks for a config file in the specified path. This file in turn has links to other configs 
+@hydra.main(version_base="1.1", config_name="custom_config", config_path="./cfg")
 def launch_rlg_hydra(cfg: DictConfig):
 
     import logging
@@ -76,32 +45,24 @@ def launch_rlg_hydra(cfg: DictConfig):
     from datetime import datetime
 
     # noinspection PyUnresolvedReferences
-    import isaacgym
-    # from isaacgymenvs.pbt.pbt import PbtAlgoObserver, initial_pbt_check
-    from isaacgymenvs.utils.rlgames_utils import multi_gpu_get_rank
+    # import isaacgym
     from hydra.utils import to_absolute_path
-    # from isaacgymenvs.tasks import isaacgym_task_map
     import gym
     from isaacgymenvs.utils.reformat import omegaconf_to_dict, print_dict
     from isaacgymenvs.utils.utils import set_np_formatting, set_seed
 
-    # if cfg.pbt.enabled:
-    #     initial_pbt_check(cfg)
-
-    # from isaacgymenvs.utils.rlgames_utils import RLGPUEnv, RLGPUAlgoObserver, MultiObserver, ComplexObsRLGPUEnv
-    # from isaacgymenvs.utils.wandb_utils import WandbAlgoObserver
     from rl_games.common import env_configurations, vecenv
     from rl_games.torch_runner import Runner
-    from rl_games.algos_torch import model_builder
-    from isaacgymenvs.learning import amp_continuous
-    from isaacgymenvs.learning import amp_players
-    from isaacgymenvs.learning import amp_models
-    from isaacgymenvs.learning import amp_network_builder
-    import isaacgymenvs
+    # from rl_games.algos_torch import model_builder
+    # from isaacgymenvs.learning import amp_continuous
+    # from isaacgymenvs.learning import amp_players
+    # from isaacgymenvs.learning import amp_models
+    # from isaacgymenvs.learning import amp_network_builder
+    # import isaacgymenvs
 
-
+    # Naming the run
     time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_name = f"{cfg.wandb_name}_{time_str}"
+    run_name = f"{cfg.run_name}_{time_str}"
 
     # ensure checkpoints can be specified as relative paths
     if cfg.checkpoint:
@@ -111,22 +72,20 @@ def launch_rlg_hydra(cfg: DictConfig):
     print_dict(cfg_dict)
     print("-----")
 
-
     # set numpy formatting for printing only
     set_np_formatting()
-
     # global rank of the GPU
     global_rank = int(os.getenv("RANK", "0"))
-
     # sets seed. if seed is -1 will pick a random one
     cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=global_rank)
+
 
     # Creating a new function to return a pushT environment. This will then be added to rl_games env_configurations so that an env can be created from its name in the config
     from custom_envs.pusht_env import PushTEnv
     from custom_envs.customenv_utils import CustomRayVecEnv, PushTAlgoObserver
 
     def create_pusht_env(**kwargs):
-        env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
+        env =  PushTEnv(cfg=cfg_dict["task"])
         return env
 
     # env_configurations.register adds the env to the list of rl_games envs. create_isaacgym_env returns a VecTask environment. But rl_games also accepts gym envs. 
@@ -139,47 +98,32 @@ def launch_rlg_hydra(cfg: DictConfig):
     vecenv.register('CUSTOMRAY', lambda config_name, num_actors, **kwargs: CustomRayVecEnv(env_configurations.configurations, config_name, num_actors, **kwargs))
 
 
-    rlg_config_dict = omegaconf_to_dict(cfg.train)
-    rlg_config_dict = preprocess_train_config(cfg, rlg_config_dict)
+    #Make separate folder and dump config dict to ensure retroactive experiment checks
+    if not cfg.test:
+        cfg.train.params.config.name = cfg.task.name + '_' + cfg.train.params.config.name + '_{date:%d-%H-%M-%S}'.format(date=datetime.now())
+        cfg.train.params.config.full_experiment_name = cfg.train.params.config.name
 
-    # Build an rl_games runner. Register new AMP network builder and agent
+        experiment_dir = os.path.join('runs', cfg.train.params.config.name)
+
+        os.makedirs(experiment_dir, exist_ok=True)
+        with open(os.path.join(experiment_dir, 'experiment_config.yaml'), 'w') as f:
+            f.write(OmegaConf.to_yaml(cfg))
+
+    # Convert to a big dictionary
+    rlg_config_dict = omegaconf_to_dict(cfg.train)
+ 
+
+    # Build an rl_games runner. You can add other algos and builders here
     def build_runner():
         runner = Runner(algo_observer=PushTAlgoObserver())
-        runner.algo_factory.register_builder('amp_continuous', lambda **kwargs : amp_continuous.AMPAgent(**kwargs))
-        runner.player_factory.register_builder('amp_continuous', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
-        model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
-        model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
-
         return runner
-
 
     # create runner and set the settings
     runner = build_runner()
     runner.load(rlg_config_dict)
     runner.reset()
 
-
-    ### TESTING AMP ###
-    # from isaacgymenvs.learning import amp_continuous
-    # temp_params = runner.params
-    # amp_agent = amp_continuous.AMPAgent("amp_continuous", temp_params)
-
-    # amp_agent.train()
-
-    # amp_obs_demo = amp_agent._fetch_amp_obs_demo(4)
-    # print(f"AMP Demo Observation {amp_obs_demo.shape}")
-
-    ### TESTING AMP ###
-
-    # dump config dict
-    if not cfg.test:
-        experiment_dir = os.path.join('runs', cfg.train.params.config.name + 
-        '_{date:%d-%H-%M-%S}'.format(date=datetime.now()))
-
-        os.makedirs(experiment_dir, exist_ok=True)
-        with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
-            f.write(OmegaConf.to_yaml(cfg))
-
+    # Run either training or playing via the rl_games runner
     runner.run({
         'train': not cfg.test,
         'play': cfg.test,

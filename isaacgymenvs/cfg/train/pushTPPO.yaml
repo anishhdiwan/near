@@ -48,7 +48,7 @@ params:
     truncate_grads: True
     e_clip: 0.2
     clip_value: True
-    num_actors: 16 # num_envs to run
+    num_actors: ${....task.env.numEnvs} #16 num_envs to run
     horizon_length: 256
     minibatch_size: 1024 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
     mini_epochs: 4

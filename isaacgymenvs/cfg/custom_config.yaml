@@ -4,11 +4,17 @@ task_name: ${task.name}
 # experiment name. defaults to name of training config
 experiment: ''
 
+# if set to positive integer, overrides the default number of environments
+num_envs: ''
+
 # seed - set to -1 to choose random seed
 seed: 50
 # set to True for deterministic performance
 torch_deterministic: False
 
+
+# disables rendering
+headless: False
 
 # RLGames Arguments
 # test - if set, run policy in inference mode (requires setting checkpoint to load)

@@ -1,4 +1,6 @@
 # used to create the object
 name: pushT
+headless: ${resolve_default:False,${..headless}}
 
-
+env: 
+  numEnvs: ${resolve_default:16,${...num_envs}}

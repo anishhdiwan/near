@@ -15,6 +15,9 @@ torch_deterministic: False
 # set the maximum number of learning iterations to train for. overrides default per-environment setting
 max_iterations: ''
 
+# disables rendering
+headless: False
+
 ## Device config
 #  'physx' or 'flex'
 physics_engine: 'physx'
@@ -54,8 +57,7 @@ capture_video_freq: 1464
 capture_video_len: 100
 force_render: True
 
-# disables rendering
-headless: False
+
 
 # set default task and default training config based on task
 defaults:
