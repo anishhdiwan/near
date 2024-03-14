@@ -1,0 +1,3 @@
+[submodule "isaacgymenvs/learning/motion_ncsn"]
+	path = isaacgymenvs/learning/motion_ncsn
+	url = https://github.com/anishhdiwan/motion_ncsn.git
