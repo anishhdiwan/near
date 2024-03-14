@@ -25,21 +25,34 @@ pip install -e .
 
 ### Running the benchmarks
 
-To train your first policy, run this line:
+#### OpenAIGym Envs 
 
+Currently only the pushT environment is included.
+
+PPO
+```bash
+python train_gym_envs.py task=pushT
+```
+
+Adversarial Motion Priors
+```bash
+python train_gym_envs.py task=pushTAMP
+```
+
+#### IsaacGym Envs
+
+PPO
 ```bash
 python train.py task=Cartpole
 ```
 
-Cartpole should train to the point that the pole stays upright within a few seconds of starting.
-
-Here's another example - Ant locomotion:
-
+PPO
 ```bash
-python train.py task=Ant
+python train.py task=HumanoidAMP experiment=AMP_walk
 ```
 
-Note that by default we show a preview window, which will usually slow down training. You 
+
+Note that with IsaacGym, by default we show a preview window, which will usually slow down training. You 
 can use the `v` key while running to disable viewer updates and allow training to proceed 
 faster. Hit the `v` key again to resume viewing after a few seconds of training, once the 
 ants have learned to run a bit better.
@@ -49,11 +62,8 @@ Use the `esc` key or close the viewer window to stop training early.
 Alternatively, you can train headlessly, as follows:
 
 ```bash
-python train.py task=Ant headless=True
+python train.py task=Cartpole headless=True
 ```
-
-Ant may take a minute or two to train a policy you can run. When running headlessly, you 
-can stop it early using Control-C in the command line window.
 
 
 ## Troubleshooting
