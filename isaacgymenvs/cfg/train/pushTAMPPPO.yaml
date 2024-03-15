@@ -54,7 +54,7 @@ params:
     normalize_input: True
     normalize_value: True
     value_bootstrap: True
-    num_actors: ${....task.env.numEnvs} #16 num_envs to run
+    num_actors: ${....task.env.numEnvs} # num_envs to run
     reward_shaper:
       scale_value: 1
     normalize_advantage: True
@@ -72,21 +72,21 @@ params:
     entropy_coef: 0.0
     truncate_grads: False
     e_clip: 0.2
-    horizon_length: 256
-    minibatch_size: 64 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents
+    horizon_length: 64
+    minibatch_size: 32 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents
     mini_epochs: 4
     critic_coef: 1
     clip_value: False
     seq_length: 4
     bounds_loss_coef: 0
-    amp_obs_demo_buffer_size: 2000
+    amp_obs_demo_buffer_size: 20000
     amp_replay_buffer_size: 10000
     amp_replay_keep_prob: 0.1
     amp_batch_size: 64
-    amp_minibatch_size: 32 # amp_minibatch size <= minibatch_size 
+    amp_minibatch_size: 16 # amp_minibatch size <= minibatch_size 
     disc_coef: 5
     disc_logit_reg: 0.05
-    disc_grad_penalty: 5.0
+    disc_grad_penalty: 10.0
     disc_reward_scale: 2
     disc_weight_decay: 0.0001
     normalize_amp_input: True
