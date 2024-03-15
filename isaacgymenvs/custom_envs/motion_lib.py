@@ -83,12 +83,13 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
 
 
 class MotionDataset():
-    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, device=None, normalize=False):
+    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=True, device=None, normalize=False):
         if device == None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
         
+        self.episodic_sampling = episodic
         self.normalize = normalize
         self.num_amp_obs_steps = num_amp_obs_steps
         self.num_amp_obs_per_step = num_amp_obs_per_step
@@ -136,31 +137,38 @@ class MotionDataset():
         return len(self.paired_processed_data)
 
     def __getitem__(self, idx):
-        # sample = self.paired_processed_data[idx]
-        # return sample
+        """ Sample either from paired processed data (not separated by episodes) or from paired processed episodes
+        """
 
-        assert self.episode != None, "Please select an episode in the dataloader sample method"
-        # try:
-        sample = self.paired_processed_episodes[self.episode][idx + self.offset]
-        # except IndexError as e:
-        #     print(self.paired_processed_episodes[self.episode])
-        #     raise e
+        if self.episodic_sampling == True:
+            assert self.episode != None, "Please select an episode in the dataloader sample method"
+            # try:
+            sample = self.paired_processed_episodes[self.episode][idx + self.offset]
+            # except IndexError as e:
+            #     print(self.paired_processed_episodes[self.episode])
+            #     raise e
+        else:
+            sample = self.paired_processed_data[idx]
+
 
         return sample
 
 class MotionLib():
-    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, device=None, normalize=False):
+    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=True, device=None, normalize=False):
         # By default the dataset is normalised. If not needed, it is unnormalized here. 
         # NOTE: AMP also normalizes data internally. It is hence advisable to set normalization to false while sampling and let AMP handle it internally
         self.normalize = normalize
 
-        self.dataset = MotionDataset(motion_file, num_amp_obs_steps, num_amp_obs_per_step, device=device, normalize=normalize)
+        self.dataset = MotionDataset(motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=episodic, device=device, normalize=normalize)
         self.dataloader = None
 
     def sample_motions(self, num_samples):
-        # TODO: sample considering episode ends
+        """Sample a trajectory of length num_samples from the demonstration dataset.
+
+        This only samples from episodes that have trajectories longer than num_samples. Naturally, samples in the batch are not shuffled 
+        """
         if self.dataloader == None:
-            self._setup_dataloader(num_samples)
+            self._setup_trajectory_dataloader(num_samples)
 
         ep_found = False
         while not ep_found:
@@ -174,7 +182,9 @@ class MotionLib():
 
         return batch
 
-    def _setup_dataloader(self, batch_size):
+    def _setup_trajectory_dataloader(self, batch_size):
+        """Set up a dataloader on the motion dataset to sample unshuffled motion trajectories
+        """
         self.dataloader = torch.utils.data.DataLoader(
             self.dataset,
             batch_size=batch_size,
@@ -184,3 +194,18 @@ class MotionLib():
             pin_memory=True,
         )
 
+    def get_traj_agnostic_dataloader(self, batch_size, shuffle=False):
+        """Returns a dataloader that can be used to sample a batch of observation pairs regardless of the episode endings. 
+
+        Primarily used to train trajectory-agnostic methods like diffusion.
+        """
+        traj_agnostic_dataloader = torch.utils.data.DataLoader(
+                    self.dataset,
+                    batch_size=batch_size,
+                    num_workers=1,
+                    shuffle=shuffle,
+                    # accelerate cpu-gpu transfer
+                    pin_memory=True,
+                    )
+
+        return traj_agnostic_dataloader
