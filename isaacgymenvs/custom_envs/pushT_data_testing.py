@@ -66,12 +66,14 @@ def play_all_episodes():
     paired_processed_episodes = motion_lib.get_episodes()
     print(f"VIEWING ALL {len(paired_processed_episodes)} EPISODES")
 
-    for episode in paired_processed_episodes:
+
+    for i, episode in enumerate(paired_processed_episodes):
         obs = env.reset()
-        print("EPISODE END! ENV RESET")
+        print(f"EPISODE {i} | ENV RESET")
+        # episode = paired_processed_episodes[5]
         unpaired_obs = episode[:, :5]
         # unpaired_obs = unnormalize_data(unpaired_obs, motion_lib.dataset.stats['obs'])
-        print(f"Episode Unpaired Obs (len episode): {unpaired_obs.shape}")
+        # print(f"Episode Unpaired Obs (len episode): {unpaired_obs.shape}")
 
         for idx, obs in enumerate(tqdm(unpaired_obs)):
             # print(f"step {idx} observation {obs}")
@@ -88,9 +90,10 @@ def play_all_episodes():
             env.block.position = tuple(obs[2:4])
             env.block.angle = obs[4]
             env.render(mode=mode)
-            time.sleep(0.1)
+            time.sleep(0.008)
 
+    print(max_idxs)
 
 # Calling functions
-play_sampled_trajectories()
-# play_all_episodes()
+# play_sampled_trajectories()
+play_all_episodes()

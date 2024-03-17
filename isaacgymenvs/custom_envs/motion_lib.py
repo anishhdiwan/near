@@ -6,6 +6,35 @@ import torch
 import random
 import copy
 from torch.utils.data.sampler import Sampler
+from numpy import linalg as linalg
+
+
+def get_episode_ends(state_sequence):
+    """Automatically detect episode ends based on the a jump in the agent's and block's pose.
+
+    Needed because some episode ends potentially missing from the dataset
+    """
+    episode_ends = []
+    last_addition = None
+    for i in range(len(state_sequence) - 1):
+        s = state_sequence[i]
+        s_next = state_sequence[i+1]
+        agent_drift = s[:2] - s_next[:2]
+        block_drift = s[2:4] - s_next[2:4]
+        block_angle_shift = s[4] - s_next[4]
+
+        if linalg.norm(agent_drift) >= 50 or linalg.norm(block_drift) >= 50 or abs(block_angle_shift) >= np.pi:
+            episode_ends.append(i+1)
+
+        # if linalg.norm(s - s_next) > 40:
+        #     episode_ends.append(i+1)
+
+    # Add the last index 
+    episode_ends.append(len(state_sequence))
+
+
+    return np.array(episode_ends)
+
 
 # normalize data
 def get_data_stats(data):
@@ -84,7 +113,7 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
 
 
 class MotionDataset():
-    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=True, device=None, normalize=False):
+    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
         if device == None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
@@ -94,6 +123,7 @@ class MotionDataset():
         self.normalize = normalize
         self.num_amp_obs_steps = num_amp_obs_steps
         self.num_amp_obs_per_step = num_amp_obs_per_step
+        self.auto_ends = auto_ends
         self._load_motions(motion_file)
         
         # Episode to load data from
@@ -112,6 +142,21 @@ class MotionDataset():
         }
         # Marks one-past the last index for each episode
         episode_ends = dataset_root['meta']['episode_ends'][:]
+
+        # Experimental: Auto detect ends
+        if self.auto_ends:
+            print("AUTO ENDS!")
+            auto_ends = get_episode_ends(train_data['obs'])
+        
+            ### TESTING AUTO EPISODE ENDS ###
+            # print(f"default ends {len(episode_ends)}: {episode_ends}")
+            # common = set(list(episode_ends)).intersection(set(list(auto_ends)))
+            # print(f"Intersection {len(common)}: {sorted(list(common))}")
+            # print(f"auto ends {len(auto_ends)}: {auto_ends}")
+            ### TESTING AUTO EPISODE ENDS ###    
+
+            episode_ends = auto_ends
+
 
         if self.normalize:
             # compute statistics and normalized data to [-1,1]
@@ -176,12 +221,12 @@ class EpisodicSequentialSampler(Sampler):
 
 
 class MotionLib():
-    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=True, device=None, normalize=False):
+    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
         # By default the dataset is normalised. If not needed, it is unnormalized here. 
         # NOTE: AMP also normalizes data internally. It is hence advisable to set normalization to false while sampling and let AMP handle it internally
         self.normalize = normalize
 
-        self.dataset = MotionDataset(motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=episodic, device=device, normalize=normalize)
+        self.dataset = MotionDataset(motion_file, num_amp_obs_steps, num_amp_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize)
         self.dataloader = None
 
     def sample_motions(self, num_samples):
