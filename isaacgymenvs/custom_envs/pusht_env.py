@@ -10,7 +10,14 @@ from pymunk.vec2d import Vec2d
 import shapely.geometry as sg
 import cv2
 import skimage.transform as st
-from .pymunk_override import DrawOptions
+
+
+# Assuming that motion_ncsn is a submodule in the algo directory
+import sys
+import os
+PYMUNK_OVERRIDE_PATH = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(PYMUNK_OVERRIDE_PATH)
+from pymunk_override import DrawOptions
 
 
 def pymunk_to_shapely(body, shapes):

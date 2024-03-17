@@ -1,13 +1,13 @@
 
 
 
-from custom_envs.motion_lib import MotionLib, unnormalize_data
-from custom_envs.pusht_env import PushTEnv
+from motion_lib import MotionLib, unnormalize_data
+from pusht_env import PushTEnv
 import time
 # import matplotlib.pyplot as plt
 
 env = PushTEnv() # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
-motion_file = "custom_envs/data/pusht/pusht_cchi_v7_replay.zarr"
+motion_file = "data/pusht/pusht_cchi_v7_replay.zarr"
 num_amp_obs_steps = 2
 num_amp_obs_per_step = 5
 num_samples = 128
