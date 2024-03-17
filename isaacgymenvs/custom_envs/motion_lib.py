@@ -150,8 +150,8 @@ class MotionDataset():
         else:
             sample = self.paired_processed_data[idx]
 
-
         return sample
+
 
 class MotionLib():
     def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=True, device=None, normalize=False):
@@ -177,6 +177,8 @@ class MotionLib():
                 ep_found = True
         self.dataset.episode = random_episode_idx
         self.dataset.offset = random.randrange((len(self.dataset.paired_processed_episodes[random_episode_idx])) - num_samples)
+
+        # print(f"Sampled Episode's Length: {len(self.dataset.paired_processed_episodes[random_episode_idx])} | Sampling offset {random.randrange((len(self.dataset.paired_processed_episodes[random_episode_idx])) - num_samples)}")
 
         batch = next(iter(self.dataloader))
 
