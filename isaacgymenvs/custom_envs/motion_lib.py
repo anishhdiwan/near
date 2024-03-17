@@ -182,6 +182,9 @@ class MotionLib():
 
         return batch
 
+    def get_episodes(self):
+        return self.dataset.paired_processed_episodes
+
     def _setup_trajectory_dataloader(self, batch_size):
         """Set up a dataloader on the motion dataset to sample unshuffled motion trajectories
         """
