@@ -11,8 +11,7 @@ import shapely.geometry as sg
 import cv2
 import skimage.transform as st
 
-
-# Assuming that motion_ncsn is a submodule in the algo directory
+# Importing from the file path
 import sys
 import os
 PYMUNK_OVERRIDE_PATH = os.path.abspath(os.path.dirname(__file__))

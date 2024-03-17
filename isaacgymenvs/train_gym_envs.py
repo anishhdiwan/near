@@ -34,6 +34,12 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from omegaconf import DictConfig, OmegaConf
 
+# Importing from the file path
+import sys
+import os
+FILE_PATH = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(FILE_PATH)
+
 
 def preprocess_train_config(cfg, config_dict):
     """
