@@ -63,8 +63,8 @@ def play_sampled_trajectories(num_plays=num_plays, num_samples=num_samples):
 
 def play_all_episodes():
     # VIEW ALL EPISODES
-    print(f"VIEWING ALL {len(paired_processed_episodes)} EPISODES")
     paired_processed_episodes = motion_lib.get_episodes()
+    print(f"VIEWING ALL {len(paired_processed_episodes)} EPISODES")
 
     for episode in paired_processed_episodes:
         obs = env.reset()

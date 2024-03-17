@@ -5,6 +5,7 @@ import zarr
 import torch
 import random
 import copy
+from torch.utils.data.sampler import Sampler
 
 # normalize data
 def get_data_stats(data):
@@ -97,6 +98,7 @@ class MotionDataset():
         
         # Episode to load data from
         self.episode = None
+        self.batch_size = None
         self.offset = 0
 
     def _load_motions(self, motion_file):
@@ -139,18 +141,38 @@ class MotionDataset():
     def __getitem__(self, idx):
         """ Sample either from paired processed data (not separated by episodes) or from paired processed episodes
         """
-
         if self.episodic_sampling == True:
             assert self.episode != None, "Please select an episode in the dataloader sample method"
-            # try:
-            sample = self.paired_processed_episodes[self.episode][idx + self.offset]
-            # except IndexError as e:
-            #     print(self.paired_processed_episodes[self.episode])
-            #     raise e
+            sample = self.paired_processed_episodes[self.episode][idx]
+
         else:
             sample = self.paired_processed_data[idx]
 
         return sample
+
+
+class EpisodicSequentialSampler(Sampler):
+    """Given a dataset that is a list of arbitrary-sized arrays, sample a batch of some size B such that samples are sequential subsets of one of the arrays
+    """
+
+    def __init__(self, data_source):
+        self.data_source = data_source
+
+    def __iter__(self):
+        if self.data_source.episodic_sampling == True:
+            return iter(range(self.data_source.offset, self.data_source.offset + self.data_source.batch_size))
+        else:
+            return iter(range(len(self.data_source.paired_processed_data)))
+
+    def __len__(self):
+
+        if self.data_source.episodic_sampling == True:
+            assert self.data_source.episode != None, "Please select an episode in the dataloader sample method"
+            return len(self.data_source.paired_processed_episodes[self.data_source.episode])
+
+        else:
+            return len(self.data_source.paired_processed_data)
+
 
 
 class MotionLib():
@@ -190,11 +212,14 @@ class MotionLib():
     def _setup_trajectory_dataloader(self, batch_size):
         """Set up a dataloader on the motion dataset to sample unshuffled motion trajectories
         """
+        self.dataset.batch_size = batch_size
+        sampler = EpisodicSequentialSampler(self.dataset)
         self.dataloader = torch.utils.data.DataLoader(
             self.dataset,
             batch_size=batch_size,
             num_workers=1,
-            shuffle=False,
+            sampler = sampler,
+            # shuffle=False,
             # accelerate cpu-gpu transfer
             pin_memory=True,
         )
