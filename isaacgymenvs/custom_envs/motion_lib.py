@@ -180,6 +180,7 @@ class MotionDataset():
         self.num_episodes = len(paired_processed_episodes)
 
     def __len__(self):
+        # Used with random sampler for non-episodic sampling
         # all possible segments of the dataset
         return len(self.paired_processed_data)
 
@@ -225,7 +226,7 @@ class MotionLib():
         # By default the dataset is normalised. If not needed, it is unnormalized here. 
         # NOTE: AMP also normalizes data internally. It is hence advisable to set normalization to false while sampling and let AMP handle it internally
         self.normalize = normalize
-
+        self.episodic = episodic
         self.dataset = MotionDataset(motion_file, num_amp_obs_steps, num_amp_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize)
         self.dataloader = None
 
@@ -234,6 +235,7 @@ class MotionLib():
 
         This only samples from episodes that have trajectories longer than num_samples. Naturally, samples in the batch are not shuffled 
         """
+        assert self.episodic == True, "Please set the episodic argument of MotionLib to true"
         if self.dataloader == None:
             self._setup_trajectory_dataloader(num_samples)
 
@@ -274,13 +276,27 @@ class MotionLib():
 
         Primarily used to train trajectory-agnostic methods like diffusion.
         """
-        traj_agnostic_dataloader = torch.utils.data.DataLoader(
-                    self.dataset,
-                    batch_size=batch_size,
-                    num_workers=1,
-                    shuffle=shuffle,
-                    # accelerate cpu-gpu transfer
-                    pin_memory=True,
-                    )
+        assert self.episodic == False, "Please set the episodic argument of MotionLib to false"
+        if shuffle == False:
+            sampler = EpisodicSequentialSampler(self.dataset)
+            traj_agnostic_dataloader = torch.utils.data.DataLoader(
+                        self.dataset,
+                        batch_size=batch_size,
+                        num_workers=1,
+                        # shuffle=shuffle,
+                        sampler=sampler,
+                        # accelerate cpu-gpu transfer
+                        pin_memory=True,
+                        )
+        else:
+            traj_agnostic_dataloader = torch.utils.data.DataLoader(
+                        self.dataset,
+                        batch_size=batch_size,
+                        num_workers=1,
+                        shuffle=shuffle,
+                        # accelerate cpu-gpu transfer
+                        pin_memory=True,
+                        )
+
 
         return traj_agnostic_dataloader

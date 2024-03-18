@@ -20,20 +20,39 @@ num_amp_obs_per_step = 5
 num_samples = 128
 mode = "human"
 num_plays = 10
+sleep_time = 0.08
 
 
-# episodic=True (default) returns trajectories of length num_samples, where each trajectory is guaranteed to be from a single episode (no trajectories with episode ends)
-# episodic=False just samples in an unshuffled manner from the whole sequence of trajectories
-motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
-# print(motion_lib.dataset.stats)
 
-# A dataloader can also be returned to get shuffled or unshuffled samples of some required length. When shuffle=True, the dataloader essentially returns trajectories regardless of episode ends
-# dataloader = motion_lib.get_traj_agnostic_dataloader(batch_size=num_samples, shuffle=True)
-# for idx, X in enumerate(dataloader):
-#     print(f"{idx}, {X.shape}")
+def test_non_episodic_dataloader():
+    # episodic=True (default) returns trajectories of length num_samples, where each trajectory is guaranteed to be from a single episode (no trajectories with episode ends)
+    # episodic=False just samples in an unshuffled manner from the whole sequence of trajectories
+    motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=False)
+
+    # A dataloader can also be returned to get shuffled or unshuffled samples of some required length. When shuffle=True, the dataloader essentially returns trajectories regardless of episode ends
+    dataloader = motion_lib.get_traj_agnostic_dataloader(batch_size=num_samples, shuffle=True)
+
+    print("Playing unshuffled, trajectory agnostic motion data")
+    obs = env.reset()
+    for i, X in enumerate(dataloader):
+        print(f"Batch {i}, {X.shape}")
+        unpaired_obs = X[:, :5]
+        for idx, obs in enumerate(tqdm(unpaired_obs)):
+            n_steps = env.sim_hz // env.control_hz
+            dt = 1.0 / env.sim_hz
+
+            for i in range(n_steps):
+                env.space.step(dt)
+
+            env.agent.position = tuple(obs[:2]) 
+            env.block.position = tuple(obs[2:4])
+            env.block.angle = obs[4]
+            env.render(mode=mode)
+            time.sleep(sleep_time)
 
 
 def play_sampled_trajectories(num_plays=num_plays, num_samples=num_samples):
+    motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
     for _ in range(num_plays):
         obs = env.reset()
         print("ENV RESET")
@@ -58,10 +77,11 @@ def play_sampled_trajectories(num_plays=num_plays, num_samples=num_samples):
             env.block.position = tuple(obs[2:4].numpy())
             env.block.angle = obs[4].item()
             env.render(mode=mode)
-            time.sleep(0.1)
+            time.sleep(sleep_time)
 
 
 def play_all_episodes():
+    motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
     # VIEW ALL EPISODES
     paired_processed_episodes = motion_lib.get_episodes()
     print(f"VIEWING ALL {len(paired_processed_episodes)} EPISODES")
@@ -90,10 +110,11 @@ def play_all_episodes():
             env.block.position = tuple(obs[2:4])
             env.block.angle = obs[4]
             env.render(mode=mode)
-            time.sleep(0.008)
+            time.sleep(sleep_time)
 
     print(max_idxs)
 
 # Calling functions
 # play_sampled_trajectories()
-play_all_episodes()
+# play_all_episodes()
+test_non_episodic_dataloader()
