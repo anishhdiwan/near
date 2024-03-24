@@ -33,7 +33,7 @@ def pymunk_to_shapely(body, shapes):
 
 
 def unnormalise_action(action, window_size):
-    """Unnormalise an input action from being in the range of [-1,-1] - [1,1] to the range [0,0] - [window_size, window_size]
+    """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([0,0], [window_size, window_size])
 
     Given,
     [r_min, r_max] = [-1,1] = data range
@@ -62,9 +62,11 @@ class PushTEnv(gym.Env):
             render_action=True,
             render_size=96,
             reset_to_state=None,
-            cfg=None
+            cfg=None,
+            normalise_action=True,
         ):
         self._seed = None
+        self.normalise_action = normalise_action
         self.seed()
         self.window_size = ws = 512  # The size of the PyGame window
         self.render_size = render_size
@@ -96,29 +98,33 @@ class PushTEnv(gym.Env):
                 NUM_AMP_OBS_PER_STEP = 5 # [robotY, robotY, tX, tY, tTheta]
                 self._num_amp_obs_per_step = NUM_AMP_OBS_PER_STEP
                 self._num_amp_obs_steps = cfg["env"]["numAMPObsSteps"]
-                self._motion_file = cfg["env"].get('motion_file', "amp_humanoid_backflip.npy")
+                self._motion_file = cfg["env"].get('motion_file', "random_motions.npy")
                 assert(self._num_amp_obs_steps >= 2)
                 self.num_amp_obs = self._num_amp_obs_steps * NUM_AMP_OBS_PER_STEP
                 self._amp_obs_space = spaces.Box(np.ones(self.num_amp_obs) * -np.Inf, np.ones(self.num_amp_obs) * np.Inf)
             except Exception as e:
                 pass
 
-        # # positional goal for agent
-        # self.action_space = spaces.Box(
-        #     low=np.array([0,0], dtype=np.float64),
-        #     high=np.array([ws,ws], dtype=np.float64),
-        #     shape=(2,),
-        #     dtype=np.float64
-        # )
 
-        # Normalised actions: in the range [-1,1]. Action space changed to normalised values
-        # In the step() function, actions are unnormalised again
-        self.action_space = spaces.Box(
-            low=np.array([-1,-1], dtype=np.float64),
-            high=np.array([1,1], dtype=np.float64),
-            shape=(2,),
-            dtype=np.float64
-        )
+        if self.normalise_action:
+            # Normalised actions: in the range [-1,1]. Action space changed to normalised values
+            # In the step() function, actions are unnormalised again
+            self.action_space = spaces.Box(
+                low=np.array([-1,-1], dtype=np.float64),
+                high=np.array([1,1], dtype=np.float64),
+                shape=(2,),
+                dtype=np.float64
+            )
+
+        else:
+            # positional goal for agent
+            self.action_space = spaces.Box(
+                low=np.array([0,0], dtype=np.float64),
+                high=np.array([ws,ws], dtype=np.float64),
+                shape=(2,),
+                dtype=np.float64
+            )
+
 
         self.block_cog = block_cog
         self.damping = damping
@@ -175,8 +181,9 @@ class PushTEnv(gym.Env):
         return self.reset(), []
 
     def step(self, action):
-        # Unnormalise action before applying to the env
-        action = unnormalise_action(action, self.window_size)
+        if self.normalise_action:
+            # Unnormalise action before applying to the env
+            action = unnormalise_action(action, self.window_size)
 
         dt = 1.0 / self.sim_hz
         self.n_contact_points = 0
@@ -422,7 +429,7 @@ class PushTEnv(gym.Env):
 
         # Counting the number of steps
         self.env_steps = 0
-        # Step returns done after this
+        # step() returns done after this
         self.max_env_steps = 150
 
     def _add_segment(self, a, b, radius):
