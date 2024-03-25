@@ -105,6 +105,8 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning import amp_network_builder
     import isaacgymenvs
 
+    from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous
+
 
     time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_name = f"{cfg.wandb_name}_{time_str}"
@@ -134,7 +136,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     def create_env(**kwargs):
         if cfg_dict["task_name"] in ["pushT", "pushTAMP"]:
             env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
-        elif cfg_dict["task_name"] in ["particle", "particleAMP"]:
+        elif cfg_dict["task_name"] in ["particle", "particleDMP"]:
             env = ParticleEnv(cfg=cfg_dict["task"])
         
         return env
@@ -159,6 +161,10 @@ def launch_rlg_hydra(cfg: DictConfig):
         runner.player_factory.register_builder('amp_continuous', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
         model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
+
+
+        ## Registering Diffusion Motion Priors ##
+        runner.algo_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_continuous.DMPAgent(**kwargs))
 
         return runner
 
