@@ -32,7 +32,7 @@ params:
   config:
     name: ${resolve_default:particle,${....experiment}}
     full_experiment_name: ${.name}
-    max_epochs: ${resolve_default:10, ''}
+    max_epochs: ${resolve_default:500,${....max_iterations}}
     env_name:  gym_env
     reward_shaper:
       scale_value: 0.1

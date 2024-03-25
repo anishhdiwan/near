@@ -5,15 +5,15 @@ task_name: ${task.name}
 experiment: ''
 
 # if set to positive integer, overrides the default number of environments
-num_envs: ''
+num_envs: 16
 
 # seed - set to -1 to choose random seed
-seed: 200
+seed: -1
 # set to True for deterministic performance
 torch_deterministic: False
 
 # set the maximum number of learning iterations to train for. overrides default per-environment setting
-max_iterations: ''
+max_iterations: 150
 
 # disables rendering
 headless: True
