@@ -36,7 +36,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         print("This is DMP (currently same as default PPO)")
 
     def play_steps(self):
-        print("Hey! This is the modified play_steps method")
+        print("This is the play_steps method modified for DMP")
         update_list = self.update_list
         step_time = 0.0
 
@@ -67,20 +67,17 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
 
             self.current_rewards += rewards
-            self.current_shaped_rewards += shaped_rewards
             self.current_lengths += 1
             all_done_indices = self.dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
      
             self.game_rewards.update(self.current_rewards[env_done_indices])
-            self.game_shaped_rewards.update(self.current_shaped_rewards[env_done_indices])
             self.game_lengths.update(self.current_lengths[env_done_indices])
             self.algo_observer.process_infos(infos, env_done_indices)
 
             not_dones = 1.0 - self.dones.float()
 
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
-            self.current_shaped_rewards = self.current_shaped_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
 
         last_values = self.get_values(self.obs)
@@ -92,10 +89,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
         mb_returns = mb_advs + mb_values
 
-        batch_dict = self.experience_buffer.get_transformed_list(swap_and_flatten01, self.tensor_list)
-        batch_dict['returns'] = swap_and_flatten01(mb_returns)
+        batch_dict = self.experience_buffer.get_transformed_list(a2c_common.swap_and_flatten01, self.tensor_list)
+        batch_dict['returns'] = a2c_common.swap_and_flatten01(mb_returns)
         batch_dict['played_frames'] = self.batch_size
         batch_dict['step_time'] = step_time
 
         return batch_dict
+
 
