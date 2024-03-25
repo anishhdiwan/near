@@ -46,7 +46,7 @@ class ParticleEnv(gym.Env):
     cfg (dict config): Typically a hydra config with rendering settings or learning algorithm related params
     """
 
-    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 1}
+    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 5}
     reward_range = (0., 1.)
 
     def __init__(self,
@@ -60,7 +60,7 @@ class ParticleEnv(gym.Env):
         self.normalise_action = normalise_action
         self.seed()
         self.window_size = ws = 512  # The size of the PyGame window
-        self.max_vel = max_vel = 5 # px/s in each axis
+        self.max_vel = max_vel = 20 # px/s in each axis
         self.render_size = render_size
         self.sim_hz = 100
         # Local controller params.
@@ -215,11 +215,11 @@ class ParticleEnv(gym.Env):
                 
 
         # TODO
-        dist_to_goal = np.linalg.norm(np.absolute(self.agent.position) - np.absolute(self.goal_pose))
+        dist_to_goal = np.linalg.norm(np.absolute(self.agent.position) - np.absolute(self.goal_pose))/363
         reward = -dist_to_goal
 
         # TODO        
-        done = dist_to_goal < 3.
+        done = dist_to_goal < 0.05
         
         
         observation = self._get_obs()
@@ -266,6 +266,7 @@ class ParticleEnv(gym.Env):
 
         # Draw agent (to self.screen)
         pygame.draw.circle(self.screen, pygame.Color('RoyalBlue'), self.agent.position, self.agent.radius)
+        pygame.draw.circle(self.screen, pygame.Color('palegreen4'), self.goal_pose, 5)
 
         if mode == "human":
             # The following line copies our drawings from `canvas` to the visible window

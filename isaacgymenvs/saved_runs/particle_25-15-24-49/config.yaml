@@ -1,0 +1,102 @@
+task:
+  name: particle
+  headless: ${resolve_default:False,${..headless}}
+  training_algo: PPO
+  env:
+    numEnvs: ${resolve_default:16,${...num_envs}}
+train:
+  params:
+    algo:
+      name: a2c_continuous
+    model:
+      name: continuous_a2c_logstd
+    network:
+      name: actor_critic
+      separate: false
+      space:
+        continuous:
+          mu_activation: None
+          sigma_activation: None
+          mu_init:
+            name: default
+            scale: 0.02
+          sigma_init:
+            name: const_initializer
+            val: 0
+          fixed_sigma: true
+      mlp:
+        units:
+        - 256
+        - 128
+        - 64
+        activation: relu
+        initializer:
+          name: default
+          scale: 2
+    load_checkpoint: ${if:${...checkpoint},True,False}
+    load_path: ${...checkpoint}
+    config:
+      name: ${resolve_default:particle,${....experiment}}
+      full_experiment_name: ${.name}
+      max_epochs: ${resolve_default:500,${....max_iterations}}
+      env_name: gym_env
+      reward_shaper:
+        scale_value: 0.1
+      normalize_advantage: true
+      gamma: 0.95
+      tau: 0.9
+      learning_rate: 0.0001
+      score_to_win: 0
+      save_best_after: 50
+      save_frequency: 30
+      grad_norm: 0.5
+      entropy_coef: 0.0
+      truncate_grads: true
+      e_clip: 0.2
+      clip_value: true
+      num_actors: ${....task.env.numEnvs}
+      horizon_length: 256
+      minibatch_size: 1024
+      mini_epochs: 4
+      critic_coef: 1
+      lr_schedule: adaptive
+      kl_threshold: 0.008
+      normalize_input: true
+      seq_length: 4
+      bounds_loss_coef: 0
+      player:
+        render: true
+        render_sleep: 0.01
+        games_num: 5
+pbt:
+  enabled: false
+task_name: ${task.name}
+experiment: ''
+num_envs: 16
+seed: 9929
+torch_deterministic: false
+max_iterations: 150
+headless: true
+physics_engine: physx
+pipeline: gpu
+sim_device: cuda:0
+rl_device: cuda:0
+graphics_device_id: 0
+num_threads: 4
+solver_type: 1
+num_subscenes: 4
+test: false
+checkpoint: ''
+sigma: ''
+multi_gpu: false
+wandb_activate: false
+wandb_group: ''
+wandb_name: ${train.params.config.name}
+wandb_entity: ''
+wandb_project: isaacgymenvs
+wandb_tags: []
+wandb_logcode_dir: ''
+capture_video: false
+capture_video_freq: 1464
+capture_video_len: 100
+force_render: true
