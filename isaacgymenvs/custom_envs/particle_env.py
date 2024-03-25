@@ -151,6 +151,7 @@ class ParticleEnv(gym.Env):
 
         # Add agent, block, and goal zone.
         self.agent = Particle((256, 400), 15)
+        self.goal_pose = np.array([self.window_size/2, self.window_size/2])
 
         # Counting the number of steps
         self.env_steps = 0
@@ -214,17 +215,11 @@ class ParticleEnv(gym.Env):
                 
 
         # TODO
-        dist_to_goal = 0.0 
-        reward = dist_to_goal
-
-        # ## PPO SANITY CHECK
-        # # Dist from agent to centre of env
-        # temp = -(np.linalg.norm(np.absolute(self.agent.position) - np.absolute(self.goal_pose[:2])))/363
-        # reward = temp
-        # ## PPO SANITY CHECK
+        dist_to_goal = np.linalg.norm(np.absolute(self.agent.position) - np.absolute(self.goal_pose))
+        reward = -dist_to_goal
 
         # TODO        
-        done = dist_to_goal > 5.
+        done = dist_to_goal < 3.
         
         
         observation = self._get_obs()

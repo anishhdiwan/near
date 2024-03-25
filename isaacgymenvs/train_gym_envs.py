@@ -117,7 +117,6 @@ def launch_rlg_hydra(cfg: DictConfig):
     print_dict(cfg_dict)
     print("-----")
 
-
     # set numpy formatting for printing only
     set_np_formatting()
 
@@ -129,16 +128,21 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # Creating a new function to return a pushT environment. This will then be added to rl_games env_configurations so that an env can be created from its name in the config
     from custom_envs.pusht_env import PushTEnv
+    from custom_envs.particle_env import ParticleEnv
     from custom_envs.customenv_utils import CustomRayVecEnv, PushTAlgoObserver
 
-    def create_pusht_env(**kwargs):
-        env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
+    def create_env(**kwargs):
+        if cfg_dict["task_name"] in ["pushT", "pushTAMP"]:
+            env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
+        elif cfg_dict["task_name"] in ["particle", "particleAMP"]:
+            env = ParticleEnv(cfg=cfg_dict["task"])
+        
         return env
 
     # env_configurations.register adds the env to the list of rl_games envs. create_isaacgym_env returns a VecTask environment. But rl_games also accepts gym envs. 
-    env_configurations.register('pushT', {
+    env_configurations.register('gym_env', {
         'vecenv_type': 'CUSTOMRAY',
-        'env_creator': lambda **kwargs: create_pusht_env(**kwargs),
+        'env_creator': lambda **kwargs: create_env(**kwargs),
     })
 
     # vecenv register calls the following lambda function which then returns an instance of CUSTOMRAY. 

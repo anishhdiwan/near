@@ -30,7 +30,7 @@ params:
   load_path: ${...checkpoint} # path to the checkpoint to load
 
   config:
-    name: ${resolve_default:pushT,${....experiment}}
+    name: ${resolve_default:particle,${....experiment}}
     full_experiment_name: ${.name}
     max_epochs: ${resolve_default:10, ''}
     env_name:  gym_env
