@@ -117,6 +117,12 @@ class AMPAgent(common_agent.CommonAgent):
             self.experience_buffer.update_data('dones', n, self.dones)
             self.experience_buffer.update_data('amp_obs', n, infos['amp_obs'])
 
+            ## TESTING ###
+            # print("TESTING")
+            # print(f"play_steps amp_obs (same as paired_obs) {infos['amp_obs']}")
+            # quit()
+            ## TESTING ###
+
             terminated = infos['terminate'].float()
             terminated = terminated.unsqueeze(-1)
             next_vals = self._eval_critic(self.obs)
@@ -149,7 +155,7 @@ class AMPAgent(common_agent.CommonAgent):
 
         ## TESTING ###
         # print("TESTING")
-        # print(f"play_steps mb_amp_obs shape {mb_amp_obs.shape}")
+        # print(f"play_steps mb_amp_obs {mb_amp_obs}")
         # quit()
         ## TESTING ###
 

@@ -61,19 +61,31 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # self.tensor_list += ['amp_obs']
         return
 
+    def _env_reset_done(self):
+        obs, done_env_ids = self.vec_env.reset_done()
+        return self.obs_to_tensors(obs), done_env_ids
+
     def play_steps(self):
+        self.set_eval()
+
         print("This is the play_steps method modified for DMP")
         update_list = self.update_list
         step_time = 0.0
 
         for n in range(self.horizon_length):
+            ## New Addition ##
+            # Reset the environments that are in the done state. Needed to get the initial observation of the paired observation.
+            self.obs, done_env_ids = self._env_reset_done()
+            self.experience_buffer.update_data('obses', n, self.obs['obs'])
+
             if self.use_action_masks:
                 masks = self.vec_env.get_action_masks()
                 res_dict = self.get_masked_action_values(self.obs, masks)
             else:
                 res_dict = self.get_action_values(self.obs)
-            self.experience_buffer.update_data('obses', n, self.obs['obs'])
-            self.experience_buffer.update_data('dones', n, self.dones)
+            
+            # self.experience_buffer.update_data('obses', n, self.obs['obs'])
+            # self.experience_buffer.update_data('dones', n, self.dones)
 
             for k in update_list:
                 self.experience_buffer.update_data(k, n, res_dict[k]) 
@@ -91,7 +103,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
                 shaped_rewards += self.gamma * res_dict['values'] * self.cast_obs(infos['time_outs']).unsqueeze(1).float()
 
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
-
+            self.experience_buffer.update_data('dones', n, self.dones)
             ## New Addition ##
             self.experience_buffer.update_data('paired_obs', n, infos['paired_obs'])
             print(f"Paired Obs {infos['paired_obs']}")
@@ -136,6 +148,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
         batch_dict['returns'] = a2c_common.swap_and_flatten01(mb_returns)
         batch_dict['played_frames'] = self.batch_size
         batch_dict['step_time'] = step_time
+
+        ## New Addition ##
+        # Adding dmp rewards to batch dict. Not used anywhere. Can be accessed in a network update later if needed
+        # for k, v in amp_rewards.items():
+        #     batch_dict[k] = a2c_common.swap_and_flatten01(v)
 
         return batch_dict
 
