@@ -90,7 +90,12 @@ class ParticleEnv(gym.Env):
                 self._num_obs_per_step = NUM_OBS_PER_STEP
 
                 # Number of observations to group together. For example, AMP groups to observations s-s' together to compute rewards as discriminator(s,s')
-                self._num_obs_steps = cfg["env"]["numAMPObsSteps"]
+                # numAMPObsSteps defines the number of obs to group in AMP. numObsSteps also defines the same but is a bit more general in its wording.
+                # Support for numAMPObsSteps is kept to maintain compatibility with AMP configs
+                try:
+                    self._num_obs_steps = cfg["env"]["numAMPObsSteps"]
+                except KeyError:
+                    self._num_obs_steps = cfg["env"].get("numObsSteps", 2)
 
                 self._motion_file = cfg["env"].get('motion_file', "random_motions.npy")
                 

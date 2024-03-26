@@ -229,9 +229,15 @@ class CustomRayVecEnv(IVecEnv):
         # Pulling config data from the env
         res = self.workers[0].get_training_algo.remote()
         self.training_algo = self.ray.get(res)
+
+        # Set up motion library to sample motions if AMP
         if self.training_algo == "AMP":
             # Set up the motions library
-            self._setup_motions()
+            self._setup_motions(setup_motionlib=True)
+        # Only set up experience buffers for paired observations for DMP (saves unnecessary memory usage)
+        elif self.training_algo == "DMP":
+            # Set up the motions library
+            self._setup_motions(setup_motionlib=False)
 
         # cfg for visualisation
         res = self.workers[0].get_render_mode.remote()
@@ -277,7 +283,7 @@ class CustomRayVecEnv(IVecEnv):
         # if self.concat_infos:
         newinfos = dicts_to_dict_with_arrays(newinfos, False)
 
-        if self.training_algo == "AMP":
+        if self.training_algo in ["AMP", "DMP"]:
             # Augmenting the infos dict
             self.post_step_procedures(ret_obs)
             newinfos = self.augment_infos(newinfos, newdones)
@@ -417,7 +423,7 @@ class CustomRayVecEnv(IVecEnv):
         return amp_obs_demo
 
 
-    def _setup_motions(self):
+    def _setup_motions(self, setup_motionlib=True):
         """
         Set up the motion library
         """
@@ -437,8 +443,9 @@ class CustomRayVecEnv(IVecEnv):
         res = self.workers[0].get_num_envs.remote()
         num_envs = self.ray.get(res)
         
-        # TODO: set device=self.device
-        self._motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step)
+        if setup_motionlib:
+            # TODO: set device=self.device
+            self._motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step)
 
         # TODO: set device=self.device
         # Set up the observations buffer. This contains s-s' pairs and has the shape [num envs, num_obs_steps*num_obs_per_step]
@@ -449,7 +456,7 @@ class CustomRayVecEnv(IVecEnv):
 
     def post_step_procedures(self, newobs):
         """
-        Post step procedures to compute additional quantities needed by any algos.
+        Post step procedures to compute additional quantities needed by any algos. Pairs observation seen in rollouts to get s-s' vectors
 
         Computes the observation buffer needed by amp_continuous and similar algos
         """
