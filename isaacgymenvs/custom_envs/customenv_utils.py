@@ -134,9 +134,12 @@ class CustomRayWorker:
         info = {}
         observation_space = self.env.observation_space
 
-        # Added to provide shape info to amp_continuous
-        if hasattr(self.env, "amp_observation_space"):
-            info['amp_observation_space'] = self.env.amp_observation_space
+        # Added to provide shape info to amp_continuous and similar algorithms
+        if hasattr(self.env, "observation_space"):
+            # amp_observation_space and paired_observation_space contain the same information. 
+            # amp_observation_space is added to maintain compatibility with adversatial motion priors
+            info['amp_observation_space'] = self.env.observation_space
+            info['paired_observation_space'] = self.env.observation_space
 
         #if isinstance(observation_space, gym.spaces.dict.Dict):
         #    observation_space = observation_space['observations']
@@ -155,11 +158,11 @@ class CustomRayWorker:
             info['state_space'] = self.env.state_space
         return info
     
-    def get_num_amp_obs_per_step(self):
-        return self.env._num_amp_obs_per_step
+    def get_num_obs_per_step(self):
+        return self.env._num_obs_per_step
 
-    def get_num_amp_obs_steps(self):
-        return self.env._num_amp_obs_steps
+    def get_num_obs_steps(self):
+        return self.env._num_obs_steps
 
     def get_motion_file(self):
         return self.env._motion_file
@@ -336,14 +339,14 @@ class CustomRayVecEnv(IVecEnv):
 
     def reset_done(self):
         """
-        Reset all done envs. If none are done, return the last seens observations are the reset observations. In the first step, reset all envs normally
+        Reset all done envs. If none are done, return the last seens observations as the reset observations. In the first step, reset all envs normally
         """
         if self.done_envs is None:
             # Return the reset observations with an empty dummy dict to match the return type expected by the amp_continuous algo
             obs = self.reset()
 
             # Set up the history amp obs
-            self._past_amp_obs_buf[:] = torch.from_numpy(obs)
+            self._past_obs_buf[:] = torch.from_numpy(obs)
             
             return obs, []
         
@@ -360,7 +363,7 @@ class CustomRayVecEnv(IVecEnv):
                 obs = self.reset()
 
                 # Set up the history amp obs
-                self._past_amp_obs_buf[:] = torch.from_numpy(obs)
+                self._past_obs_buf[:] = torch.from_numpy(obs)
                 
                 return obs, []
 
@@ -420,13 +423,13 @@ class CustomRayVecEnv(IVecEnv):
         """
 
         # Pulling config data from the env
-        res = self.workers[0].get_num_amp_obs_steps.remote()
-        num_amp_obs_steps = self.ray.get(res)
+        res = self.workers[0].get_num_obs_steps.remote()
+        num_obs_steps = self.ray.get(res)
 
-        res = self.workers[0].get_num_amp_obs_per_step.remote()
-        num_amp_obs_per_step = self.ray.get(res)
+        res = self.workers[0].get_num_obs_per_step.remote()
+        num_obs_per_step = self.ray.get(res)
 
-        self.num_amp_obs = int(num_amp_obs_steps * num_amp_obs_per_step)
+        self.num_obs = int(num_obs_steps * num_obs_per_step)
 
         res = self.workers[0].get_motion_file.remote()
         motion_file = self.ray.get(res)
@@ -435,27 +438,27 @@ class CustomRayVecEnv(IVecEnv):
         num_envs = self.ray.get(res)
         
         # TODO: set device=self.device
-        self._motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
+        self._motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step)
 
         # TODO: set device=self.device
-        # Set up the amp observations buffer. This contains s-s' pairs and has the shape [num envs, num_amp_obs_steps*num_amp_obs_per_step]
-        self._amp_obs_buf = torch.zeros((num_envs, num_amp_obs_steps, num_amp_obs_per_step), dtype=torch.float, device=self.device)
-        # TODO: This is currently set up only for num_amp_obs_steps = 2!!
-        self._curr_amp_obs_buf = self._amp_obs_buf[:, 0]
-        self._past_amp_obs_buf = self._amp_obs_buf[:, 1]
+        # Set up the observations buffer. This contains s-s' pairs and has the shape [num envs, num_obs_steps*num_obs_per_step]
+        self._obs_buf = torch.zeros((num_envs, num_obs_steps, num_obs_per_step), dtype=torch.float, device=self.device)
+        # TODO: This is currently set up only for num_obs_steps = 2!!
+        self._curr_obs_buf = self._obs_buf[:, 0]
+        self._past_obs_buf = self._obs_buf[:, 1]
 
     def post_step_procedures(self, newobs):
         """
-        Post step procedures to compute additional quantities needed by any algos. Also render one of the envs (as per "headless" in cfg)
+        Post step procedures to compute additional quantities needed by any algos.
 
-        Computes the observation buffer needed by amp_continuous
+        Computes the observation buffer needed by amp_continuous and similar algos
         """
-        self._curr_amp_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
-        self._amp_obs_buf[:, 0] = self._curr_amp_obs_buf
-        self._amp_obs_buf[:, 1] = self._past_amp_obs_buf
-        # self._amp_obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_amp_obs_buf, newobs), axis=1))
-        self._past_amp_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
-        self._curr_amp_obs_buf[:] = torch.zeros_like(self._amp_obs_buf[:, 0], device=self.device)
+        self._curr_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
+        self._obs_buf[:, 0] = self._curr_obs_buf
+        self._obs_buf[:, 1] = self._past_obs_buf
+        # self._obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_obs_buf, newobs), axis=1))
+        self._past_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
+        self._curr_obs_buf[:] = torch.zeros_like(self._obs_buf[:, 0], device=self.device)
 
     def render(self):
         """
@@ -468,7 +471,11 @@ class CustomRayVecEnv(IVecEnv):
 
             time.sleep(0.04) # 50 fps = 0.08s wait
 
-    def augment_infos(self, infos, dones):
-        infos["amp_obs"] = self._amp_obs_buf.view(-1, self.num_amp_obs)
+    def augment_infos(self, infos, dones): 
+        paired_obs= self._obs_buf.view(-1, self.num_obs)
+        # amp_obs and paired_obs contain the same observations
+        # amp_obs is added to maintain compatibility with adversatial motion priors
+        infos["amp_obs"] = paired_obs
+        infos["paired_obs"] = paired_obs
         infos["terminate"] = torch.from_numpy(self.concat_func(dones)).to(self.device)
         return infos

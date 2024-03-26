@@ -85,7 +85,7 @@ class PushTEnv(gym.Env):
             dtype=np.float64
         )
 
-        # Setting up the env observation space info used to train amp_continuous
+        # Setting up the env observation space params used to train AMP and similar algos
         if cfg != None:
             # General config params
             self._headless = cfg["headless"]
@@ -93,15 +93,24 @@ class PushTEnv(gym.Env):
             self._training_algo = cfg["training_algo"]
 
             try:
-                # Adversarial Motion Priors config params
+                # Training params for AMP and similar algos
                 # self.reset_called = False
-                NUM_AMP_OBS_PER_STEP = 5 # [robotY, robotY, tX, tY, tTheta]
-                self._num_amp_obs_per_step = NUM_AMP_OBS_PER_STEP
-                self._num_amp_obs_steps = cfg["env"]["numAMPObsSteps"]
+                
+                # Number of features in an observation vector 
+                NUM_OBS_PER_STEP = 5 # [robotY, robotY, tX, tY, tTheta]
+                self._num_obs_per_step = NUM_OBS_PER_STEP
+
+                # Number of observations to group together. For example, AMP groups to observations s-s' together to compute rewards as discriminator(s,s')
+                self._num_obs_steps = cfg["env"]["numAMPObsSteps"]
+                
                 self._motion_file = cfg["env"].get('motion_file', "random_motions.npy")
-                assert(self._num_amp_obs_steps >= 2)
-                self.num_amp_obs = self._num_amp_obs_steps * NUM_AMP_OBS_PER_STEP
-                self._amp_obs_space = spaces.Box(np.ones(self.num_amp_obs) * -np.Inf, np.ones(self.num_amp_obs) * np.Inf)
+                                
+                assert(self._num_obs_steps >= 2)
+                # Number of features in the grouped observation vector
+                self.num_obs = self._num_obs_steps * NUM_OBS_PER_STEP
+
+                # Observation space as a gym Box object
+                self._obs_space = spaces.Box(np.ones(self.num_obs) * -np.Inf, np.ones(self.num_obs) * np.Inf)
             except Exception as e:
                 pass
 
@@ -149,8 +158,8 @@ class PushTEnv(gym.Env):
 
     # Added to provide env obs shape info to amp_continuous
     @property
-    def amp_observation_space(self):
-        return self._amp_obs_space
+    def observation_space(self):
+        return self._obs_space
     
     def reset(self):
         seed = self._seed
