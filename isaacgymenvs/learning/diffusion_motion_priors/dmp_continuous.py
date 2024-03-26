@@ -25,7 +25,7 @@ from tensorboardX import SummaryWriter
 
 class DMPAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
-        """Initialise the default PPO algorithm with passed params. Nothing new here
+        """Initialise the default PPO algorithm with passed params.
 
         Args:
             base_name (:obj:`str`): Name passed on to the observer and used for checkpoints etc.
@@ -33,7 +33,33 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         """
         super().__init__(base_name, params)
+        self._paired_observation_space = self.env_info['paired_observation_space']
         print("This is DMP (currently same as default PPO)")
+
+
+    def init_tensors(self):
+        super().init_tensors()
+        self._build_buffers()
+        # self.experience_buffer.tensor_dict['next_obses'] = torch.zeros_like(self.experience_buffer.tensor_dict['obses'])
+        # self.experience_buffer.tensor_dict['next_values'] = torch.zeros_like(self.experience_buffer.tensor_dict['values'])
+
+        # self.tensor_list += ['next_obses']
+        return
+
+    def _build_buffers(self):
+        batch_shape = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['paired_obs'] = torch.zeros(batch_shape + self._paired_observation_space.shape,
+                                                                    device=self.ppo_device)
+        
+        # amp_obs_demo_buffer_size = int(self.config['amp_obs_demo_buffer_size'])
+        # self._amp_obs_demo_buffer = replay_buffer.ReplayBuffer(amp_obs_demo_buffer_size, self.ppo_device)
+
+        # self._amp_replay_keep_prob = self.config['amp_replay_keep_prob']
+        # replay_buffer_size = int(self.config['amp_replay_buffer_size'])
+        # self._amp_replay_buffer = replay_buffer.ReplayBuffer(replay_buffer_size, self.ppo_device)
+
+        # self.tensor_list += ['amp_obs']
+        return
 
     def play_steps(self):
         print("This is the play_steps method modified for DMP")
@@ -66,6 +92,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
 
+            ## New Addition ##
+            self.experience_buffer.update_data('paired_obs', n, infos['paired_obs'])
+            print(f"Paired Obs {infos['paired_obs']}")
+
             self.current_rewards += rewards
             self.current_lengths += 1
             all_done_indices = self.dones.nonzero(as_tuple=False)
@@ -80,12 +110,25 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
 
+            ## New Addition ##
+            # if (self.vec_env.env.viewer and (n == (self.horizon_length - 1))):
+            #     self._print_debug_stats(infos)
+
         last_values = self.get_values(self.obs)
 
         fdones = self.dones.float()
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
         mb_values = self.experience_buffer.tensor_dict['values']
         mb_rewards = self.experience_buffer.tensor_dict['rewards']
+
+        ## New Addition ##
+        mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
+        print(f"Batch of paired obs {mb_paired_obs}")
+
+        ## New Addition ##
+        # dmp_rewards = self._calc_energies(mb_paired_obs)
+        # mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
+
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
         mb_returns = mb_advs + mb_values
 
