@@ -138,8 +138,8 @@ class CustomRayWorker:
         if hasattr(self.env, "observation_space"):
             # amp_observation_space and paired_observation_space contain the same information. 
             # amp_observation_space is added to maintain compatibility with adversatial motion priors
-            info['amp_observation_space'] = self.env.observation_space
-            info['paired_observation_space'] = self.env.observation_space
+            info['amp_observation_space'] = self.env.paired_observation_space
+            info['paired_observation_space'] = self.env.paired_observation_space
 
         #if isinstance(observation_space, gym.spaces.dict.Dict):
         #    observation_space = observation_space['observations']

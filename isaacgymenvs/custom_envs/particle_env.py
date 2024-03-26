@@ -156,7 +156,7 @@ class ParticleEnv(gym.Env):
 
     # Added to provide env obs shape info to amp_continuous
     @property
-    def observation_space(self):
+    def paired_observation_space(self):
         return self._obs_space
 
 
