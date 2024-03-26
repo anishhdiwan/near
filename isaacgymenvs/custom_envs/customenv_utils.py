@@ -7,6 +7,7 @@ import random
 from time import sleep
 import torch
 import time
+import copy
 
 from .motion_lib import MotionLib
 
@@ -350,18 +351,19 @@ class CustomRayVecEnv(IVecEnv):
         if self.done_envs is None:
             # Return the reset observations with an empty dummy dict to match the return type expected by the amp_continuous algo
             obs = self.reset()
-
             # Set up the history amp obs
             self._past_obs_buf[:] = torch.from_numpy(obs)
             
+            print(f"done envs is None. First reset. Obs {obs}")
             return obs, []
         
         else:
 
             # If no environments are done
-            # if not len(self.done_envs) > 0:
             if len(self.done_envs) == 0:
-                return self.last_obs, []
+                # No need to explicitly define past_obs_buf as no environments were done. It is directly set in post_step_procedures
+                print(f"no envs were done. continuing on. Obs {self.last_obs}")
+                return copy.deepcopy(self.last_obs), []
 
             # If all envs are done
             elif len(self.done_envs) == len(self.workers):
@@ -370,7 +372,7 @@ class CustomRayVecEnv(IVecEnv):
 
                 # Set up the history amp obs
                 self._past_obs_buf[:] = torch.from_numpy(obs)
-                
+                print(f"All envs were done. Resetting all. Obs {obs}")
                 return obs, []
 
             # If some are done and some are not
@@ -406,11 +408,14 @@ class CustomRayVecEnv(IVecEnv):
                         newobsdict["states"] = np.stack(newstates)            
                     ret_obs = newobsdict
 
-                last_obs = self.last_obs
+                last_obs = copy.deepcopy(self.last_obs)
                 for idx, done_env_idx in enumerate(self.done_envs):
                     last_obs[done_env_idx] = ret_obs[idx]
 
+                print(f"ret obs {ret_obs}")
                 ret_obs = last_obs
+                print(f"some envs were done. Reset dones and add new obs to last seen obs. \n Last Obs {self.last_obs} | Obs {ret_obs} | Done envs {self.done_envs}")
+                self._past_obs_buf[:] = torch.from_numpy(ret_obs)
                 return ret_obs, self.done_envs
 
 
@@ -451,8 +456,8 @@ class CustomRayVecEnv(IVecEnv):
         # Set up the observations buffer. This contains s-s' pairs and has the shape [num envs, num_obs_steps*num_obs_per_step]
         self._obs_buf = torch.zeros((num_envs, num_obs_steps, num_obs_per_step), dtype=torch.float, device=self.device)
         # TODO: This is currently set up only for num_obs_steps = 2!!
-        self._curr_obs_buf = self._obs_buf[:, 0]
-        self._past_obs_buf = self._obs_buf[:, 1]
+        self._curr_obs_buf = torch.zeros_like(self._obs_buf[:, 0])
+        self._past_obs_buf = torch.zeros_like(self._obs_buf[:, 1])
 
     def post_step_procedures(self, newobs):
         """
@@ -461,8 +466,8 @@ class CustomRayVecEnv(IVecEnv):
         Computes the observation buffer needed by amp_continuous and similar algos
         """
         self._curr_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
-        self._obs_buf[:, 0] = self._curr_obs_buf
-        self._obs_buf[:, 1] = self._past_obs_buf
+        self._obs_buf[:, 1] = copy.deepcopy(self._curr_obs_buf)
+        self._obs_buf[:, 0] = copy.deepcopy(self._past_obs_buf)
         # self._obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_obs_buf, newobs), axis=1))
         self._past_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
         self._curr_obs_buf[:] = torch.zeros_like(self._obs_buf[:, 0], device=self.device)

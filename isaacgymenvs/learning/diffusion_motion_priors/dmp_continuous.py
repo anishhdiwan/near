@@ -135,7 +135,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         ## New Addition ##
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
-        print(f"Batch of paired obs {mb_paired_obs}")
+        # print(f"Batch of paired obs {mb_paired_obs}")
 
         ## New Addition ##
         # dmp_rewards = self._calc_energies(mb_paired_obs)
