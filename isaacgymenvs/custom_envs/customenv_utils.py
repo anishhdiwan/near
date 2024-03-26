@@ -354,7 +354,6 @@ class CustomRayVecEnv(IVecEnv):
             # Set up the history amp obs
             self._past_obs_buf[:] = torch.from_numpy(obs)
             
-            print(f"done envs is None. First reset. Obs {obs}")
             return obs, []
         
         else:
@@ -362,7 +361,6 @@ class CustomRayVecEnv(IVecEnv):
             # If no environments are done
             if len(self.done_envs) == 0:
                 # No need to explicitly define past_obs_buf as no environments were done. It is directly set in post_step_procedures
-                print(f"no envs were done. continuing on. Obs {self.last_obs}")
                 return copy.deepcopy(self.last_obs), []
 
             # If all envs are done
@@ -372,7 +370,6 @@ class CustomRayVecEnv(IVecEnv):
 
                 # Set up the history amp obs
                 self._past_obs_buf[:] = torch.from_numpy(obs)
-                print(f"All envs were done. Resetting all. Obs {obs}")
                 return obs, []
 
             # If some are done and some are not
@@ -412,9 +409,7 @@ class CustomRayVecEnv(IVecEnv):
                 for idx, done_env_idx in enumerate(self.done_envs):
                     last_obs[done_env_idx] = ret_obs[idx]
 
-                print(f"ret obs {ret_obs}")
                 ret_obs = last_obs
-                print(f"some envs were done. Reset dones and add new obs to last seen obs. \n Last Obs {self.last_obs} | Obs {ret_obs} | Done envs {self.done_envs}")
                 self._past_obs_buf[:] = torch.from_numpy(ret_obs)
                 return ret_obs, self.done_envs
 
