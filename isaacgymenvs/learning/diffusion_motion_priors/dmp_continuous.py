@@ -25,7 +25,7 @@ from tensorboardX import SummaryWriter
 
 class DMPAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
-        """Initialise the default PPO algorithm with passed params.
+        """Initialise DMP algorithm with passed params.
 
         Args:
             base_name (:obj:`str`): Name passed on to the observer and used for checkpoints etc.
@@ -33,11 +33,44 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         """
         super().__init__(base_name, params)
+        config = params['config']
+        self._load_config_params(config)
+
+        # if self.normalize_value:
+        #     self.value_mean_std = self.central_value_net.model.value_mean_std if self.has_central_value else self.model.value_mean_std
+        # if self._normalize_energynet_input:
+            # self._amp_input_mean_std = RunningMeanStd(self._amp_observation_space.shape).to(self.ppo_device)
+
+        print("This is DMP")
+
+
+    def _load_config_params(self, config):
+        """Load algorithm parameters passed via the config file
+
+        Args:
+            config (dict): Configuration params
+        """
+        
+        self._task_reward_w = config['task_reward_w']
+        self._energy_reward_w = config['energy_reward_w']
+
         self._paired_observation_space = self.env_info['paired_observation_space']
-        print("This is DMP (currently same as default PPO)")
+        # self._amp_batch_size = int(config['amp_batch_size'])
+        # self._amp_minibatch_size = int(config['amp_minibatch_size'])
+        # assert(self._amp_minibatch_size <= self.minibatch_size)
+
+        # self._disc_coef = config['disc_coef']
+        # self._disc_logit_reg = config['disc_logit_reg']
+        # self._disc_grad_penalty = config['disc_grad_penalty']
+        # self._disc_weight_decay = config['disc_weight_decay']
+        # self._disc_reward_scale = config['disc_reward_scale']
+        self._normalize_energynet_input = config.get('normalize_energynet_input', True)
 
 
     def init_tensors(self):
+        """Initialise the default experience buffer (used in PPO in rl_games) and add additional tensors to track
+        """
+
         super().init_tensors()
         self._build_buffers()
         # self.experience_buffer.tensor_dict['next_obses'] = torch.zeros_like(self.experience_buffer.tensor_dict['obses'])
@@ -47,6 +80,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
         return
 
     def _build_buffers(self):
+        """Set up the experience buffer to track tensors required by the algorithm.
+
+        Here, paired_obs tracks a set of s-s' pairs used to compute energies. Refer to rl_games.common.a2c_common and rl_games.common.experience for more info
+        """
+
         batch_shape = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['paired_obs'] = torch.zeros(batch_shape + self._paired_observation_space.shape,
                                                                     device=self.ppo_device)
@@ -62,10 +100,65 @@ class DMPAgent(a2c_continuous.A2CAgent):
         return
 
     def _env_reset_done(self):
+        """Reset any environments that are in the done state. 
+        
+        Wrapper around the vec_env reset_done() method. Internally, it handles several cases of envs being done (all done, no done, some done etc.)
+        """
+
         obs, done_env_ids = self.vec_env.reset_done()
         return self.obs_to_tensors(obs), done_env_ids
 
+
+    def _calc_rewards(self, paired_obs):
+        """Calculate DMP rewards given a sest of observation pairs
+
+        Args:
+            paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
+        """
+
+        energy_rew = self._calc_energy(paired_obs)
+        output = {
+            'energy_reward': energy_rew
+        }
+        return output
+
+    def _calc_energy(self, paired_obs):
+        """Run the pre-trained energy-based model to compute rewards as energies
+
+        Args:
+            paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
+        """
+
+        with torch.no_grad():
+            # Whatever
+
+        return energy_rew
+
+    def _combine_rewards(self, task_rewards, dmp_rewards):
+        """Combine task and style (energy) rewards using the weights assigned in the config file
+
+        Args:
+            task_rewards (torch.Tensor): rewards received from the environment
+            dmp_rewards (torch.Tensor): rewards obtained as energies computed using an energy-based model
+        """
+
+        energy_rew = amp_rewards['energy_reward']
+        combined_rewards = self._task_reward_w * task_rewards + \
+                         + self._energy_reward_w * energy_rew
+        return combined_rewards
+
+    # def _preproc_obs(self, obs):
+    #     if self._normalize_amp_input:
+    #         obs = self._amp_input_mean_std(obs)
+    #     return obs
+
+
     def play_steps(self):
+        """Rollout the current policy for some horizon length to obtain experience samples (s, s', r, info). 
+        
+        Also compute augmented rewards and save for later optimisation 
+        """
+
         self.set_eval()
 
         print("This is the play_steps method modified for DMP")
@@ -106,7 +199,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self.experience_buffer.update_data('dones', n, self.dones)
             ## New Addition ##
             self.experience_buffer.update_data('paired_obs', n, infos['paired_obs'])
-            print(f"Paired Obs {infos['paired_obs']}")
 
             self.current_rewards += rewards
             self.current_lengths += 1
@@ -135,10 +227,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         ## New Addition ##
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
-        # print(f"Batch of paired obs {mb_paired_obs}")
 
         ## New Addition ##
-        # dmp_rewards = self._calc_energies(mb_paired_obs)
+        # dmp_rewards = self._calc_rewards(mb_paired_obs)
         # mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
 
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)

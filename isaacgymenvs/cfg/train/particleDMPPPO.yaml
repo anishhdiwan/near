@@ -59,6 +59,12 @@ params:
     normalize_input: True
     seq_length: 4
     bounds_loss_coef: 0
+    
+    
+    # DMP Params
+    normalize_energynet_input: True
+    task_reward_w: 0.0
+    energy_reward_w: 1.0
 
     player:
       render: True
