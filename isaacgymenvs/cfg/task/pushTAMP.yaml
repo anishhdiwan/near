@@ -30,6 +30,7 @@ env:
   #motion_file: "amp_humanoid_walk.npy"
   #motion_file: "amp_humanoid_run.npy"
   #motion_file: "amp_humanoid_dance.npy"
+  # Relative to the train.py file
   motion_file: "custom_envs/data/pusht/pusht_cchi_v7_replay.zarr"
 
   # these motions should use hyperparameters from HumanoidAMPPPOLowGP.yaml

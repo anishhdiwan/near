@@ -21,11 +21,12 @@ from torch import optim
 # from . import amp_datasets as amp_datasets
 
 from tensorboardX import SummaryWriter
+from learning.motion_ncsn.models.motion_scorenet import SimpleNet
 
 
 class DMPAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
-        """Initialise DMP algorithm with passed params.
+        """Initialise DMP algorithm with passed params. Inherit from the rl_games PPO implementation.
 
         Args:
             base_name (:obj:`str`): Name passed on to the observer and used for checkpoints etc.
@@ -35,6 +36,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         super().__init__(base_name, params)
         config = params['config']
         self._load_config_params(config)
+        self._init_network(config['dmp_config'])
 
         # if self.normalize_value:
         #     self.value_mean_std = self.central_value_net.model.value_mean_std if self.has_central_value else self.model.value_mean_std
@@ -51,20 +53,16 @@ class DMPAgent(a2c_continuous.A2CAgent):
             config (dict): Configuration params
         """
         
-        self._task_reward_w = config['task_reward_w']
-        self._energy_reward_w = config['energy_reward_w']
+        self._task_reward_w = config['dmp_config']['inference']['task_reward_w']
+        self._energy_reward_w = config['dmp_config']['inference']['energy_reward_w']
 
         self._paired_observation_space = self.env_info['paired_observation_space']
-        # self._amp_batch_size = int(config['amp_batch_size'])
-        # self._amp_minibatch_size = int(config['amp_minibatch_size'])
-        # assert(self._amp_minibatch_size <= self.minibatch_size)
-
-        # self._disc_coef = config['disc_coef']
-        # self._disc_logit_reg = config['disc_logit_reg']
-        # self._disc_grad_penalty = config['disc_grad_penalty']
-        # self._disc_weight_decay = config['disc_weight_decay']
-        # self._disc_reward_scale = config['disc_reward_scale']
-        self._normalize_energynet_input = config.get('normalize_energynet_input', True)
+        self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
+        self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1]
+        self._sigma_begin = config['dmp_config']['model']['sigma_begin']
+        self._sigma_end = config['dmp_config']['model']['sigma_end']
+        self._L = config['dmp_config']['model']['L']
+        self._normalize_energynet_input = config['dmp_config']['training'].get('normalize_energynet_input', True)
 
 
     def init_tensors(self):
@@ -73,11 +71,24 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         super().init_tensors()
         self._build_buffers()
-        # self.experience_buffer.tensor_dict['next_obses'] = torch.zeros_like(self.experience_buffer.tensor_dict['obses'])
-        # self.experience_buffer.tensor_dict['next_values'] = torch.zeros_like(self.experience_buffer.tensor_dict['values'])
 
-        # self.tensor_list += ['next_obses']
-        return
+
+    def _init_network(self, energynet_config):
+        """Initialise the energy-based model based on the parameters in the config file
+
+        Args:
+            energynet_config (dict): Configuration parameters used to define the energy network
+        """
+
+        eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
+        energynet = SimpleNet(energynet_config).to(self.ppo_device)
+        energynet = torch.nn.DataParallel(energynet)
+        energynet.load_state_dict(eb_model_states[0])
+
+        self._energynet = energynet
+        self._energynet.eval()
+        self._sigmas = np.exp(np.linspace(np.log(self._sigma_begin), np.log(self._sigma_end), self._L))
+
 
     def _build_buffers(self):
         """Set up the experience buffer to track tensors required by the algorithm.
@@ -89,15 +100,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self.experience_buffer.tensor_dict['paired_obs'] = torch.zeros(batch_shape + self._paired_observation_space.shape,
                                                                     device=self.ppo_device)
         
-        # amp_obs_demo_buffer_size = int(self.config['amp_obs_demo_buffer_size'])
-        # self._amp_obs_demo_buffer = replay_buffer.ReplayBuffer(amp_obs_demo_buffer_size, self.ppo_device)
-
-        # self._amp_replay_keep_prob = self.config['amp_replay_keep_prob']
-        # replay_buffer_size = int(self.config['amp_replay_buffer_size'])
-        # self._amp_replay_buffer = replay_buffer.ReplayBuffer(replay_buffer_size, self.ppo_device)
-
-        # self.tensor_list += ['amp_obs']
-        return
 
     def _env_reset_done(self):
         """Reset any environments that are in the done state. 
@@ -128,9 +130,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
         Args:
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
         """
-
+        # if self._normalize_energynet_input:
+        #     pass
+        
+        # Tensor of noise level to condition the energynet
+        labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * self._c # c ranges from [0,L-1]
+        
         with torch.no_grad():
-            # Whatever
+            energy_rew = self._energynet(paired_obs, labels)
 
         return energy_rew
 
@@ -147,7 +154,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
                          + self._energy_reward_w * energy_rew
         return combined_rewards
 
+
     # def _preproc_obs(self, obs):
+    #     """Preprocess observations (normalization)
+
+    #     Args:
+    #         obs (torch.Tensor): observations to feed into the energy-based model
+    #     """
+
     #     if self._normalize_amp_input:
     #         obs = self._amp_input_mean_std(obs)
     #     return obs
