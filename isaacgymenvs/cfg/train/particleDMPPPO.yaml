@@ -106,7 +106,7 @@ params:
         energy_reward_w: 1.0
         sigma_level: 9 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: ""
+        eb_model_checkpoint: "learning/motion_ncsn/run/logs/2d_test_bigL_norm/checkpoint_200000.pth"
 
 
     player:

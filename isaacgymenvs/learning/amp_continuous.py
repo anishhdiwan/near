@@ -155,7 +155,7 @@ class AMPAgent(common_agent.CommonAgent):
 
         ## TESTING ###
         # print("TESTING")
-        # print(f"play_steps mb_amp_obs {mb_amp_obs}")
+        # print(f"play_steps mb_amp_obs {mb_amp_obs.shape}")
         # quit()
         ## TESTING ###
 
@@ -545,6 +545,7 @@ class AMPAgent(common_agent.CommonAgent):
             prob = 1 / (1 + torch.exp(-disc_logits)) 
             disc_r = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
             disc_r *= self._disc_reward_scale
+
         return disc_r
 
     def _store_replay_amp_obs(self, amp_obs):

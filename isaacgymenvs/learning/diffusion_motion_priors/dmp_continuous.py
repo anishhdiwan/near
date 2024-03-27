@@ -5,6 +5,7 @@ import numpy as np
 import os
 import time
 import yaml
+import argparse
 
 from rl_games.algos_torch import a2c_continuous
 # from rl_games.algos_torch import torch_ext
@@ -23,6 +24,20 @@ from torch import optim
 from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet
 
+def dict2namespace(config):
+    """Convert a disctionary (typically containing config params) to a namespace structure (https://tedboy.github.io/python_stdlib/generated/generated/argparse.Namespace.html#argparse.Namespace)
+
+    Args:
+        config (dict): dictionary of configs params
+    """
+    namespace = argparse.Namespace()
+    for key, value in config.items():
+        if isinstance(value, dict):
+            new_value = dict2namespace(value)
+        else:
+            new_value = value
+        setattr(namespace, key, new_value)
+    return namespace
 
 class DMPAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
@@ -80,6 +95,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
             energynet_config (dict): Configuration parameters used to define the energy network
         """
 
+        # Convert to Namespace() 
+        energynet_config = dict2namespace(energynet_config)
+
         eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
         energynet = SimpleNet(energynet_config).to(self.ppo_device)
         energynet = torch.nn.DataParallel(energynet)
@@ -122,6 +140,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         output = {
             'energy_reward': energy_rew
         }
+
         return output
 
     def _calc_energy(self, paired_obs):
@@ -132,12 +151,22 @@ class DMPAgent(a2c_continuous.A2CAgent):
         """
         # if self._normalize_energynet_input:
         #     pass
-        
+
+        ### TESTING - ONLY FOR PARTICLE ENV 2D ###
+        paired_obs = paired_obs[:,:,:2]
+        ### TESTING - ONLY FOR PARTICLE ENV 2D ###
+
+        # Reshape from being (horizon_len, num_envs, paired_obs_shape) to (-1, paired_obs_shape)
+        original_shape = list(paired_obs.shape)
+        paired_obs = paired_obs.reshape(-1, original_shape[-1])
+
         # Tensor of noise level to condition the energynet
         labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * self._c # c ranges from [0,L-1]
         
         with torch.no_grad():
             energy_rew = self._energynet(paired_obs, labels)
+            original_shape[-1] = energy_rew.shape[-1]
+            energy_rew = energy_rew.reshape(original_shape)
 
         return energy_rew
 
@@ -149,7 +178,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
             dmp_rewards (torch.Tensor): rewards obtained as energies computed using an energy-based model
         """
 
-        energy_rew = amp_rewards['energy_reward']
+        energy_rew = dmp_rewards['energy_reward']
         combined_rewards = self._task_reward_w * task_rewards + \
                          + self._energy_reward_w * energy_rew
         return combined_rewards
@@ -243,8 +272,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
 
         ## New Addition ##
-        # dmp_rewards = self._calc_rewards(mb_paired_obs)
-        # mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
+        dmp_rewards = self._calc_rewards(mb_paired_obs)
+        mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
 
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
         mb_returns = mb_advs + mb_values
@@ -258,7 +287,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # Adding dmp rewards to batch dict. Not used anywhere. Can be accessed in a network update later if needed
         # for k, v in amp_rewards.items():
         #     batch_dict[k] = a2c_common.swap_and_flatten01(v)
-
+        quit()
         return batch_dict
 
 
