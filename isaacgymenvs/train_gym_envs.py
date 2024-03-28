@@ -108,8 +108,8 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous
 
 
-    time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_name = f"{cfg.wandb_name}_{time_str}"
+    # time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # run_name = f"{cfg.wandb_name}_{time_str}"
 
     # ensure checkpoints can be specified as relative paths
     if cfg.checkpoint:

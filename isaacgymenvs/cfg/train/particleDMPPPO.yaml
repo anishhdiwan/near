@@ -61,9 +61,9 @@ params:
     bounds_loss_coef: 0
     
     
-    # DMP Params (these get copied over automatically)
+    # DMP Params
     dmp_config:
-
+      
       training:
         batch_size: 128
         n_epochs: 500000
@@ -102,6 +102,7 @@ params:
 
       # Change these to use the learnt energies to train a policy
       inference:
+        test: False
         task_reward_w: 0.0
         energy_reward_w: 1.0
         sigma_level: 9 # Must be in range(0,L)

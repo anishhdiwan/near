@@ -5,7 +5,6 @@ import numpy as np
 import os
 import time
 import yaml
-import argparse
 
 from rl_games.algos_torch import a2c_continuous
 # from rl_games.algos_torch import torch_ext
@@ -23,21 +22,7 @@ from torch import optim
 
 from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet
-
-def dict2namespace(config):
-    """Convert a disctionary (typically containing config params) to a namespace structure (https://tedboy.github.io/python_stdlib/generated/generated/argparse.Namespace.html#argparse.Namespace)
-
-    Args:
-        config (dict): dictionary of configs params
-    """
-    namespace = argparse.Namespace()
-    for key, value in config.items():
-        if isinstance(value, dict):
-            new_value = dict2namespace(value)
-        else:
-            new_value = value
-        setattr(namespace, key, new_value)
-    return namespace
+from utils.ncsn_utils import dict2namespace
 
 class DMPAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
