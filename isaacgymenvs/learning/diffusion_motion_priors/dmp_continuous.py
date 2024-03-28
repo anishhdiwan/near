@@ -9,7 +9,7 @@ import yaml
 from rl_games.algos_torch import a2c_continuous
 # from rl_games.algos_torch import torch_ext
 # from rl_games.algos_torch import central_value
-# from rl_games.algos_torch.running_mean_std import RunningMeanStd
+from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.common import a2c_common
 # from rl_games.common import datasets
 # from rl_games.common import schedulers
@@ -38,10 +38,19 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._load_config_params(config)
         self._init_network(config['dmp_config'])
 
-        # if self.normalize_value:
-        #     self.value_mean_std = self.central_value_net.model.value_mean_std if self.has_central_value else self.model.value_mean_std
-        # if self._normalize_energynet_input:
-            # self._amp_input_mean_std = RunningMeanStd(self._amp_observation_space.shape).to(self.ppo_device)
+        # Standardization
+        if self._normalize_energynet_input:
+            ## TESTING ONLY: Swiss-Roll ##
+            self._running_mean_std = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
+            ## TESTING ONLY ##
+
+            # self._running_mean_std = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
+            # Since the running mean and std are pre-computed on the demo data, only eval is needed here
+
+            running_mean_std_states = torch.load(self._running_mean_std_checkpoint, map_location=self.ppo_device)
+            self._running_mean_std.load_state_dict(running_mean_std_states)
+
+            self._running_mean_std.eval()
 
         print("This is DMP")
 
@@ -63,6 +72,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._sigma_end = config['dmp_config']['model']['sigma_end']
         self._L = config['dmp_config']['model']['L']
         self._normalize_energynet_input = config['dmp_config']['training'].get('normalize_energynet_input', True)
+        self._running_mean_std_checkpoint = config['dmp_config']['inference']['running_mean_std_checkpoint']
 
 
     def init_tensors(self):
@@ -134,12 +144,12 @@ class DMPAgent(a2c_continuous.A2CAgent):
         Args:
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
         """
-        # if self._normalize_energynet_input:
-        #     pass
 
         ### TESTING - ONLY FOR PARTICLE ENV 2D ###
         paired_obs = paired_obs[:,:,:2]
         ### TESTING - ONLY FOR PARTICLE ENV 2D ###
+
+        self._preproc_obs(paired_obs)
 
         # Reshape from being (horizon_len, num_envs, paired_obs_shape) to (-1, paired_obs_shape)
         original_shape = list(paired_obs.shape)
@@ -169,16 +179,16 @@ class DMPAgent(a2c_continuous.A2CAgent):
         return combined_rewards
 
 
-    # def _preproc_obs(self, obs):
-    #     """Preprocess observations (normalization)
+    def _preproc_obs(self, obs):
+        """Preprocess observations (normalization)
 
-    #     Args:
-    #         obs (torch.Tensor): observations to feed into the energy-based model
-    #     """
+        Args:
+            obs (torch.Tensor): observations to feed into the energy-based model
+        """
 
-    #     if self._normalize_amp_input:
-    #         obs = self._amp_input_mean_std(obs)
-    #     return obs
+        if self._normalize_energynet_input:
+            obs = self._running_mean_std(obs)
+        return obs
 
 
     def play_steps(self):
@@ -272,7 +282,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # Adding dmp rewards to batch dict. Not used anywhere. Can be accessed in a network update later if needed
         # for k, v in amp_rewards.items():
         #     batch_dict[k] = a2c_common.swap_and_flatten01(v)
-        quit()
+
         return batch_dict
 
 

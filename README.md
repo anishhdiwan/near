@@ -51,8 +51,7 @@ PPO
 python train.py task=HumanoidAMP experiment=AMP_walk
 ```
 
-
-Note that with IsaacGym, by default we show a preview window, which will usually slow down training. You 
+Note: with IsaacGym, by default we show a preview window, which will usually slow down training. You 
 can use the `v` key while running to disable viewer updates and allow training to proceed 
 faster. Hit the `v` key again to resume viewing after a few seconds of training, once the 
 ants have learned to run a bit better.
@@ -64,6 +63,15 @@ Alternatively, you can train headlessly, as follows:
 ```bash
 python train.py task=Cartpole headless=True
 ```
+
+### Training the energy-based model (NCSN)
+
+```bash
+python train_ncsn.py task=particleDMP
+```
+
+Note: set DMP params in the `dsm_config` part of the `train/particleDMP.yml` file. The motions are currently preset within the ncsn script but will soon be passable as config params. 
+
 
 
 ## Troubleshooting

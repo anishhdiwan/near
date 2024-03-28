@@ -104,12 +104,14 @@ params:
 
       # Change these to use the learnt energies to train a policy
       inference:
-        test: False
+        test: True
         task_reward_w: 0.0
         energy_reward_w: 1.0
         sigma_level: 9 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "learning/motion_ncsn/run/logs/2d_test_bigL_norm/checkpoint_200000.pth"
+        eb_model_checkpoint: "ncsn_runs/particleDMP_NCSN_28-18-06-14/nn/checkpoint.pth"
+        # The running mean is used for standardization. Only used when normalize_energynet_input is true
+        running_mean_std_checkpoint: "ncsn_runs/particleDMP_NCSN_28-18-06-14/nn/running_mean_std.pth"
 
 
     player:
