@@ -1,7 +1,6 @@
 import hydra
 
-from omegaconf import DictConfig, OmegaConf
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf, open_dict
 
 # Importing from the file path
 import sys
@@ -32,6 +31,11 @@ def launch_hydra(cfg: DictConfig):
 
     dmp_cfg = cfg.train.params.config.dmp_config
 
+    # add device
+    device = dmp_cfg.get('device', 'cuda:0')
+    with open_dict(dmp_cfg):
+        dmp_cfg.device = device
+
     # Printing the config
     dmp_cfg_dict = omegaconf_to_dict(dmp_cfg)
     print_dict(dmp_cfg_dict)
@@ -51,14 +55,15 @@ def launch_hydra(cfg: DictConfig):
     args = argparse.Namespace()
     args.run = experiment_dir
     args.log = os.path.join(experiment_dir, 'nn')
+    os.makedirs(args.log, exist_ok=True)
     args.doc = '_'
 
 
     runner = AnnealRunner(args, dmp_cfg)
-    # if not dmp_cfg.inference.test:
-    #     runner.train()
-    # else:
-    #     runner.test()
+    if not dmp_cfg.inference.test:
+        runner.train()
+    else:
+        runner.test()
 
 
 if __name__ == "__main__":

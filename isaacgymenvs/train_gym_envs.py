@@ -32,7 +32,6 @@
 import hydra
 
 from omegaconf import DictConfig, OmegaConf
-from omegaconf import DictConfig, OmegaConf
 
 # Importing from the file path
 import sys

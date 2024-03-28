@@ -82,6 +82,8 @@ params:
         sigma_end: 0.01
         L: 10
         in_dim: 2
+        # needed for standardization computation
+        numObsSteps: ${......task.env.numObsSteps}
         encoder_hidden_layers: [16, 32]
         latent_space_dim: 64
         decoder_hidden_layers: [32, 16]

@@ -6,4 +6,4 @@ headless: ${resolve_default:False,${..headless}}
 training_algo: DMP 
 env: 
   numEnvs: ${resolve_default:16,${...num_envs}}
-  numAMPObsSteps: 2
+  numObsSteps: 2
