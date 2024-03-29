@@ -41,7 +41,7 @@ params:
     tau: 0.9
 
     learning_rate: 1e-4
-    score_to_win: 0 # Training stops if reached
+    score_to_win: 50 # Training stops if reached
     save_best_after: 50
     save_frequency: 30
     grad_norm: 0.5
@@ -106,11 +106,11 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 6 # Must be in range(0,L)
+        sigma_level: 5 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/particleDMP_NCSN_29-14-18-57/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/particleDMP_NCSN_29-15-41-45/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/particleDMP_NCSN_29-14-18-57/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/particleDMP_NCSN_29-15-41-45/nn/running_mean_std.pth"
 
 
     player:

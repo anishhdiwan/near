@@ -7,7 +7,7 @@ import time
 import yaml
 
 from rl_games.algos_torch import a2c_continuous
-# from rl_games.algos_torch import torch_ext
+from rl_games.algos_torch import torch_ext
 # from rl_games.algos_torch import central_value
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.common import a2c_common
@@ -276,9 +276,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
         batch_dict['step_time'] = step_time
 
         ## New Addition ##
-        # Adding dmp rewards to batch dict. Not used anywhere. Can be accessed in a network update later if needed
-        # for k, v in amp_rewards.items():
-        #     batch_dict[k] = a2c_common.swap_and_flatten01(v)
+        # Adding dmp rewards to batch dict. Used for early stopping and reward logging
+        for k, v in dmp_rewards.items():
+            batch_dict[k] = a2c_common.swap_and_flatten01(v)
+        batch_dict['combined_rewards'] = a2c_common.swap_and_flatten01(mb_rewards)
 
         return batch_dict
 
@@ -298,5 +299,211 @@ class DMPAgent(a2c_continuous.A2CAgent):
         paired_obs = paired_obs.view(shape)
         energy_rew = self._calc_energy(paired_obs)
 
-        print(f"mean energy reward (across all envs): {energy_rew.mean()}")
+        print(f"Mean energy reward (across all envs): {energy_rew.mean()}")
 
+    def _log_train_info(self, infos, frame):
+        """Log dmp specific training information
+
+        Args:
+            infos (dict): dictionary of training logs
+            frame (int): current training step
+        """
+        for k, v in infos.items():
+            self.writer.add_scalar(f'{k}/step', torch.mean(v).item(), frame)
+
+    def train(self):
+        """Train the algorithm and log training metrics
+        """
+        self.init_tensors()
+        self.last_mean_rewards = -100500
+        start_time = time.time()
+        total_time = 0
+        rep_count = 0
+        self.obs = self.env_reset()
+        self.curr_frames = self.batch_size_envs
+
+        if self.multi_gpu:
+            print("====================broadcasting parameters")
+            model_params = [self.model.state_dict()]
+            dist.broadcast_object_list(model_params, 0)
+            self.model.load_state_dict(model_params[0])
+
+        while True:
+            epoch_num = self.update_epoch()
+            energy_rew, combined_rewards, step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
+            total_time += sum_time
+            frame = self.frame // self.num_agents
+
+            ## New Addition ##
+            dmp_infos = {'energy_reward': energy_rew, 'combined_rewards': combined_rewards}
+            mean_combined_reward = torch.mean(combined_rewards).item()
+
+            # cleaning memory to optimize space
+            self.dataset.update_values_dict(None)
+            should_exit = False
+
+            if self.rank == 0:
+                self.diagnostics.epoch(self, current_epoch = epoch_num)
+                # do we need scaled_time?
+                scaled_time = self.num_agents * sum_time
+                scaled_play_time = self.num_agents * play_time
+                curr_frames = self.curr_frames * self.rank_size if self.multi_gpu else self.curr_frames
+                self.frame += curr_frames
+
+                a2c_common.print_statistics(self.print_stats, curr_frames, step_time, scaled_play_time, scaled_time, 
+                                epoch_num, self.max_epochs, frame, self.max_frames)
+
+                self.write_stats(total_time, epoch_num, step_time, play_time, update_time,
+                                a_losses, c_losses, entropies, kls, last_lr, lr_mul, frame,
+                                scaled_time, scaled_play_time, curr_frames)
+
+                if len(b_losses) > 0:
+                    self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(b_losses).item(), frame)
+
+                if self.has_soft_aug:
+                    self.writer.add_scalar('losses/aug_loss', np.mean(aug_losses), frame)
+
+                ## New Addition ##
+                self._log_train_info(dmp_infos, frame)
+                
+                if self.game_rewards.current_size > 0:
+                    mean_rewards = self.game_rewards.get_mean()
+                    mean_lengths = self.game_lengths.get_mean()
+                    self.mean_rewards = mean_rewards[0]
+
+                    for i in range(self.value_size):
+                        rewards_name = 'rewards' if i == 0 else 'rewards{0}'.format(i)
+                        self.writer.add_scalar(rewards_name + '/step'.format(i), mean_rewards[i], frame)
+                        self.writer.add_scalar(rewards_name + '/iter'.format(i), mean_rewards[i], epoch_num)
+                        self.writer.add_scalar(rewards_name + '/time'.format(i), mean_rewards[i], total_time)
+
+                    self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
+                    self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
+                    self.writer.add_scalar('episode_lengths/time', mean_lengths, total_time)
+
+                    if self.has_self_play_config:
+                        self.self_play_manager.update(self)
+
+                    checkpoint_name = self.config['name'] + '_ep_' + str(epoch_num) + '_combined_rew_' + str(mean_combined_reward)
+
+                    if self.save_freq > 0:
+                        if (epoch_num % self.save_freq == 0) and (mean_combined_reward <= self.last_mean_rewards):
+                            self.save(os.path.join(self.nn_dir, 'last_' + checkpoint_name))
+
+                    if mean_combined_reward > self.last_mean_rewards and epoch_num >= self.save_best_after:
+                        print('saving next best rewards: ', mean_combined_reward)
+                        self.last_mean_rewards = mean_combined_reward
+                        self.save(os.path.join(self.nn_dir, self.config['name']))
+
+                        if 'score_to_win' in self.config:
+                            if self.last_mean_rewards > self.config['score_to_win']:
+                                print('Maximum reward achieved. Network won!')
+                                self.save(os.path.join(self.nn_dir, checkpoint_name))
+                                should_exit = True
+
+                if epoch_num >= self.max_epochs and self.max_epochs != -1:
+                    if self.game_rewards.current_size == 0:
+                        print('WARNING: Max epochs reached before any env terminated at least once')
+                        mean_rewards = -np.inf
+
+                    self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_ep_' + str(epoch_num) \
+                        + '_combined_rew_' + str(mean_combined_reward).replace('[', '_').replace(']', '_')))
+                    print('MAX EPOCHS NUM!')
+                    should_exit = True
+
+                if self.frame >= self.max_frames and self.max_frames != -1:
+                    if self.game_rewards.current_size == 0:
+                        print('WARNING: Max frames reached before any env terminated at least once')
+                        mean_rewards = -np.inf
+
+                    self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_frame_' + str(self.frame) \
+                        + '_combined_rew_' + str(mean_combined_reward).replace('[', '_').replace(']', '_')))
+                    print('MAX FRAMES NUM!')
+                    should_exit = True
+
+                update_time = 0
+
+            if self.multi_gpu:
+                should_exit_t = torch.tensor(should_exit, device=self.device).float()
+                dist.broadcast(should_exit_t, 0)
+                should_exit = should_exit_t.float().item()
+            if should_exit:
+                return self.last_mean_rewards, epoch_num
+
+            if should_exit:
+                return self.last_mean_rewards, epoch_num
+
+
+    def train_epoch(self):
+        """Train one epoch of the algorithm
+        """
+        # super().train_epoch()
+
+        self.set_eval()
+        play_time_start = time.time()
+        with torch.no_grad():
+            if self.is_rnn:
+                batch_dict = self.play_steps_rnn()
+            else:
+                batch_dict = self.play_steps()
+
+        play_time_end = time.time()
+        update_time_start = time.time()
+        rnn_masks = batch_dict.get('rnn_masks', None)
+
+        ## New Addition ##
+        energy_rew = batch_dict.get('energy_reward', torch.zeros(self.num_agents))
+        combined_rewards = batch_dict.get('combined_rewards', torch.zeros(self.num_agents))
+
+        self.set_train()
+        self.curr_frames = batch_dict.pop('played_frames')
+        self.prepare_dataset(batch_dict)
+        self.algo_observer.after_steps()
+        if self.has_central_value:
+            self.train_central_value()
+
+        a_losses = []
+        c_losses = []
+        b_losses = []
+        entropies = []
+        kls = []
+
+        for mini_ep in range(0, self.mini_epochs_num):
+            ep_kls = []
+            for i in range(len(self.dataset)):
+                a_loss, c_loss, entropy, kl, last_lr, lr_mul, cmu, csigma, b_loss = self.train_actor_critic(self.dataset[i])
+                a_losses.append(a_loss)
+                c_losses.append(c_loss)
+                ep_kls.append(kl)
+                entropies.append(entropy)
+                if self.bounds_loss_coef is not None:
+                    b_losses.append(b_loss)
+
+                self.dataset.update_mu_sigma(cmu, csigma)
+                if self.schedule_type == 'legacy':
+                    av_kls = kl
+                    if self.multi_gpu:
+                        dist.all_reduce(kl, op=dist.ReduceOp.SUM)
+                        av_kls /= self.rank_size
+                    self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
+                    self.update_lr(self.last_lr)
+
+            av_kls = torch_ext.mean_list(ep_kls)
+            if self.multi_gpu:
+                dist.all_reduce(av_kls, op=dist.ReduceOp.SUM)
+                av_kls /= self.rank_size
+            if self.schedule_type == 'standard':
+                self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
+                self.update_lr(self.last_lr)
+
+            kls.append(av_kls)
+            self.diagnostics.mini_epoch(self, mini_ep)
+            if self.normalize_input:
+                self.model.running_mean_std.eval() # don't need to update statstics more than one miniepoch
+
+        update_time_end = time.time()
+        play_time = play_time_end - play_time_start
+        update_time = update_time_end - update_time_start
+        total_time = update_time_end - play_time_start
+
+        return energy_rew, combined_rewards, batch_dict['step_time'], play_time, update_time, total_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul
