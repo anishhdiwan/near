@@ -41,18 +41,18 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # Standardization
         if self._normalize_energynet_input:
             ## TESTING ONLY: Swiss-Roll ##
-            self._running_mean_std = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
+            self._energynet_input_norm = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
             ## TESTING ONLY ##
 
-            # self._running_mean_std = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
+            # self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
             # Since the running mean and std are pre-computed on the demo data, only eval is needed here
 
-            running_mean_std_states = torch.load(self._running_mean_std_checkpoint, map_location=self.ppo_device)
-            self._running_mean_std.load_state_dict(running_mean_std_states)
+            energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.ppo_device)
+            self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
 
-            self._running_mean_std.eval()
+            self._energynet_input_norm.eval()
 
-        print("This is DMP")
+        print("Diffusion Motion Priors Initialised!")
 
 
     def _load_config_params(self, config):
@@ -72,7 +72,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._sigma_end = config['dmp_config']['model']['sigma_end']
         self._L = config['dmp_config']['model']['L']
         self._normalize_energynet_input = config['dmp_config']['training'].get('normalize_energynet_input', True)
-        self._running_mean_std_checkpoint = config['dmp_config']['inference']['running_mean_std_checkpoint']
+        self._energynet_input_norm_checkpoint = config['dmp_config']['inference']['running_mean_std_checkpoint']
 
 
     def init_tensors(self):
@@ -148,9 +148,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         ### TESTING - ONLY FOR PARTICLE ENV 2D ###
         paired_obs = paired_obs[:,:,:2]
         ### TESTING - ONLY FOR PARTICLE ENV 2D ###
-
-        self._preproc_obs(paired_obs)
-
+        paired_obs = self._preproc_obs(paired_obs)
         # Reshape from being (horizon_len, num_envs, paired_obs_shape) to (-1, paired_obs_shape)
         original_shape = list(paired_obs.shape)
         paired_obs = paired_obs.reshape(-1, original_shape[-1])
@@ -187,7 +185,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         """
 
         if self._normalize_energynet_input:
-            obs = self._running_mean_std(obs)
+            obs = self._energynet_input_norm(obs)
         return obs
 
 
@@ -199,7 +197,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         self.set_eval()
 
-        print("This is the play_steps method modified for DMP")
         update_list = self.update_list
         step_time = 0.0
 
@@ -253,8 +250,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self.current_lengths = self.current_lengths * not_dones
 
             ## New Addition ##
-            # if (self.vec_env.env.viewer and (n == (self.horizon_length - 1))):
-            #     self._print_debug_stats(infos)
+            if (self.vec_env.env.viewer and (n == (self.horizon_length - 1))):
+                self._print_debug_stats(infos)
 
         last_values = self.get_values(self.obs)
 
@@ -285,4 +282,21 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         return batch_dict
 
+
+    def _print_debug_stats(self, infos):
+        """Print training stats for debugging. Usually called at the end of every training epoch
+
+        Args:
+            infos (dict): Dictionary containing infos passed to the algorithms after stepping the environment
+        """
+
+
+        paired_obs = infos['amp_obs']
+
+        shape = list(paired_obs.shape)
+        shape.insert(0,1)
+        paired_obs = paired_obs.view(shape)
+        energy_rew = self._calc_energy(paired_obs)
+
+        print(f"mean energy reward (across all envs): {energy_rew.mean()}")
 

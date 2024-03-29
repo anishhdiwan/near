@@ -29,6 +29,7 @@ def launch_hydra(cfg: DictConfig):
     # if cfg.checkpoint:
     #     cfg.checkpoint = to_absolute_path(cfg.checkpoint)
 
+    visualise = cfg.test
     dmp_cfg = cfg.train.params.config.dmp_config
 
     # add device
@@ -36,14 +37,16 @@ def launch_hydra(cfg: DictConfig):
     with open_dict(dmp_cfg):
         dmp_cfg.device = device
 
-    # Printing the config
-    dmp_cfg_dict = omegaconf_to_dict(dmp_cfg)
-    print_dict(dmp_cfg_dict)
-    print("-----")
-
 
     # dump config dict
-    if not dmp_cfg.inference.test:
+    if not visualise:
+
+        # Printing the config
+        dmp_cfg_dict = omegaconf_to_dict(dmp_cfg)
+        print("TRAIN CFG")
+        print_dict(dmp_cfg_dict)
+        print("-----")
+
         experiment_dir = os.path.join('ncsn_runs', cfg.train.params.config.name + '_NCSN' + 
         '_{date:%d-%H-%M-%S}'.format(date=datetime.now()))
 
@@ -51,19 +54,22 @@ def launch_hydra(cfg: DictConfig):
         with open(os.path.join(experiment_dir, 'ncsn_config.yaml'), 'w') as f:
             f.write(OmegaConf.to_yaml(dmp_cfg))
 
-    # AnnealRunner generally takes in command line arguments for training log paths and other options. Setting up an artifical args object here to feed in the options
-    args = argparse.Namespace()
-    args.run = experiment_dir
-    args.log = os.path.join(experiment_dir, 'nn')
-    os.makedirs(args.log, exist_ok=True)
-    args.doc = '_'
+        # AnnealRunner generally takes in command line arguments for training log paths and other options. Setting up an artifical args object here to feed in the options
+        args = argparse.Namespace()
+        args.run = experiment_dir
+        args.log = os.path.join(experiment_dir, 'nn')
+        os.makedirs(args.log, exist_ok=True)
+        args.doc = '_'
 
 
-    runner = AnnealRunner(args, dmp_cfg)
-    if not dmp_cfg.inference.test:
+        runner = AnnealRunner(args, dmp_cfg)
         runner.train()
+    
     else:
-        runner.test()
+        # Empty args
+        args = argparse.Namespace()
+        runner = AnnealRunner(args, dmp_cfg)
+        runner.visualise_energy()
 
 
 if __name__ == "__main__":

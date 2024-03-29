@@ -83,7 +83,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     # noinspection PyUnresolvedReferences
     import isaacgym
     # from isaacgymenvs.pbt.pbt import PbtAlgoObserver, initial_pbt_check
-    from isaacgymenvs.utils.rlgames_utils import multi_gpu_get_rank
+    # from isaacgymenvs.utils.rlgames_utils import multi_gpu_get_rank
     from hydra.utils import to_absolute_path
     # from isaacgymenvs.tasks import isaacgym_task_map
     import gym
