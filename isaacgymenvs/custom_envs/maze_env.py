@@ -5,10 +5,32 @@ import collections
 import numpy as np
 import pygame
 
+import pymunk
+import pymunk.pygame_util
+from pymunk.vec2d import Vec2d
 import shapely.geometry as sg
 import cv2
 import skimage.transform as st
 
+# Importing from the file path
+import sys
+import os
+PYMUNK_OVERRIDE_PATH = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(PYMUNK_OVERRIDE_PATH)
+from pymunk_override import DrawOptions
+
+
+def pymunk_to_shapely(body, shapes):
+    geoms = list()
+    for shape in shapes:
+        if isinstance(shape, pymunk.shapes.Poly):
+            verts = [body.local_to_world(v) for v in shape.get_vertices()]
+            verts += [verts[0]]
+            geoms.append(sg.Polygon(verts))
+        else:
+            raise RuntimeError(f'Unsupported shape type {type(shape)}')
+    geom = sg.MultiPolygon(geoms)
+    return geom
 
 def unnormalise_action(action, max_vel):
     """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([-max_vel,-max_vel], [max_vel, max_vel])
@@ -31,14 +53,12 @@ def unnormalise_action(action, max_vel):
 
     return action
 
-class Particle():
-    def __init__(self, position, radius):
-        self.position = position
-        self.radius = radius
 
-class ParticleEnv(gym.Env):
+class MazeEnv(gym.Env):
     """
-    A simple 2D environment with a particle that moves around in a window, given velocity actions
+    A simple 2D environment with a particle that moves given velocity actions. The goal is to get to the end.
+    
+    The environment also has a maze that offers a longer (suboptimal) path to the end. 
 
     render_action (Bool): Whether to render actions
     render_size (Int): Render scaling
@@ -46,11 +66,11 @@ class ParticleEnv(gym.Env):
     cfg (dict config): Typically a hydra config with rendering settings or learning algorithm related params
     """
 
-    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 5}
+    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 10}
     reward_range = (0., 1.)
 
     def __init__(self,
-            render_action=True,
+            render_action=True, damping=None,
             render_size=96,
             reset_to_state=None,
             cfg=None,
@@ -63,7 +83,9 @@ class ParticleEnv(gym.Env):
         self.max_vel = max_vel = 20 # px/s in each axis
         self.render_size = render_size
         self.sim_hz = 100
+
         # Local controller params.
+        # self.k_p, self.k_v = 100, 20    # PD control.z
         self.control_hz = self.metadata['video.frames_per_second']
 
         # agent_pos
@@ -126,7 +148,7 @@ class ParticleEnv(gym.Env):
                 dtype=np.float64
             )
 
-
+        self.damping = damping
         self.render_action = render_action
 
         """
@@ -140,6 +162,8 @@ class ParticleEnv(gym.Env):
         self.clock = None
         self.screen = None
 
+        # Pumunk space
+        self.space = None
         self.teleop = None
         self.latest_action = None
         self.reset_to_state = reset_to_state
@@ -161,16 +185,78 @@ class ParticleEnv(gym.Env):
 
 
     def _setup(self):
+        # Set up a pumunk space of 2D physics
+        self.space = pymunk.Space()
+        self.space.gravity = 0, 0
+        self.space.damping = 0
         self.teleop = False
 
-        # Add agent and block goal
-        self.agent = Particle((256, 400), 15)
-        self.goal_pose = np.array([self.window_size/2, self.window_size/2])
+        # Add walls so that the agent cant not escape the environment
+        walls = [
+            self._add_segment((5, 506), (5, 5), 2),
+            self._add_segment((5, 5), (506, 5), 2),
+            self._add_segment((506, 5), (506, 506), 2),
+            self._add_segment((5, 506), (506, 506), 2)
+        ]
+        self.space.add(*walls)
+
+        # Add agent, maze, and goal zone (goal pose is at k*ws in each axis where k in (0,1) is some const.)
+        self.agent = self.add_circle((256, 400), 15)
+
+        # Add maze
+        maze_walls = [
+            self._add_polygon([(40,100), (40,460), (20,460), (20,100)]),
+
+            self._add_polygon([(100,100), (100,380), (120,380), (120,100)]),
+
+            self._add_polygon([(20,460), (380,460), (380,480), (20,480)]),
+
+            self._add_polygon([(100,380), (380,380), (380,400), (100,400)]),
+
+
+        ]
+        self.space.add(*maze_walls)
+
+        self.goal_color = pygame.Color('LightGreen')
+        self.goal_pose = 0.85 * np.array([self.window_size, self.window_size])
+
+        # Add collision handling
+        self.collision_handeler = self.space.add_collision_handler(0, 0)
+        # self.collision_handeler.post_solve = self._handle_collision
+        # self.n_contact_points = 0
 
         # Counting the number of steps
         self.env_steps = 0
         # step() returns done after this
         self.max_env_steps = 150
+
+
+    def _handle_collision(self, arbiter, space, data):
+        self.n_contact_points += len(arbiter.contact_point_set.points)
+
+
+    def _add_polygon(self, vertices):
+        shape = pymunk.Poly(self.space.static_body, vertices)
+        shape.color = pygame.Color('RosyBrown')    # https://htmlcolorcodes.com/color-names
+        return shape
+
+
+    def _add_segment(self, a, b, radius):
+        shape = pymunk.Segment(self.space.static_body, a, b, radius)
+        shape.color = pygame.Color('LightGray')    # https://htmlcolorcodes.com/color-names
+        return shape
+
+
+    def add_circle(self, position, radius):
+        """Add a circle to the pymunk space
+        """
+        body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
+        body.position = position
+        body.friction = 1
+        shape = pymunk.Circle(body, radius)
+        shape.color = pygame.Color('RoyalBlue')
+        self.space.add(body, shape)
+        return body
 
     def reset(self):
         """
@@ -178,10 +264,12 @@ class ParticleEnv(gym.Env):
         """
         seed = self._seed
         self._setup()
+        if self.damping is not None:
+            self.space.damping = self.damping
         
         state = self.reset_to_state
         if state is None:
-            state = np.random.randint(low=50, high=450, size=2)
+            state = np.random.randint(low=60, high=80, size=2)
         self._set_state(state)
 
         observation = self._get_obs()
@@ -200,6 +288,8 @@ class ParticleEnv(gym.Env):
         pos_agent = state
         self.agent.position = pos_agent
 
+        # Run physics to take effect
+        self.space.step(1.0 / self.sim_hz)
 
 
     def step(self, action):
@@ -212,24 +302,15 @@ class ParticleEnv(gym.Env):
         if action is not None:
             self.latest_action = action
             for i in range(n_steps):
-                updated_position = self.agent.position + action * dt
+                self.agent.position = self.agent.position + action * dt
 
-                if updated_position[0] < 0.:
-                    updated_position[0] = 0.
-                elif updated_position[0] > self.window_size:
-                    updated_position[0] = self.window_size
-
-                if updated_position[1] < 0.:
-                    updated_position[1] = 0.
-                elif updated_position[1] > self.window_size:
-                    updated_position[1] = self.window_size
-
-                self.agent.position = updated_position
+                # Step physics.
+                self.space.step(dt)
 
 
         dist_to_goal = np.linalg.norm(np.absolute(self.agent.position) - np.absolute(self.goal_pose))/np.linalg.norm(np.absolute(self.goal_pose))
         reward = -dist_to_goal
-   
+
         done = dist_to_goal < 0.05
         
         
@@ -273,11 +354,15 @@ class ParticleEnv(gym.Env):
         canvas = pygame.Surface((self.window_size, self.window_size))
         canvas.fill((255, 255, 255))
         self.screen = canvas
+        
+        draw_options = DrawOptions(canvas)
 
+        # Draw goal pose
+        pygame.draw.circle(self.screen, pygame.Color('palegreen4'), self.goal_pose, 10)
 
-        # Draw agent (to self.screen)
-        pygame.draw.circle(self.screen, pygame.Color('RoyalBlue'), self.agent.position, self.agent.radius)
-        pygame.draw.circle(self.screen, pygame.Color('palegreen4'), self.goal_pose, 5)
+        # Draw all bodies defined in the space (agent, walls, maze)
+        self.space.debug_draw(draw_options)
+
 
         if mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
@@ -306,16 +391,6 @@ class ParticleEnv(gym.Env):
 
     def teleop_agent(self):
         pass
-        # TeleopAgent = collections.namedtuple('TeleopAgent', ['act'])
-        # def act(obs):
-        #     act = None
-        #     mouse_position = pymunk.pygame_util.from_pygame(Vec2d(*pygame.mouse.get_pos()), self.screen)
-        #     if self.teleop or (mouse_position - self.agent.position).length < 30:
-        #         self.teleop = True
-        #         act = mouse_position
-        #     return act
-        # return TeleopAgent(act)
-
 
     def close(self):
         if self.window is not None:
