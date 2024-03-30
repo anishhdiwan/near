@@ -4,7 +4,7 @@ import time
 env = MazeEnv(normalise_action=False)
 
 
-env.teleop_agent()
+env.teleop_agent(record_data=True)
 
 # obs = env.reset()
 

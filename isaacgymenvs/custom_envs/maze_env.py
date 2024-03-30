@@ -5,6 +5,7 @@ import collections
 import numpy as np
 import pygame
 import time
+from datetime import datetime
 
 import pymunk
 import pymunk.pygame_util
@@ -41,25 +42,6 @@ def unnormalise_action(action, window_size):
     return action
 
 
-def normalise_action(action, window_size):
-    """Normalise an input action from being in the range Box([0,0], [window_size, window_size]) to the range of Box([-1,-1], [1,1])  
-
-    Given,
-    [r_min, r_max] = [0,window_size] = data range
-    [t_min, t_max] = [-1, 1] = target range
-    x in data range
-
-    x_in_target_range = t_min + (x - r_min)*(t_max - t_min)/(r_max - r_min) 
-    https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range
-
-    Args:
-        action (gym.Actions): Input action in unnormalised range
-        window_size (float): Size of the pushT window to which the action is unnormalised
-    """ 
-    action = -1 + (action * 2)/window_size
-
-    return action
-
 class MazeEnv(gym.Env):
     """
     A simple 2D environment with a particle that moves given position actions. The goal is to get to the end.
@@ -89,6 +71,8 @@ class MazeEnv(gym.Env):
         # self.max_vel = max_vel = 2 # px/s in each axis
         self.render_size = render_size
         self.sim_hz = 100
+        # step() returns done after this
+        self.max_env_steps = 150
 
         # Local controller params.
         self.k_p, self.k_v = 100, 20    # PD control.z
@@ -228,8 +212,6 @@ class MazeEnv(gym.Env):
 
         # Counting the number of steps
         self.env_steps = 0
-        # step() returns done after this
-        self.max_env_steps = 150
 
 
     def _handle_collision(self, arbiter, space, data):
@@ -327,6 +309,7 @@ class MazeEnv(gym.Env):
         self.env_steps += 1
         if self.env_steps >= self.max_env_steps:
             done = True
+            info['max_steps'] = True
 
         return observation, reward, done, info
 
@@ -397,17 +380,31 @@ class MazeEnv(gym.Env):
     def teleop_agent(self, record_data=False):
         assert self.normalise_action == False, "Please set normalisation to False. This is necessary to feed in the correct joystick commands to the environment"
         # Get pygame joystick
+
+        # Print instructions
+        print('''At any point the left joystick moves the agent 
+        
+        Press B to reset the environment
+        Press X to close the game
+        Press A to reset the environment and start recording motion data (once recording has finished the game will resume in non-recording mode)
+        
+        ''')
+
         if not self.pygame_initialised:
             pygame.init()
             # pygame.display.init()
 
         assert pygame.joystick.get_count() > 0, "No joystick found! Please plug in and try again"
         joystick = pygame.joystick.Joystick(0)
-        
+
+        # Increase max env steps before reset for teleop
+        self.max_env_steps = 15000
+        recording_stated = False
+
         # Reset env
         obs = self.reset()
 
-        print("Press Ctrl+C to force stop")
+        print("The environment will reset after a set time! Press Ctrl+C to force stop")
         while True:
             # Get joystick vals
             # Axes are in a range of [-1,1]
@@ -440,18 +437,44 @@ class MazeEnv(gym.Env):
                 obs = self.reset()
 
             
+            # Reset and start recording if A
+            if record_data:
+                if js_A:
+                    recording_stated = True
+                    print("Resetting the game! This episode will be recorded as training data")
+                    time.sleep(0.5)
+                    obs = self.reset()
+                    states = np.zeros((self.max_env_steps, self.action_space.shape[0]))
+
+            
             current_pos = np.array(tuple(self.agent.position))
+            if record_data and recording_stated:
+                states[self.env_steps] = current_pos
+
             js_action = self.scale_joystick(np.array([js_x, js_y]))
-
             action = current_pos + js_action
-
             observation, reward, done, info = self.step(action)
+
             # print(f"Obs {observation} | Rew {reward} | done {done} | info {info}")
             self.render(mode="human")
-            # time.sleep(0.1)
-            
 
-        # return js_x, js_y
+            if done:
+                if record_data and recording_stated:
+                    if not info.get('max_steps', False):
+                        now = '_{date:%d-%H-%M-%S}'.format(date=datetime.now())
+                        with open(f'data/maze_env/{now}.npy', 'wb') as f:
+                            np.save(f, states)
+                        print("Recording saved!")
+                    else:
+                        print("Recording was not saved! Episode ended at max steps")
+
+                    recording_stated = False
+
+                print("Episode finished! Resetting")
+                time.sleep(0.25)
+                obs = self.reset()
+
+
 
     def scale_joystick(self, joystick_vals):
         """
