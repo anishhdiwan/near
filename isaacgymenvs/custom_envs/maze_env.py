@@ -21,24 +21,12 @@ sys.path.append(PYMUNK_OVERRIDE_PATH)
 from pymunk_override import DrawOptions
 
 
-def pymunk_to_shapely(body, shapes):
-    geoms = list()
-    for shape in shapes:
-        if isinstance(shape, pymunk.shapes.Poly):
-            verts = [body.local_to_world(v) for v in shape.get_vertices()]
-            verts += [verts[0]]
-            geoms.append(sg.Polygon(verts))
-        else:
-            raise RuntimeError(f'Unsupported shape type {type(shape)}')
-    geom = sg.MultiPolygon(geoms)
-    return geom
-
-def unnormalise_action(action, max_vel):
-    """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([-max_vel,-max_vel], [max_vel, max_vel])
+def unnormalise_action(action, window_size):
+    """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([0,0], [window_size, window_size])
 
     Given,
     [r_min, r_max] = [-1,1] = data range
-    [t_min, t_max] = [-max_vel, max_vel] = target range
+    [t_min, t_max] = [0, window_size] = target range
     x in data range
 
     x_in_target_range = t_min + (x - r_min)*(t_max - t_min)/(r_max - r_min) 
@@ -46,18 +34,35 @@ def unnormalise_action(action, max_vel):
 
     Args:
         action (gym.Actions): Input action in normalised range
-        max_vel (float): Max velocity to which the action is unnormalised
+        window_size (float): Size of the pushT window to which the action is unnormalised
     """
-    # action = (action + 1)*(max_vel)/2
-
-    action = -max_vel + (action + 1)*(max_vel)
+    action = (action + 1)*(window_size)/2
 
     return action
 
 
+def normalise_action(action, window_size):
+    """Normalise an input action from being in the range Box([0,0], [window_size, window_size]) to the range of Box([-1,-1], [1,1])  
+
+    Given,
+    [r_min, r_max] = [0,window_size] = data range
+    [t_min, t_max] = [-1, 1] = target range
+    x in data range
+
+    x_in_target_range = t_min + (x - r_min)*(t_max - t_min)/(r_max - r_min) 
+    https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range
+
+    Args:
+        action (gym.Actions): Input action in unnormalised range
+        window_size (float): Size of the pushT window to which the action is unnormalised
+    """ 
+    action = -1 + (action * 2)/window_size
+
+    return action
+
 class MazeEnv(gym.Env):
     """
-    A simple 2D environment with a particle that moves given velocity actions. The goal is to get to the end.
+    A simple 2D environment with a particle that moves given position actions. The goal is to get to the end.
     
     The environment also has a maze that offers a longer (suboptimal) path to the end. 
 
@@ -81,7 +86,7 @@ class MazeEnv(gym.Env):
         self.normalise_action = normalise_action
         self.seed()
         self.window_size = ws = 512  # The size of the PyGame window
-        self.max_vel = max_vel = 2 # px/s in each axis
+        # self.max_vel = max_vel = 2 # px/s in each axis
         self.render_size = render_size
         self.sim_hz = 100
 
@@ -143,8 +148,8 @@ class MazeEnv(gym.Env):
         else:
             # velocity goal for agent
             self.action_space = spaces.Box(
-                low=np.array([-max_vel,-max_vel], dtype=np.float64),
-                high=np.array([max_vel,max_vel], dtype=np.float64),
+                low=np.array([0,0], dtype=np.float64),
+                high=np.array([ws,ws], dtype=np.float64),
                 shape=(2,),
                 dtype=np.float64
             )
@@ -291,16 +296,16 @@ class MazeEnv(gym.Env):
     def step(self, action):
         if self.normalise_action:
             # Unnormalise action before applying to the env
-            action = unnormalise_action(action, self.max_vel)
+            action = unnormalise_action(action, self.window_size)
 
         dt = 1.0 / self.sim_hz
         n_steps = self.sim_hz // self.control_hz
         if action is not None:
             self.latest_action = action
             for i in range(n_steps):
-                self.agent.position = self.agent.position + action * dt
-                # acceleration = self.k_p * (action - self.agent.position) + self.k_v * (Vec2d(0, 0) - self.agent.velocity)
-                # self.agent.velocity += acceleration * dt
+                # self.agent.position = self.agent.position + action * dt
+                acceleration = self.k_p * (action - self.agent.position) + self.k_v * (Vec2d(0, 0) - self.agent.velocity)
+                self.agent.velocity += acceleration * dt
 
                 # Step physics.
                 self.space.step(dt)
@@ -432,27 +437,27 @@ class MazeEnv(gym.Env):
                 print("Resetting the game!")
                 time.sleep(0.25)
                 obs = self.reset()
-            
+
+            action = np.array([js_x, js_y])
+
 
             # Scale joystick inputs if needed
             if not self.normalise_action:
-                js_x, js_y = self.scale_joystick(js_x, js_y)
+                action = unnormalise_action(action, self.window_size)
 
-
-            action = np.array([js_x, js_y])
             observation, reward, done, info = self.step(action)
             # print(f"Obs {observation} | Rew {reward} | done {done} | info {info}")
             self.render(mode="human")
             # time.sleep(0.1)
             
-            
-    def scale_joystick(self, js_x, js_y):
-        """Scale the joystick input from [-1,1] to [-max_vel, max_vel]. Used in case actions are not normalised
-        """
-        js_x = self.max_vel * js_x
-        js_y = self.max_vel * js_y
 
-        return js_x, js_y
+        # return js_x, js_y
+
+    def scale_joystick(self, joystick_vals):
+        """
+        """
+        return 0.05 * joystick_vals
+
 
     def close(self):
         if self.window is not None:
