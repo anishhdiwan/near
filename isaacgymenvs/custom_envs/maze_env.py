@@ -377,7 +377,7 @@ class MazeEnv(gym.Env):
         # return img
 
 
-    def teleop_agent(self, record_data=False):
+    def teleop_agent(self, record_data=True):
         assert self.normalise_action == False, "Please set normalisation to False. This is necessary to feed in the correct joystick commands to the environment"
         # Get pygame joystick
 
@@ -387,6 +387,8 @@ class MazeEnv(gym.Env):
         Press B to reset the environment
         Press X to close the game
         Press A to reset the environment and start recording motion data (once recording has finished the game will resume in non-recording mode)
+            - If A is pressed during recording, the current one is discarded and a new recording is started
+            - If B is pressed during recording, the current one is discarded and the game resumes in normal mode 
         
         ''')
 
@@ -431,21 +433,34 @@ class MazeEnv(gym.Env):
                 exit()
 
             # Reset if B
-            if js_B:
-                print("Resetting the game!")
-                time.sleep(0.25)
-                obs = self.reset()
+            if not recording_stated:
+                if js_B:
+                    print("Resetting the game!")
+                    time.sleep(0.25)
+                    obs = self.reset()
 
             
             # Reset and start recording if A
             if record_data:
-                if js_A:
+                if js_A and recording_stated==False:
                     recording_stated = True
                     print("Resetting the game! This episode will be recorded as training data")
                     time.sleep(0.5)
                     obs = self.reset()
                     states = np.zeros((self.max_env_steps, self.action_space.shape[0]))
 
+                elif js_A and recording_stated==True:
+                    recording_stated = True
+                    print("Game reset during recording! Previous recording discarded and new one started")
+                    time.sleep(1)
+                    obs = self.reset()
+                    states = np.zeros((self.max_env_steps, self.action_space.shape[0]))
+
+                elif js_B and recording_stated==True:
+                    recording_stated = False
+                    print("Game reset during recording! Previous recording discarded")
+                    time.sleep(1)
+                    obs = self.reset()
             
             current_pos = np.array(tuple(self.agent.position))
             if record_data and recording_stated:
@@ -464,13 +479,14 @@ class MazeEnv(gym.Env):
                         now = '_{date:%d-%H-%M-%S}'.format(date=datetime.now())
                         with open(f'data/maze_env/{now}.npy', 'wb') as f:
                             np.save(f, states)
-                        print("Recording saved!")
+                        print("Recording saved! Game reset to normal mode")
                     else:
-                        print("Recording was not saved! Episode ended at max steps")
+                        print("Recording was not saved! Episode ended at max steps. Game reset")
 
                     recording_stated = False
 
-                print("Episode finished! Resetting")
+                else:
+                    print("Episode finished! Resetting")
                 time.sleep(0.25)
                 obs = self.reset()
 
