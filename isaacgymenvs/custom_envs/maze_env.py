@@ -4,6 +4,7 @@ from gym import spaces
 import collections
 import numpy as np
 import pygame
+import time
 
 import pymunk
 import pymunk.pygame_util
@@ -80,12 +81,12 @@ class MazeEnv(gym.Env):
         self.normalise_action = normalise_action
         self.seed()
         self.window_size = ws = 512  # The size of the PyGame window
-        self.max_vel = max_vel = 20 # px/s in each axis
+        self.max_vel = max_vel = 2 # px/s in each axis
         self.render_size = render_size
         self.sim_hz = 100
 
         # Local controller params.
-        # self.k_p, self.k_v = 100, 20    # PD control.z
+        self.k_p, self.k_v = 100, 20    # PD control.z
         self.control_hz = self.metadata['video.frames_per_second']
 
         # agent_pos
@@ -161,10 +162,10 @@ class MazeEnv(gym.Env):
         self.window = None
         self.clock = None
         self.screen = None
+        self.pygame_initialised = False
 
         # Pumunk space
         self.space = None
-        self.teleop = None
         self.latest_action = None
         self.reset_to_state = reset_to_state
 
@@ -189,7 +190,7 @@ class MazeEnv(gym.Env):
         self.space = pymunk.Space()
         self.space.gravity = 0, 0
         self.space.damping = 0
-        self.teleop = False
+
 
         # Add walls so that the agent cant not escape the environment
         walls = [
@@ -206,14 +207,9 @@ class MazeEnv(gym.Env):
         # Add maze
         maze_walls = [
             self._add_polygon([(40,100), (40,460), (20,460), (20,100)]),
-
             self._add_polygon([(100,100), (100,380), (120,380), (120,100)]),
-
             self._add_polygon([(20,460), (380,460), (380,480), (20,480)]),
-
             self._add_polygon([(100,380), (380,380), (380,400), (100,400)]),
-
-
         ]
         self.space.add(*maze_walls)
 
@@ -303,6 +299,8 @@ class MazeEnv(gym.Env):
             self.latest_action = action
             for i in range(n_steps):
                 self.agent.position = self.agent.position + action * dt
+                # acceleration = self.k_p * (action - self.agent.position) + self.k_v * (Vec2d(0, 0) - self.agent.velocity)
+                # self.agent.velocity += acceleration * dt
 
                 # Step physics.
                 self.space.step(dt)
@@ -345,8 +343,9 @@ class MazeEnv(gym.Env):
     def _render_frame(self, mode):
 
         if self.window is None and mode == "human":
-            pygame.init()
-            pygame.display.init()
+            if not self.pygame_initialised:
+                pygame.init()
+                # pygame.display.init()
             self.window = pygame.display.set_mode((self.window_size, self.window_size))
         if self.clock is None and mode == "human":
             self.clock = pygame.time.Clock()
@@ -358,7 +357,7 @@ class MazeEnv(gym.Env):
         draw_options = DrawOptions(canvas)
 
         # Draw goal pose
-        pygame.draw.circle(self.screen, pygame.Color('palegreen4'), self.goal_pose, 10)
+        pygame.draw.circle(self.screen, self.goal_color, self.goal_pose, 10)
 
         # Draw all bodies defined in the space (agent, walls, maze)
         self.space.debug_draw(draw_options)
@@ -389,8 +388,71 @@ class MazeEnv(gym.Env):
         # return img
 
 
-    def teleop_agent(self):
-        pass
+    def teleop_agent(self, record_data=False):
+          
+        # Get pygame joystick
+        if not self.pygame_initialised:
+            pygame.init()
+            # pygame.display.init()
+
+        assert pygame.joystick.get_count() > 0, "No joystick found! Please plug in and try again"
+        joystick = pygame.joystick.Joystick(0)
+        
+        # Reset env
+        obs = self.reset()
+
+        print("Press Ctrl+C to force stop")
+        while True:
+            # Get joystick vals
+            # Axes are in a range of [-1,1]
+            js_x = joystick.get_axis(0)
+            js_y = joystick.get_axis(1)
+
+            # Buttons are bools
+            js_A = joystick.get_button(0)
+            js_B = joystick.get_button(1)
+            js_X = joystick.get_button(2)
+
+
+            # Quit if ctrl+c or window closed
+            for event in pygame.event.get(): # get the events (update the joystick)
+                if event.type == pygame.QUIT: # allow to click on the X button to close the window
+                    pygame.quit()
+                    exit()
+                    
+            # Quit if X
+            if js_X:
+                print("Quitting the game!")
+                time.sleep(0.25)
+                pygame.quit()
+                exit()
+
+            # Reset if B
+            if js_B:
+                print("Resetting the game!")
+                time.sleep(0.25)
+                obs = self.reset()
+            
+
+            # Scale joystick inputs if needed
+            if not self.normalise_action:
+                js_x, js_y = self.scale_joystick(js_x, js_y)
+
+
+            action = np.array([js_x, js_y])
+            observation, reward, done, info = self.step(action)
+            # print(f"Obs {observation} | Rew {reward} | done {done} | info {info}")
+            self.render(mode="human")
+            # time.sleep(0.1)
+            
+            
+    def scale_joystick(self, js_x, js_y):
+        """Scale the joystick input from [-1,1] to [-max_vel, max_vel]. Used in case actions are not normalised
+        """
+        js_x = self.max_vel * js_x
+        js_y = self.max_vel * js_y
+
+        return js_x, js_y
 
     def close(self):
         if self.window is not None:
