@@ -251,7 +251,7 @@ class MazeEnv(gym.Env):
     def add_circle(self, position, radius):
         """Add a circle to the pymunk space
         """
-        body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
+        body = pymunk.Body(1, float("inf"))
         body.position = position
         body.friction = 1
         shape = pymunk.Circle(body, radius)
@@ -360,6 +360,7 @@ class MazeEnv(gym.Env):
         self.screen = canvas
         
         draw_options = DrawOptions(canvas)
+        # draw_options = pymunk.pygame_util.DrawOptions(canvas)
 
         # Draw goal pose
         pygame.draw.circle(self.screen, self.goal_color, self.goal_pose, 10)
@@ -394,7 +395,7 @@ class MazeEnv(gym.Env):
 
 
     def teleop_agent(self, record_data=False):
-          
+        assert self.normalise_action == False, "Please set normalisation to False. This is necessary to feed in the correct joystick commands to the environment"
         # Get pygame joystick
         if not self.pygame_initialised:
             pygame.init()
@@ -438,12 +439,11 @@ class MazeEnv(gym.Env):
                 time.sleep(0.25)
                 obs = self.reset()
 
-            action = np.array([js_x, js_y])
+            
+            current_pos = np.array(tuple(self.agent.position))
+            js_action = self.scale_joystick(np.array([js_x, js_y]))
 
-
-            # Scale joystick inputs if needed
-            if not self.normalise_action:
-                action = unnormalise_action(action, self.window_size)
+            action = current_pos + js_action
 
             observation, reward, done, info = self.step(action)
             # print(f"Obs {observation} | Rew {reward} | done {done} | info {info}")
@@ -455,8 +455,9 @@ class MazeEnv(gym.Env):
 
     def scale_joystick(self, joystick_vals):
         """
+        Scale joystick actions to increase or decrease input sensitivity
         """
-        return 0.05 * joystick_vals
+        return 2.0 * joystick_vals
 
 
     def close(self):
