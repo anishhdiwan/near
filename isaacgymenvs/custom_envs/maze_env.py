@@ -22,12 +22,12 @@ sys.path.append(PYMUNK_OVERRIDE_PATH)
 from pymunk_override import DrawOptions
 
 
-def unnormalise_action(action, window_size):
-    """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([0,0], [window_size, window_size])
+def unnormalise_action(action, range_max):
+    """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([-range_max,-range_max], [range_max, range_max])
 
     Given,
     [r_min, r_max] = [-1,1] = data range
-    [t_min, t_max] = [0, window_size] = target range
+    [t_min, t_max] = [-range_max, range_max] = target range
     x in data range
 
     x_in_target_range = t_min + (x - r_min)*(t_max - t_min)/(r_max - r_min) 
@@ -37,14 +37,21 @@ def unnormalise_action(action, window_size):
         action (gym.Actions): Input action in normalised range
         window_size (float): Size of the pushT window to which the action is unnormalised
     """
-    action = (action + 1)*(window_size)/2
+
+    action = range_max * action
 
     return action
 
 
 class MazeEnv(gym.Env):
     """
-    A simple 2D environment with a particle that moves given position actions. The goal is to get to the end.
+    A simple 2D environment with a particle that moves given position actions. The action space is the set of 2D poses in a k unit circle around the agent.
+
+      .....
+    .       .
+    .   A    .
+     .      .
+      .....
     
     The environment also has a maze that offers a longer (suboptimal) path to the end. 
 
@@ -68,7 +75,8 @@ class MazeEnv(gym.Env):
         self.normalise_action = normalise_action
         self.seed()
         self.window_size = ws = 512  # The size of the PyGame window
-        # self.max_vel = max_vel = 2 # px/s in each axis
+        # Radius of the circle around the agent in which position actions are given
+        self.action_space_radius = act_rad = 2.0
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
@@ -132,8 +140,8 @@ class MazeEnv(gym.Env):
         else:
             # velocity goal for agent
             self.action_space = spaces.Box(
-                low=np.array([0,0], dtype=np.float64),
-                high=np.array([ws,ws], dtype=np.float64),
+                low=np.array([-act_rad,-act_rad], dtype=np.float64),
+                high=np.array([act_rad,act_rad], dtype=np.float64),
                 shape=(2,),
                 dtype=np.float64
             )
@@ -276,9 +284,13 @@ class MazeEnv(gym.Env):
 
 
     def step(self, action):
+
         if self.normalise_action:
             # Unnormalise action before applying to the env
-            action = unnormalise_action(action, self.window_size)
+            action = unnormalise_action(action, self.action_space_radius)
+
+        current_pos = np.array(tuple(self.agent.position))
+        action = current_pos + action
 
         dt = 1.0 / self.sim_hz
         n_steps = self.sim_hz // self.control_hz
@@ -378,7 +390,7 @@ class MazeEnv(gym.Env):
 
 
     def teleop_agent(self, record_data=True):
-        assert self.normalise_action == False, "Please set normalisation to False. This is necessary to feed in the correct joystick commands to the environment"
+        assert self.normalise_action == True, "Please set normalisation to True. This is necessary to feed in the correct joystick commands to the environment"
         # Get pygame joystick
 
         # Print instructions
@@ -466,8 +478,7 @@ class MazeEnv(gym.Env):
             if record_data and recording_stated:
                 states[self.env_steps] = current_pos
 
-            js_action = self.scale_joystick(np.array([js_x, js_y]))
-            action = current_pos + js_action
+            action = np.array([js_x, js_y])
             observation, reward, done, info = self.step(action)
 
             # print(f"Obs {observation} | Rew {reward} | done {done} | info {info}")
@@ -492,11 +503,11 @@ class MazeEnv(gym.Env):
 
 
 
-    def scale_joystick(self, joystick_vals):
-        """
-        Scale joystick actions to increase or decrease input sensitivity
-        """
-        return 2.0 * joystick_vals
+    # def scale_joystick(self, joystick_vals):
+    #     """
+    #     Scale joystick actions to increase or decrease input sensitivity
+    #     """
+    #     return self.action_space_radius * joystick_vals
 
 
     def close(self):
