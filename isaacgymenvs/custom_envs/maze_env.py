@@ -478,7 +478,7 @@ class MazeEnv(gym.Env):
                     if not info.get('max_steps', False):
                         now = '_{date:%d-%H-%M-%S}'.format(date=datetime.now())
                         with open(f'data/maze_env/{now}.npy', 'wb') as f:
-                            np.save(f, states)
+                            np.save(f, states[:self.env_steps])
                         print("Recording saved! Game reset to normal mode")
                     else:
                         print("Recording was not saved! Episode ended at max steps. Game reset")
