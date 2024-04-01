@@ -76,11 +76,11 @@ class MazeEnv(gym.Env):
         self.seed()
         self.window_size = ws = 512  # The size of the PyGame window
         # Radius of the circle around the agent in which position actions are given
-        self.action_space_radius = act_rad = 2.0
+        self.action_space_radius = act_rad = 3.0
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
-        self.max_env_steps = 150
+        self.max_env_steps = 8000
 
         # Local controller params.
         self.k_p, self.k_v = 100, 20    # PD control.z
@@ -203,10 +203,10 @@ class MazeEnv(gym.Env):
 
         # Add maze
         maze_walls = [
-            self._add_polygon([(40,100), (40,460), (20,460), (20,100)]),
-            self._add_polygon([(100,100), (100,380), (120,380), (120,100)]),
-            self._add_polygon([(20,460), (380,460), (380,480), (20,480)]),
-            self._add_polygon([(100,380), (380,380), (380,400), (100,400)]),
+            self._add_polygon([(40,140), (40,460), (20,460), (20,140)]),
+            self._add_polygon([(100,140), (100,380), (120,380), (120,140)]),
+            self._add_polygon([(20,460), (350,460), (350,480), (20,480)]),
+            self._add_polygon([(100,380), (350,380), (350,400), (100,400)]),
         ]
         self.space.add(*maze_walls)
 
@@ -412,7 +412,7 @@ class MazeEnv(gym.Env):
         joystick = pygame.joystick.Joystick(0)
 
         # Increase max env steps before reset for teleop
-        self.max_env_steps = 15000
+        # self.max_env_steps = 12000
         recording_stated = False
 
         # Reset env
