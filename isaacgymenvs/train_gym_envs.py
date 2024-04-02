@@ -98,13 +98,14 @@ def launch_rlg_hydra(cfg: DictConfig):
     from rl_games.common import env_configurations, vecenv
     from rl_games.torch_runner import Runner
     from rl_games.algos_torch import model_builder
+    from rl_games.algos_torch import players
     from isaacgymenvs.learning import amp_continuous
     from isaacgymenvs.learning import amp_players
     from isaacgymenvs.learning import amp_models
     from isaacgymenvs.learning import amp_network_builder
     import isaacgymenvs
 
-    from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous
+    from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous, dmp_players
 
 
     # time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -164,6 +165,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
         ## Registering Diffusion Motion Priors ##
         runner.algo_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_continuous.DMPAgent(**kwargs))
+        runner.player_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_players.DMPPlayerContinuous(**kwargs))
 
         return runner
 

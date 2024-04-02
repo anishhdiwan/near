@@ -95,5 +95,5 @@ params:
     
     player:
       render: True
-      render_sleep: 0.08 # Determines frame rate (how many seconds to wait between two frames)
+      render_sleep: 0.1 # Determines frame rate (how many seconds to wait between two frames)
       games_num: 5 # Number of games to play

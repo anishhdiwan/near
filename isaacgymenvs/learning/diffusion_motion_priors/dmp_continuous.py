@@ -100,7 +100,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         self._energynet = energynet
         self._energynet.eval()
-        self._sigmas = np.exp(np.linspace(np.log(self._sigma_begin), np.log(self._sigma_end), self._L))
+        # self._sigmas = np.exp(np.linspace(np.log(self._sigma_begin), np.log(self._sigma_end), self._L))
 
 
     def _build_buffers(self):
@@ -291,8 +291,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
             infos (dict): Dictionary containing infos passed to the algorithms after stepping the environment
         """
 
-
-        paired_obs = infos['amp_obs']
+        # TODO: Handle the case where paired obs is not provided (isaacgym envs)
+        paired_obs = infos['paired_obs']
 
         shape = list(paired_obs.shape)
         shape.insert(0,1)
@@ -336,7 +336,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             ## New Addition ##
             dmp_infos = {'energy_reward': energy_rew, 'combined_rewards': combined_rewards}
-            mean_combined_reward = torch.mean(combined_rewards).item()
+            mean_combined_reward = torch.mean(combined_rewards).round(decimals=4).item()
 
             # cleaning memory to optimize space
             self.dataset.update_values_dict(None)
