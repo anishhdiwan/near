@@ -336,7 +336,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             ## New Addition ##
             dmp_infos = {'energy_reward': energy_rew, 'combined_rewards': combined_rewards}
-            mean_combined_reward = torch.mean(combined_rewards).round(decimals=4).item()
+            mean_combined_reward = torch.round(torch.mean(combined_rewards), decimals=4).item()
 
             # cleaning memory to optimize space
             self.dataset.update_values_dict(None)

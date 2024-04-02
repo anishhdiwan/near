@@ -106,7 +106,7 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 4 # Must be in range(0,L)
+        sigma_level: 1 # Must be in range(0,L)
         # Relative to the train.py file
         eb_model_checkpoint: "ncsn_runs/particleDMP_NCSN_02-11-24-10/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true

@@ -2,8 +2,8 @@ from maze_env import MazeEnv
 import time
 import numpy as np
 
-# env = MazeEnv()
-# env.teleop_agent(record_data=True)
+env = MazeEnv()
+env.teleop_agent(record_data=True)
 
 
 # env = MazeEnv(normalise_action=True)

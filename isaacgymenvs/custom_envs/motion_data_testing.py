@@ -9,25 +9,37 @@ from pymunk_override import DrawOptions
 
 from motion_lib import MotionLib, unnormalize_data
 from pusht_env import PushTEnv
+from maze_env import MazeEnv
 import time
 from tqdm import tqdm
 # import matplotlib.pyplot as plt
 
-env = PushTEnv() 
-motion_file = FILE_PATH + "/data/pusht/pusht_cchi_v7_replay.zarr"
-num_amp_obs_steps = 2
-num_amp_obs_per_step = 5
+environment = "maze" # "pushT"
+
+if environment == "maze":
+    env = MazeEnv() 
+    motion_file = FILE_PATH + "/data/maze_env/maze_motions.zarr"
+    num_obs_steps = 2
+    num_obs_per_step = 2
+
+elif environment == "pushT":
+    env = PushTEnv() 
+    motion_file = FILE_PATH + "/data/pusht/pusht_cchi_v7_replay.zarr"
+    num_obs_steps = 2
+    num_obs_per_step = 5
+
+
 num_samples = 128
 mode = "human"
 num_plays = 10
-sleep_time = 0.08
+sleep_time = 0.0
 
 
 
 def test_non_episodic_dataloader():
     # episodic=True (default) returns trajectories of length num_samples, where each trajectory is guaranteed to be from a single episode (no trajectories with episode ends)
     # episodic=False just samples in an unshuffled manner from the whole sequence of trajectories
-    motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step, episodic=False)
+    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, episodic=False)
 
     # A dataloader can also be returned to get shuffled or unshuffled samples of some required length. When shuffle=True, the dataloader essentially returns trajectories regardless of episode ends
     dataloader = motion_lib.get_traj_agnostic_dataloader(batch_size=num_samples, shuffle=True)
@@ -52,7 +64,7 @@ def test_non_episodic_dataloader():
 
 
 def play_sampled_trajectories(num_plays=num_plays, num_samples=num_samples):
-    motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
+    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step)
     for _ in range(num_plays):
         obs = env.reset()
         print("ENV RESET")
@@ -81,7 +93,13 @@ def play_sampled_trajectories(num_plays=num_plays, num_samples=num_samples):
 
 
 def play_all_episodes():
-    motion_lib = MotionLib(motion_file, num_amp_obs_steps, num_amp_obs_per_step)
+
+    if environment == "pushT":
+        auto_ends = True
+    elif environment == "maze":
+        auto_ends = False
+
+    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends)
     # VIEW ALL EPISODES
     paired_processed_episodes = motion_lib.get_episodes()
     print(f"VIEWING ALL {len(paired_processed_episodes)} EPISODES")
@@ -91,7 +109,10 @@ def play_all_episodes():
         obs = env.reset()
         print(f"EPISODE {i} | ENV RESET")
         # episode = paired_processed_episodes[5]
-        unpaired_obs = episode[:, :5]
+        if environment == "pushT":
+            unpaired_obs = episode[:, :5]
+        elif environment == "maze":
+            unpaired_obs = episode[:, :2]
         # unpaired_obs = unnormalize_data(unpaired_obs, motion_lib.dataset.stats['obs'])
         # print(f"Episode Unpaired Obs (len episode): {unpaired_obs.shape}")
 
@@ -107,14 +128,17 @@ def play_all_episodes():
                 env.space.step(dt)
 
             env.agent.position = tuple(obs[:2]) 
-            env.block.position = tuple(obs[2:4])
-            env.block.angle = obs[4]
+            try:
+                env.block.position = tuple(obs[2:4])
+                env.block.angle = obs[4]
+            except Exception:
+                pass
             env.render(mode=mode)
             time.sleep(sleep_time)
 
-    print(max_idxs)
+
 
 # Calling functions
 # play_sampled_trajectories()
-# play_all_episodes()
-test_non_episodic_dataloader()
+play_all_episodes()
+# test_non_episodic_dataloader()

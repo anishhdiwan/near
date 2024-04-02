@@ -57,17 +57,17 @@ def unnormalize_data(ndata, stats):
     data = ndata * (stats['max'] - stats['min']) + stats['min']
     return data
 
-def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, device):
+def pair_data(data_dict, episode_ends, num_obs_steps, num_obs_per_step, device):
     """
     Create sets of data [ [s1,s2,.. sn], [s2,s3,.. s+1] ...]
-    n = num_amp_obs_steps
+    n = num_obs_steps
     """
     for key, data in data_dict.items():
-        # paired_size = data.shape[0] - len(episode_ends)*(num_amp_obs_steps - 1)
-        # paired_data = torch.zeros((paired_size, num_amp_obs_steps*num_amp_obs_per_step), device=device, dtype=torch.float)
+        # paired_size = data.shape[0] - len(episode_ends)*(num_obs_steps - 1)
+        # paired_data = torch.zeros((paired_size, num_obs_steps*num_obs_per_step), device=device, dtype=torch.float)
 
         # new ends after having paired data
-        new_ends = copy.deepcopy(episode_ends) # - (num_amp_obs_per_step - 1)
+        new_ends = copy.deepcopy(episode_ends) # - (num_obs_per_step - 1)
 
         # preprocess episode ends list
         episode_ends = episode_ends.tolist()
@@ -78,15 +78,15 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
         # list of indices to delete after pairing up data
         del_list = []
         for end in episode_ends:
-            for i in range(num_amp_obs_steps - 1):
+            for i in range(num_obs_steps - 1):
                 if i != 0:
                     del_list.append((end - i))
         del_list = del_list + episode_ends
 
         # make copies of original data and shift each copy progressively by one index
         shifted_copies = []
-        for i in range(num_amp_obs_steps - 1):
-            shifted_array = np.copy(data)
+        for i in range(num_obs_steps - 1):
+            shifted_array = copy.deepcopy(data)
             shifted_array[:-1-i,:] = shifted_array[1+i:,:]
             # shifted_array[-1-i:,:] = 0.0
             # shifted_array = np.delete(shifted_array, [-1-i:])
@@ -113,7 +113,7 @@ def pair_data(data_dict, episode_ends, num_amp_obs_steps, num_amp_obs_per_step, 
 
 
 class MotionDataset():
-    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
+    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
         if device == None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
@@ -121,8 +121,8 @@ class MotionDataset():
         
         self.episodic_sampling = episodic
         self.normalize = normalize
-        self.num_amp_obs_steps = num_amp_obs_steps
-        self.num_amp_obs_per_step = num_amp_obs_per_step
+        self.num_obs_steps = num_obs_steps
+        self.num_obs_per_step = num_obs_per_step
         self.auto_ends = auto_ends
         self._load_motions(motion_file)
         
@@ -172,7 +172,7 @@ class MotionDataset():
         else:
             processed_train_data = train_data
                 
-        paired_processed_data, paired_processed_episodes = pair_data(processed_train_data, episode_ends, self.num_amp_obs_steps, self.num_amp_obs_per_step, self.device)
+        paired_processed_data, paired_processed_episodes = pair_data(processed_train_data, episode_ends, self.num_obs_steps, self.num_obs_per_step, self.device)
 
 
         self.paired_processed_data = paired_processed_data
@@ -222,12 +222,12 @@ class EpisodicSequentialSampler(Sampler):
 
 
 class MotionLib():
-    def __init__(self, motion_file, num_amp_obs_steps, num_amp_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
+    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
         # By default the dataset is normalised. If not needed, it is unnormalized here. 
         # NOTE: AMP also normalizes data internally. It is hence advisable to set normalization to false while sampling and let AMP handle it internally
         self.normalize = normalize
         self.episodic = episodic
-        self.dataset = MotionDataset(motion_file, num_amp_obs_steps, num_amp_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize)
+        self.dataset = MotionDataset(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize)
         self.dataloader = None
 
     def sample_motions(self, num_samples):
