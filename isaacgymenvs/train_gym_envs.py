@@ -131,13 +131,16 @@ def launch_rlg_hydra(cfg: DictConfig):
     # Creating a new function to return a pushT environment. This will then be added to rl_games env_configurations so that an env can be created from its name in the config
     from custom_envs.pusht_env import PushTEnv
     from custom_envs.particle_env import ParticleEnv
+    from custom_envs.maze_env import MazeEnv
     from custom_envs.customenv_utils import CustomRayVecEnv, PushTAlgoObserver
 
     def create_env(**kwargs):
-        if cfg_dict["task_name"] in ["pushT", "pushTAMP"]:
+        if cfg_dict["task_name"] in ["pushT", "pushTAMP", "pushTDMP"]:
             env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
         elif cfg_dict["task_name"] in ["particle", "particleDMP"]:
             env = ParticleEnv(cfg=cfg_dict["task"])
+        elif cfg_dict["task_name"] in ["maze", "mazeDMP", "mazeAMP"]:
+            env = MazeEnv(cfg=cfg_dict["task"])
         
         return env
 

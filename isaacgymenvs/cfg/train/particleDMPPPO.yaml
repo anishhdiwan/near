@@ -76,11 +76,14 @@ params:
 
       data:
         dataset: "Swiss-Roll"
+        # Since the swiss roll dataset is used, no motion file is needed here
+        # motion_file: None
       
       model:
         sigma_begin: 1
         sigma_end: 0.01
         L: 10
+        # number of features in an observation
         in_dim: 2
         # needed for standardization computation
         numObsSteps: ${......task.env.numObsSteps}

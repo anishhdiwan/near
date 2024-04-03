@@ -178,10 +178,8 @@ class MotionDataset():
 
         if self.split == "train":
             paired_processed_data = paired_processed_data[:int(len(paired_processed_data) * 0.8)]
-            print(f"train splitting {len(paired_processed_data)}")
         elif self.split == "test":
             paired_processed_data = paired_processed_data[int(len(paired_processed_data) * 0.8):]
-            print(f"test splitting {len(paired_processed_data)}")
 
         self.paired_processed_data = paired_processed_data
         self.paired_processed_episodes = paired_processed_episodes

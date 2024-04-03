@@ -76,12 +76,15 @@ params:
 
       data:
         dataset: "maze"
+        # Relative to the train.py file
+        motion_file: "custom_envs/data/maze_env/maze_motions.zarr"
       
       model:
         sigma_begin: 1
         sigma_end: 0.01
         L: 10
-        in_dim: 
+        # number of features in an observation
+        in_dim: 2
         # needed for standardization computation
         numObsSteps: ${......task.env.numObsSteps}
         encoder_hidden_layers: [16, 32]
@@ -106,11 +109,11 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 1 # Must be in range(0,L)
+        sigma_level: 9 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/particleDMP_NCSN_02-11-24-10/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_03-14-34-52/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/particleDMP_NCSN_02-11-24-10/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_03-14-34-52/nn/running_mean_std.pth"
 
 
     player:
