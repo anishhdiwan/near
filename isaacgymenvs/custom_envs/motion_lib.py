@@ -113,7 +113,7 @@ def pair_data(data_dict, episode_ends, num_obs_steps, num_obs_per_step, device):
 
 
 class MotionDataset():
-    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
+    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False, split=None):
         if device == None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
@@ -124,6 +124,8 @@ class MotionDataset():
         self.num_obs_steps = num_obs_steps
         self.num_obs_per_step = num_obs_per_step
         self.auto_ends = auto_ends
+        self.split = split
+
         self._load_motions(motion_file)
         
         # Episode to load data from
@@ -174,6 +176,12 @@ class MotionDataset():
                 
         paired_processed_data, paired_processed_episodes = pair_data(processed_train_data, episode_ends, self.num_obs_steps, self.num_obs_per_step, self.device)
 
+        if self.split == "train":
+            paired_processed_data = paired_processed_data[:int(len(paired_processed_data) * 0.8)]
+            print(f"train splitting {len(paired_processed_data)}")
+        elif self.split == "test":
+            paired_processed_data = paired_processed_data[int(len(paired_processed_data) * 0.8):]
+            print(f"test splitting {len(paired_processed_data)}")
 
         self.paired_processed_data = paired_processed_data
         self.paired_processed_episodes = paired_processed_episodes
@@ -222,12 +230,17 @@ class EpisodicSequentialSampler(Sampler):
 
 
 class MotionLib():
-    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False):
+    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False, test_split=True):
         # By default the dataset is normalised. If not needed, it is unnormalized here. 
         # NOTE: AMP also normalizes data internally. It is hence advisable to set normalization to false while sampling and let AMP handle it internally
         self.normalize = normalize
         self.episodic = episodic
-        self.dataset = MotionDataset(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize)
+        self.test_split = test_split
+        if self.test_split:
+            self.train_dataset = MotionDataset(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize, split="train")
+            self.test_dataset = MotionDataset(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize, split="test")
+        else:
+            self.dataset = MotionDataset(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends, episodic=episodic, device=device, normalize=normalize)            
         self.dataloader = None
 
     def sample_motions(self, num_samples):
@@ -236,6 +249,7 @@ class MotionLib():
         This only samples from episodes that have trajectories longer than num_samples. Naturally, samples in the batch are not shuffled 
         """
         assert self.episodic == True, "Please set the episodic argument of MotionLib to true"
+        assert self.test_split == False, "Episodic motion sampling current does not support test splitting"
         if self.dataloader == None:
             self._setup_trajectory_dataloader(num_samples)
 
@@ -257,7 +271,7 @@ class MotionLib():
         return self.dataset.paired_processed_episodes
 
     def _setup_trajectory_dataloader(self, batch_size):
-        """Set up a dataloader on the motion dataset to sample unshuffled motion trajectories
+        """Set up a dataloader on the motion dataset to sample (unshuffled) motion trajectories
         """
         self.dataset.batch_size = batch_size
         sampler = EpisodicSequentialSampler(self.dataset)
@@ -277,26 +291,72 @@ class MotionLib():
         Primarily used to train trajectory-agnostic methods like diffusion.
         """
         assert self.episodic == False, "Please set the episodic argument of MotionLib to false"
-        if shuffle == False:
-            sampler = EpisodicSequentialSampler(self.dataset)
-            traj_agnostic_dataloader = torch.utils.data.DataLoader(
-                        self.dataset,
-                        batch_size=batch_size,
-                        num_workers=1,
-                        # shuffle=shuffle,
-                        sampler=sampler,
-                        # accelerate cpu-gpu transfer
-                        pin_memory=True,
-                        )
-        else:
-            traj_agnostic_dataloader = torch.utils.data.DataLoader(
-                        self.dataset,
-                        batch_size=batch_size,
-                        num_workers=1,
-                        shuffle=shuffle,
-                        # accelerate cpu-gpu transfer
-                        pin_memory=True,
-                        )
+        if not self.test_split:
+            if shuffle == False:
+                sampler = EpisodicSequentialSampler(self.dataset)
+                traj_agnostic_dataloader = torch.utils.data.DataLoader(
+                            self.dataset,
+                            batch_size=batch_size,
+                            num_workers=1,
+                            # shuffle=shuffle,
+                            sampler=sampler,
+                            # accelerate cpu-gpu transfer
+                            pin_memory=True,
+                            )
+            else:
+                traj_agnostic_dataloader = torch.utils.data.DataLoader(
+                            self.dataset,
+                            batch_size=batch_size,
+                            num_workers=1,
+                            shuffle=shuffle,
+                            # accelerate cpu-gpu transfer
+                            pin_memory=True,
+                            )
 
 
-        return traj_agnostic_dataloader
+            return traj_agnostic_dataloader
+
+        elif self.test_split:
+            if shuffle == False:
+                train_sampler = EpisodicSequentialSampler(self.train_dataset)
+                test_sampler = EpisodicSequentialSampler(self.test_dataset)
+                traj_agnostic_train_dataloader = torch.utils.data.DataLoader(
+                            self.train_dataset,
+                            batch_size=batch_size,
+                            num_workers=1,
+                            # shuffle=shuffle,
+                            sampler=train_sampler,
+                            # accelerate cpu-gpu transfer
+                            pin_memory=True,
+                            )
+
+                traj_agnostic_test_dataloader = torch.utils.data.DataLoader(
+                            self.test_dataset,
+                            batch_size=batch_size,
+                            num_workers=1,
+                            # shuffle=shuffle,
+                            sampler=test_sampler,
+                            # accelerate cpu-gpu transfer
+                            pin_memory=True,
+                            )
+            else:
+                traj_agnostic_train_dataloader = torch.utils.data.DataLoader(
+                            self.train_dataset,
+                            batch_size=batch_size,
+                            num_workers=1,
+                            shuffle=shuffle,
+                            # accelerate cpu-gpu transfer
+                            pin_memory=True,
+                            )
+
+                traj_agnostic_test_dataloader = torch.utils.data.DataLoader(
+                            self.test_dataset,
+                            batch_size=batch_size,
+                            num_workers=1,
+                            shuffle=shuffle,
+                            # accelerate cpu-gpu transfer
+                            pin_memory=True,
+                            )
+
+
+            return traj_agnostic_train_dataloader, traj_agnostic_test_dataloader
