@@ -266,6 +266,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         dmp_rewards = self._calc_rewards(mb_paired_obs)
         mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
 
+
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
         mb_returns = mb_advs + mb_values
 

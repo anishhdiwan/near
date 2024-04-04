@@ -80,7 +80,7 @@ class MazeEnv(gym.Env):
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
-        self.max_env_steps = 2000
+        self.max_env_steps = 1000
 
         # Local controller params.
         self.k_p, self.k_v = 100, 20    # PD control.z
@@ -305,10 +305,17 @@ class MazeEnv(gym.Env):
                 self.space.step(dt)
 
 
-        dist_to_goal = np.linalg.norm(np.absolute(self.agent.position) - np.absolute(self.goal_pose))/np.linalg.norm(np.absolute(self.goal_pose))
+        dist_to_goal = np.linalg.norm(np.absolute(np.array(self.agent.position)) - np.absolute(self.goal_pose))/np.linalg.norm(np.absolute(self.goal_pose))
         reward = -dist_to_goal
+        # reward = 0.
 
-        done = dist_to_goal < 0.05
+        # done = dist_to_goal < 0.05
+
+        if dist_to_goal < 0.05:
+            done = True
+            reward += 1000
+        else:
+            done = False
         
         
         observation = self._get_obs()

@@ -35,7 +35,7 @@ params:
     max_epochs: ${resolve_default:500,${....max_iterations}}
     env_name:  gym_env
     reward_shaper:
-      scale_value: 0.1
+      scale_value: 1.
     normalize_advantage: True
     gamma: 0.95
     tau: 0.9
@@ -87,13 +87,13 @@ params:
         in_dim: 2
         # needed for standardization computation
         numObsSteps: ${......task.env.numObsSteps}
-        encoder_hidden_layers: [16, 32]
-        latent_space_dim: 64
-        decoder_hidden_layers: [32, 16]
+        encoder_hidden_layers: [32, 64]
+        latent_space_dim: 128
+        decoder_hidden_layers: [64, 32, 8]
         # The out dim is set to 1 internally (out_dim: 1) 
         
       optim:
-        weight_decay: 0.000
+        weight_decay: 1e-5
         optimizer: "Adam"
         lr: 0.0001
         beta1: 0.9
@@ -107,13 +107,13 @@ params:
 
       # Change these to use the learnt energies to train a policy
       inference:
-        task_reward_w: 0.0
+        task_reward_w: 5.0
         energy_reward_w: 1.0
         sigma_level: 8 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_03-14-34-52/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_04-14-43-18/nn/checkpoint_100000.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_03-14-34-52/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_04-14-43-18/nn/running_mean_std.pth"
 
 
     player:
