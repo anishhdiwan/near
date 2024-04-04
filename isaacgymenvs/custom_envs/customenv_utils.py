@@ -476,7 +476,7 @@ class CustomRayVecEnv(IVecEnv):
             res = self.workers[0].render.remote()
             _ = self.ray.get(res)
 
-            time.sleep(0.04) # 50 fps = 0.08s wait
+            # time.sleep(0.04) # 50 fps = 0.08s wait
 
     def augment_infos(self, infos, dones): 
         paired_obs= self._obs_buf.view(-1, self.num_obs)

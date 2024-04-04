@@ -80,7 +80,7 @@ class MazeEnv(gym.Env):
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
-        self.max_env_steps = 8000
+        self.max_env_steps = 2000
 
         # Local controller params.
         self.k_p, self.k_v = 100, 20    # PD control.z

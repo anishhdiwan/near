@@ -41,10 +41,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # Standardization
         if self._normalize_energynet_input:
             ## TESTING ONLY: Swiss-Roll ##
-            self._energynet_input_norm = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
+            # self._energynet_input_norm = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
             ## TESTING ONLY ##
 
-            # self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
+            self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
             # Since the running mean and std are pre-computed on the demo data, only eval is needed here
 
             energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.ppo_device)
@@ -145,10 +145,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
         """
 
-        ### TESTING - ONLY FOR PARTICLE ENV 2D ###
-        paired_obs = paired_obs[:,:,:2]
-        ### TESTING - ONLY FOR PARTICLE ENV 2D ###
-        paired_obs = self._preproc_obs(paired_obs)
+        # ### TESTING - ONLY FOR PARTICLE ENV 2D ###
+        # paired_obs = paired_obs[:,:,:2]
+        # ### TESTING - ONLY FOR PARTICLE ENV 2D ###
+        paired_obs = self._preprocess_observations(paired_obs)
         # Reshape from being (horizon_len, num_envs, paired_obs_shape) to (-1, paired_obs_shape)
         original_shape = list(paired_obs.shape)
         paired_obs = paired_obs.reshape(-1, original_shape[-1])
@@ -177,13 +177,12 @@ class DMPAgent(a2c_continuous.A2CAgent):
         return combined_rewards
 
 
-    def _preproc_obs(self, obs):
+    def _preprocess_observations(self, obs):
         """Preprocess observations (normalization)
 
         Args:
             obs (torch.Tensor): observations to feed into the energy-based model
         """
-
         if self._normalize_energynet_input:
             obs = self._energynet_input_norm(obs)
         return obs
@@ -336,7 +335,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             ## New Addition ##
             dmp_infos = {'energy_reward': energy_rew, 'combined_rewards': combined_rewards}
-            mean_combined_reward = torch.round(torch.mean(combined_rewards), decimals=4).item()
+            mean_combined_reward = round(torch.mean(combined_rewards).item(), ndigits=4)
 
             # cleaning memory to optimize space
             self.dataset.update_values_dict(None)
