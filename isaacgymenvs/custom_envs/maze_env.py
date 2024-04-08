@@ -210,7 +210,8 @@ class MazeEnv(gym.Env):
         ]
         self.space.add(*maze_walls)
 
-        self.goal_color = pygame.Color('LightGreen')
+        # https://htmlcolorcodes.com/color-names
+        self.goal_color = pygame.Color("ForestGreen")
         self.goal_pose = 0.85 * np.array([self.window_size, self.window_size])
 
         # Add collision handling
@@ -228,7 +229,7 @@ class MazeEnv(gym.Env):
 
     def _add_polygon(self, vertices):
         shape = pymunk.Poly(self.space.static_body, vertices)
-        shape.color = pygame.Color('RosyBrown')    # https://htmlcolorcodes.com/color-names
+        shape.color = pygame.Color("#B4656F")    # https://htmlcolorcodes.com/color-names #C33C54 #846C5B #B4656F
         return shape
 
 

@@ -34,17 +34,17 @@ elif environment == "pushT":
 num_samples = 512
 mode = "human"
 num_plays = 10
-sleep_time = 0.0
+sleep_time = 0.001
 
 
 
 def test_non_episodic_dataloader():
     # episodic=True (default) returns trajectories of length num_samples, where each trajectory is guaranteed to be from a single episode (no trajectories with episode ends)
     # episodic=False just samples in an unshuffled manner from the whole sequence of trajectories
-    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, episodic=False, auto_ends=auto_ends)
+    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, episodic=False, auto_ends=auto_ends, test_split=False)
 
     # A dataloader can also be returned to get shuffled or unshuffled samples of some required length. When shuffle=True, the dataloader essentially returns trajectories regardless of episode ends
-    dataloader = motion_lib.get_traj_agnostic_dataloader(batch_size=num_samples, shuffle=True)
+    dataloader = motion_lib.get_traj_agnostic_dataloader(batch_size=num_samples, shuffle=False)
 
     print("Playing unshuffled, trajectory agnostic motion data")
     obs = env.reset()
@@ -74,7 +74,7 @@ def test_non_episodic_dataloader():
 
 
 def play_sampled_trajectories(num_plays=num_plays, num_samples=num_samples):
-    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends)
+    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends, test_split=False)
     for _ in range(num_plays):
         obs = env.reset()
         print("ENV RESET")
@@ -111,7 +111,7 @@ def play_sampled_trajectories(num_plays=num_plays, num_samples=num_samples):
 
 
 def play_all_episodes():
-    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends)
+    motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, auto_ends=auto_ends, test_split=False)
     # VIEW ALL EPISODES
     paired_processed_episodes = motion_lib.get_episodes()
     print(f"VIEWING ALL {len(paired_processed_episodes)} EPISODES")
@@ -151,6 +151,6 @@ def play_all_episodes():
 
 
 # Calling functions
-play_sampled_trajectories()
+# play_sampled_trajectories()
 # play_all_episodes()
-# test_non_episodic_dataloader()
+test_non_episodic_dataloader()

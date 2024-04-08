@@ -4,7 +4,7 @@ import glob
 
 
 demo_list = []
-folders = ['anish', 'gargi', 'tanmay']
+folders = ['ParticipantA', 'ParticipantB', 'ParticipantC', 'ParticipantD', 'ParticipantE']
 ep_ends = []
 curr_idx = 0
 
@@ -28,5 +28,3 @@ ends = meta.create_dataset('episode_ends', shape=ep_ends.shape, dtype=np.intc)
 
 states[:] = dataset
 ends[:] = ep_ends
-
-# zarr.save_group('data/maze_env/maze_motions.zarr')
