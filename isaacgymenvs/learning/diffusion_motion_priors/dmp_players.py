@@ -31,18 +31,20 @@ class DMPPlayerContinuous(players.PpoPlayerContinuous):
 
 
         # Standardization
-        if self._normalize_energynet_input:
+        # if self._normalize_energynet_input:
             ## TESTING ONLY: Swiss-Roll ##
-            self._energynet_input_norm = RunningMeanStd(torch.ones(self.config['dmp_config']['model']['in_dim']).shape).to(self.device)
+            # self._energynet_input_norm = RunningMeanStd(torch.ones(self.config['dmp_config']['model']['in_dim']).shape).to(self.device)
             ## TESTING ONLY ##
+
+            # self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.device)
 
             # self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.device)
             # Since the running mean and std are pre-computed on the demo data, only eval is needed here
 
-            energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.device)
-            self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
+            # energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.device)
+            # self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
 
-            self._energynet_input_norm.eval()
+            # self._energynet_input_norm.eval()
 
 
     def _init_network(self, energynet_config):
@@ -118,9 +120,9 @@ class DMPPlayerContinuous(players.PpoPlayerContinuous):
         """
 
         ### TESTING - ONLY FOR PARTICLE ENV 2D ###
-        paired_obs = paired_obs[:,:,:2]
+        # paired_obs = paired_obs[:,:,:2]
         ### TESTING - ONLY FOR PARTICLE ENV 2D ###
-        paired_obs = self._preproc_obs(paired_obs)
+        paired_obs = self._preprocess_observations(paired_obs)
         # Reshape from being (horizon_len, num_envs, paired_obs_shape) to (-1, paired_obs_shape)
         original_shape = list(paired_obs.shape)
         paired_obs = paired_obs.reshape(-1, original_shape[-1])
@@ -135,7 +137,7 @@ class DMPPlayerContinuous(players.PpoPlayerContinuous):
 
         return energy_rew
 
-    def _preproc_obs(self, obs):
+    def _preprocess_observations(self, obs):
         """Preprocess observations (normalization)
 
         Args:
