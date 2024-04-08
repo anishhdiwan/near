@@ -80,7 +80,7 @@ class MazeEnv(gym.Env):
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
-        self.max_env_steps = 1000
+        self.max_env_steps = 8000
 
         # Local controller params.
         self.k_p, self.k_v = 100, 20    # PD control.z
@@ -292,8 +292,14 @@ class MazeEnv(gym.Env):
         current_pos = np.array(tuple(self.agent.position))
         action = current_pos + action
 
-        dt = 1.0 / self.sim_hz
-        n_steps = self.sim_hz // self.control_hz
+        # dt = 1.0 / self.sim_hz
+        # n_steps = self.sim_hz // self.control_hz
+
+        # # Time in seconds for which to apply an action
+        action_time = 0.6
+        dt = action_time / self.sim_hz
+        n_steps = self.sim_hz
+
         if action is not None:
             self.latest_action = action
             for i in range(n_steps):
@@ -426,6 +432,7 @@ class MazeEnv(gym.Env):
         obs = self.reset()
 
         print("The environment will reset after a set time! Press Ctrl+C to force stop")
+        done = False
         while True:
             # Get joystick vals
             # Axes are in a range of [-1,1]
@@ -483,10 +490,13 @@ class MazeEnv(gym.Env):
             
             current_pos = np.array(tuple(self.agent.position))
             if record_data and recording_stated:
+                # print(states[self.env_steps - 10: self.env_steps])
                 states[self.env_steps] = current_pos
 
             action = np.array([js_x, js_y])
-            observation, reward, done, info = self.step(action)
+            # Only apply action if joystick vals are non-zero
+            if not np.logical_and(action > -0.3, action < 0.3).all():
+                observation, reward, done, info = self.step(action)
 
             # print(f"Obs {observation} | Rew {reward} | done {done} | info {info}")
             self.render(mode="human")
