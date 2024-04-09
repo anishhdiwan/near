@@ -20,7 +20,7 @@ params:
           val: 0
         fixed_sigma: True
     mlp:
-      units: [256, 128, 64]
+      units: [512, 1024]
       activation: relu
       initializer:
           name: default
@@ -41,7 +41,7 @@ params:
     tau: 0.9
 
     learning_rate: 1e-4
-    score_to_win: 300 # Training stops if reached
+    score_to_win: 2000 # Training stops if reached
     save_best_after: 50
     save_frequency: 30
     grad_norm: 0.5
@@ -50,11 +50,11 @@ params:
     e_clip: 0.2
     clip_value: True
     num_actors: ${....task.env.numEnvs} #16 num_envs to run
-    horizon_length: 128
-    minibatch_size: 128 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
+    horizon_length: 64
+    minibatch_size: 32 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
     mini_epochs: 4
     critic_coef: 1
-    lr_schedule:  adaptive
+    lr_schedule:  None
     kl_threshold: 0.008
     normalize_input: True
     seq_length: 4
@@ -67,7 +67,7 @@ params:
       training:
         batch_size: 128
         n_epochs: 500000
-        n_iters: 200000
+        n_iters: 100000
         ngpu: 1
         snapshot_freq: 5000
         algo: 'dsm'
@@ -107,13 +107,13 @@ params:
 
       # Change these to use the learnt energies to train a policy
       inference:
-        task_reward_w: 5.0
-        energy_reward_w: 1.0
-        sigma_level: 5 # Must be in range(0,L)
+        task_reward_w: 1.0
+        energy_reward_w: 0.0
+        sigma_level: 9 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_04-14-43-18/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_09-14-14-35/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_04-14-43-18/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_09-14-14-35/nn/running_mean_std.pth"
 
 
     player:

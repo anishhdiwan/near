@@ -80,7 +80,8 @@ class MazeEnv(gym.Env):
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
-        self.max_env_steps = 8000
+        self.max_env_steps = 4000
+        self.quit_if_stuck = True
 
         # Local controller params.
         self.k_p, self.k_v = 100, 20    # PD control.z
@@ -164,6 +165,8 @@ class MazeEnv(gym.Env):
         # Pumunk space
         self.space = None
         self.latest_action = None
+        shape = list(self.observation_space.shape)[0]
+        self.last_states = []
         self.reset_to_state = reset_to_state
 
 
@@ -302,7 +305,15 @@ class MazeEnv(gym.Env):
         n_steps = self.sim_hz
 
         if action is not None:
+
+            # Saving latest actions and states
             self.latest_action = action
+            if len(self.last_states) > 50:
+                self.last_states.pop(0)
+                self.last_states.append(self.agent.position)
+            else:
+                self.last_states.append(self.agent.position)
+
             for i in range(n_steps):
                 # self.agent.position = self.agent.position + action * dt
                 acceleration = self.k_p * (action - self.agent.position) + self.k_v * (Vec2d(0, 0) - self.agent.velocity)
@@ -317,12 +328,17 @@ class MazeEnv(gym.Env):
         # reward = 0.
 
         # done = dist_to_goal < 0.05
+        done = False
 
         if dist_to_goal < 0.05:
             done = True
-            reward += 1000
-        else:
-            done = False
+            reward += 5000
+
+        if self.quit_if_stuck:
+            if self.env_steps > 100:
+                if self.is_stuck():
+                    done = True
+                    reward += -5000
         
         
         observation = self._get_obs()
@@ -404,6 +420,7 @@ class MazeEnv(gym.Env):
 
 
     def teleop_agent(self, record_data=True):
+        self.quit_if_stuck = False
         assert self.normalise_action == True, "Please set normalisation to True. This is necessary to feed in the correct joystick commands to the environment"
         # Get pygame joystick
 
@@ -532,3 +549,18 @@ class MazeEnv(gym.Env):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
+
+    def is_stuck(self):
+        first_state = self.last_states[0]
+        last_state = self.last_states[-1]
+        dist = np.linalg.norm(np.absolute(first_state) - np.absolute(last_state))/np.linalg.norm(np.array([self.window_size,self.window_size]))
+        # If agent has not moved by some percentage of the window size then it is stuck
+        if dist < 0.005:
+            return True
+        else:
+            return False
+
+
+if __name__ == "__main__":
+    env = MazeEnv()
+    env.teleop_agent(record_data=True)

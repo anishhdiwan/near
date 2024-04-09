@@ -1,0 +1,43 @@
+training:
+  batch_size: 128
+  n_epochs: 500000
+  n_iters: 200000
+  ngpu: 1
+  snapshot_freq: 5000
+  algo: dsm
+  anneal_power: 2.0
+  normalize_energynet_input: true
+data:
+  dataset: maze
+  motion_file: custom_envs/data/maze_env/maze_motions.zarr
+model:
+  sigma_begin: 1
+  sigma_end: 0.01
+  L: 10
+  in_dim: 2
+  numObsSteps: ${......task.env.numObsSteps}
+  encoder_hidden_layers:
+  - 32
+  - 64
+  latent_space_dim: 128
+  decoder_hidden_layers:
+  - 64
+  - 32
+  - 8
+optim:
+  weight_decay: 1.0e-05
+  optimizer: Adam
+  lr: 0.0001
+  beta1: 0.9
+  amsgrad: false
+visualise:
+  plot3d: true
+  colormask: true
+  plot_train_data: true
+inference:
+  task_reward_w: 0.0
+  energy_reward_w: 1.0
+  sigma_level: 8
+  eb_model_checkpoint: ''
+  running_mean_std_checkpoint: ''
+device: cuda:0
