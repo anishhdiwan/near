@@ -279,24 +279,12 @@ class DMPAgent(a2c_continuous.A2CAgent):
         batch_dict['played_frames'] = self.batch_size
         batch_dict['step_time'] = step_time
 
-        ## New Addition ##
-        # Adding dmp rewards to batch dict. Used for early stopping and reward logging
-        # for k, v in dmp_rewards.items():
-        #     batch_dict[k] = a2c_common.swap_and_flatten01(v)
-        # batch_dict['combined_rewards'] = a2c_common.swap_and_flatten01(mb_rewards)
-        # batch_dict['shaped_env_rewards'] = a2c_common.swap_and_flatten01(shaped_env_rewards)
-
         temp_combined_rewards = copy.deepcopy(mb_rewards).squeeze()
         temp_energy_rewards = copy.deepcopy(dmp_rewards['energy_reward']).squeeze()
         self.mean_combined_rewards.update(temp_combined_rewards.sum(dim=0))
         self.mean_energy_rewards.update(temp_energy_rewards.sum(dim=0))
         self.mean_shaped_task_rewards.update(shaped_env_rewards.sum(dim=0))
-        
 
-        # for i in range(temp_combined_rewards.shape[0]):
-        #     self.mean_combined_rewards.update(temp_combined_rewards[i])
-        #     self.mean_energy_rewards.update(temp_energy_rewards[i])
-        #     self.mean_shaped_task_rewards.update(shaped_env_rewards[i])
 
         return batch_dict
 
@@ -350,10 +338,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
             step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
             total_time += sum_time
             frame = self.frame // self.num_agents
-
-            ## New Addition ##
-            # dmp_infos = {'energy_reward': energy_rew, 'combined_rewards': combined_rewards, 'shaped_env_rewards': shaped_env_rewards}
-            # mean_combined_reward = round(torch.mean(combined_rewards).item(), ndigits=4)
 
             # cleaning memory to optimize space
             self.dataset.update_values_dict(None)
@@ -476,11 +460,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
         play_time_end = time.time()
         update_time_start = time.time()
         rnn_masks = batch_dict.get('rnn_masks', None)
-
-        ## New Addition ##
-        # energy_rew = batch_dict.get('energy_reward', torch.zeros(self.num_agents))
-        # combined_rewards = batch_dict.get('combined_rewards', torch.zeros(self.num_agents))
-        # shaped_env_rewards = batch_dict.get('shaped_env_rewards', torch.zeros(self.num_agents))
 
         self.set_train()
         self.curr_frames = batch_dict.pop('played_frames')
