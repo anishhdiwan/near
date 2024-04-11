@@ -22,7 +22,7 @@ sys.path.append(PYMUNK_OVERRIDE_PATH)
 from pymunk_override import DrawOptions
 
 
-def unnormalise_action(action, range_max):
+def unnormalise_action_teleop(action, range_max):
     """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([-range_max,-range_max], [range_max, range_max])
 
     Given,
@@ -43,9 +43,32 @@ def unnormalise_action(action, range_max):
     return action
 
 
+def unnormalise_action(action, window_size):
+    """Unnormalise an input action from being in the range of Box([-1,-1], [1,1]) to the range Box([0,0], [window_size, window_size])
+
+    Given,
+    [r_min, r_max] = [-1,1] = data range
+    [t_min, t_max] = [0, window_size] = target range
+    x in data range
+
+    x_in_target_range = t_min + (x - r_min)*(t_max - t_min)/(r_max - r_min) 
+    https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range
+
+    Args:
+        action (gym.Actions): Input action in normalised range
+        window_size (float): Size of the pushT window to which the action is unnormalised
+    """
+    action = (action + 1)*(window_size)/2
+
+    return action
+
+
 class MazeEnv(gym.Env):
     """
-    A simple 2D environment with a particle that moves given position actions. The action space is the set of 2D poses in a k unit circle around the agent.
+    A simple 2D environment with a particle that moves given position actions. The environment also has a maze that offers a longer (suboptimal) path to the end. 
+    
+    During Learning: The action space is all possible points in the environment
+    During Data Collection: The action space is the set of 2D poses in a k unit circle around the agent.
 
       .....
     .       .
@@ -53,7 +76,9 @@ class MazeEnv(gym.Env):
      .      .
       .....
     
-    The environment also has a maze that offers a longer (suboptimal) path to the end. 
+    The spaces are different because data collection requires slower movements for easier control. Further, the max possible env steps is also higher during data collection
+    for easier control. 
+
 
     render_action (Bool): Whether to render actions
     render_size (Int): Render scaling
@@ -80,8 +105,9 @@ class MazeEnv(gym.Env):
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
-        self.max_env_steps = 4000
-        self.quit_if_stuck = True
+        self.max_env_steps = 650
+        self.quit_if_stuck = False
+        self.teleop = False
 
         # Local controller params.
         self.k_p, self.k_v = 100, 20    # PD control.z
@@ -186,11 +212,10 @@ class MazeEnv(gym.Env):
 
 
     def _setup(self):
-        # Set up a pumunk space of 2D physics
+        # Set up a pumunk space for 2D physics
         self.space = pymunk.Space()
         self.space.gravity = 0, 0
         self.space.damping = 0
-
 
         # Add walls so that the agent cant not escape the environment
         walls = [
@@ -219,15 +244,9 @@ class MazeEnv(gym.Env):
 
         # Add collision handling
         self.collision_handeler = self.space.add_collision_handler(0, 0)
-        # self.collision_handeler.post_solve = self._handle_collision
-        # self.n_contact_points = 0
 
         # Counting the number of steps
         self.env_steps = 0
-
-
-    def _handle_collision(self, arbiter, space, data):
-        self.n_contact_points += len(arbiter.contact_point_set.points)
 
 
     def _add_polygon(self, vertices):
@@ -290,25 +309,28 @@ class MazeEnv(gym.Env):
     def step(self, action):
 
         if self.normalise_action:
-            # Unnormalise action before applying to the env
-            action = unnormalise_action(action, self.action_space_radius)
+            if self.teleop:
+                action = unnormalise_action_teleop(action, self.action_space_radius)
+            else:
+                # Unnormalise action before applying to the env
+                action = unnormalise_action(action, self.window_size)
 
-        current_pos = np.array(tuple(self.agent.position))
-        action = current_pos + action
+        if self.teleop:
+            current_pos = np.array(tuple(self.agent.position))
+            action = current_pos + action
+            # # Time in seconds for which to apply an action
+            action_time = 0.6
+        else:
+            # # Time in seconds for which to apply an action
+            action_time = 0.3
 
-        # dt = 1.0 / self.sim_hz
-        # n_steps = self.sim_hz // self.control_hz
-
-        # # Time in seconds for which to apply an action
-        action_time = 0.6
         dt = action_time / self.sim_hz
         n_steps = self.sim_hz
 
         if action is not None:
-
             # Saving latest actions and states
             self.latest_action = action
-            if len(self.last_states) > 50:
+            if len(self.last_states) > 100:
                 self.last_states.pop(0)
                 self.last_states.append(self.agent.position)
             else:
@@ -317,6 +339,8 @@ class MazeEnv(gym.Env):
             for i in range(n_steps):
                 # self.agent.position = self.agent.position + action * dt
                 acceleration = self.k_p * (action - self.agent.position) + self.k_v * (Vec2d(0, 0) - self.agent.velocity)
+                if not self.teleop:
+                    acceleration = acceleration * 0.1
                 self.agent.velocity += acceleration * dt
 
                 # Step physics.
@@ -325,6 +349,7 @@ class MazeEnv(gym.Env):
 
         dist_to_goal = np.linalg.norm(np.absolute(np.array(self.agent.position)) - np.absolute(self.goal_pose))/np.linalg.norm(np.absolute(self.goal_pose))
         reward = -dist_to_goal
+
         # reward = 0.
 
         # done = dist_to_goal < 0.05
@@ -335,10 +360,10 @@ class MazeEnv(gym.Env):
             reward += 5000
 
         if self.quit_if_stuck:
-            if self.env_steps > 100:
+            if self.env_steps > 250:
                 if self.is_stuck():
                     done = True
-                    reward += -5000
+                    # reward += -5000
         
         
         observation = self._get_obs()
@@ -390,9 +415,13 @@ class MazeEnv(gym.Env):
         # Draw goal pose
         pygame.draw.circle(self.screen, self.goal_color, self.goal_pose, 10)
 
+        # Draw the previous action
+        if self.render_action and (self.latest_action is not None):
+            action = np.array(self.latest_action)
+            self.drawCrossHair(self.screen, action[0], action[1])
+
         # Draw all bodies defined in the space (agent, walls, maze)
         self.space.debug_draw(draw_options)
-
 
         if mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
@@ -400,27 +429,17 @@ class MazeEnv(gym.Env):
             pygame.event.pump()
             pygame.display.update()
 
-            # the clock is already ticked during in step for "human"
 
 
-        # img = np.transpose(
-        #         np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
-        #     )
-        # img = cv2.resize(img, (self.render_size, self.render_size))
-        # if self.render_action:
-        #     if self.render_action and (self.latest_action is not None):
-        #         action = np.array(self.latest_action)
-        #         coord = (action / 512 * 96).astype(np.int32)
-        #         marker_size = int(8/96*self.render_size)
-        #         thickness = int(1/96*self.render_size)
-        #         cv2.drawMarker(img, coord,
-        #             color=(255,0,0), markerType=cv2.MARKER_CROSS,
-        #             markerSize=marker_size, thickness=thickness)
-        # return img
-
+    def drawCrossHair(self, surface, x, y):
+        size = 5
+        pygame.draw.lines(surface, (255,0,0), True, [(x-size,y-size),(x+size,y+size)], 5)
+        pygame.draw.lines(surface, (255,0,0), True, [(x-size,y+size),(x+size,y-size)], 5)
 
     def teleop_agent(self, record_data=True):
         self.quit_if_stuck = False
+        self.teleop = True
+        self.max_env_steps = 5000
         assert self.normalise_action == True, "Please set normalisation to True. This is necessary to feed in the correct joystick commands to the environment"
         # Get pygame joystick
 
@@ -491,14 +510,14 @@ class MazeEnv(gym.Env):
                     print("Resetting the game! This episode will be recorded as training data")
                     time.sleep(0.5)
                     obs = self.reset()
-                    states = np.zeros((self.max_env_steps, self.action_space.shape[0]))
+                    states = ObservationArray(self.max_env_steps, self.action_space.shape[0])
 
                 elif js_A and recording_stated==True:
                     recording_stated = True
                     print("Game reset during recording! Previous recording discarded and new one started")
                     time.sleep(1)
                     obs = self.reset()
-                    states = np.zeros((self.max_env_steps, self.action_space.shape[0]))
+                    states = ObservationArray(self.max_env_steps, self.action_space.shape[0])
 
                 elif js_B and recording_stated==True:
                     recording_stated = False
@@ -508,8 +527,10 @@ class MazeEnv(gym.Env):
             
             current_pos = np.array(tuple(self.agent.position))
             if record_data and recording_stated:
-                # print(states[self.env_steps - 10: self.env_steps])
-                states[self.env_steps] = current_pos
+                # states.show_last()
+                if self.env_steps % 10 == 0:
+                    # states[self.env_steps] = current_pos
+                    states.append(current_pos)
 
             action = np.array([js_x, js_y])
             # Only apply action if joystick vals are non-zero
@@ -524,7 +545,7 @@ class MazeEnv(gym.Env):
                     if not info.get('max_steps', False):
                         now = '_{date:%d-%H-%M-%S}'.format(date=datetime.now())
                         with open(f'data/maze_env/{now}.npy', 'wb') as f:
-                            np.save(f, states[:self.env_steps])
+                            np.save(f, states.get_data())
                         print("Recording saved! Game reset to normal mode")
                     else:
                         print("Recording was not saved! Episode ended at max steps. Game reset")
@@ -537,14 +558,6 @@ class MazeEnv(gym.Env):
                 obs = self.reset()
 
 
-
-    # def scale_joystick(self, joystick_vals):
-    #     """
-    #     Scale joystick actions to increase or decrease input sensitivity
-    #     """
-    #     return self.action_space_radius * joystick_vals
-
-
     def close(self):
         if self.window is not None:
             pygame.display.quit()
@@ -555,10 +568,41 @@ class MazeEnv(gym.Env):
         last_state = self.last_states[-1]
         dist = np.linalg.norm(np.absolute(first_state) - np.absolute(last_state))/np.linalg.norm(np.array([self.window_size,self.window_size]))
         # If agent has not moved by some percentage of the window size then it is stuck
-        if dist < 0.005:
+        if dist < 0.003:
             return True
         else:
             return False
+
+
+class ObservationArray():
+
+    def __init__(self, max_length, observation_dim):
+        """A numpy-based array enabling appending
+
+        Args:
+            max_length (int): The maximum length of the array
+            observation dim (int): The number of features in each observation
+        """
+        self.states = np.zeros((max_length, observation_dim))
+        self.idx = 0
+
+    def append(self, observation):
+        """Append an observation to the array
+        """
+        self.states[self.idx] = observation
+        self.idx += 1
+
+    def get_data(self):
+        """Return the filled up portion of the array
+        """
+        return self.states[:self.idx]
+
+    def show_last(self):
+        """Print the last 10 entries for debugging
+        """
+        print(self.states[self.idx - 10: self.idx])
+
+
 
 
 if __name__ == "__main__":

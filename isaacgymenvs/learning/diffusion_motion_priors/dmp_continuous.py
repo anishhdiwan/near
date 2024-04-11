@@ -81,6 +81,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         super().init_tensors()
         self._build_buffers()
+        self.mean_shaped_task_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+        self.mean_energy_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+        self.mean_combined_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
 
 
     def _init_network(self, energynet_config):
@@ -157,7 +160,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * self._c # c ranges from [0,L-1]
         
         with torch.no_grad():
-            energy_rew = self._energynet(paired_obs, labels)
+            energy_rew = -self._energynet(paired_obs, labels)
             original_shape[-1] = energy_rew.shape[-1]
             energy_rew = energy_rew.reshape(original_shape)
 
@@ -172,8 +175,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         """
 
         energy_rew = dmp_rewards['energy_reward']
-        combined_rewards = self._task_reward_w * task_rewards + \
-                         + self._energy_reward_w * energy_rew
+        combined_rewards = (self._task_reward_w * task_rewards) + (self._energy_reward_w * energy_rew)
         return combined_rewards
 
 
@@ -259,6 +261,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
         mb_values = self.experience_buffer.tensor_dict['values']
         mb_rewards = self.experience_buffer.tensor_dict['rewards']
 
+        shaped_env_rewards = copy.deepcopy(mb_rewards).squeeze()
+
         ## New Addition ##
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
 
@@ -277,9 +281,22 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         ## New Addition ##
         # Adding dmp rewards to batch dict. Used for early stopping and reward logging
-        for k, v in dmp_rewards.items():
-            batch_dict[k] = a2c_common.swap_and_flatten01(v)
-        batch_dict['combined_rewards'] = a2c_common.swap_and_flatten01(mb_rewards)
+        # for k, v in dmp_rewards.items():
+        #     batch_dict[k] = a2c_common.swap_and_flatten01(v)
+        # batch_dict['combined_rewards'] = a2c_common.swap_and_flatten01(mb_rewards)
+        # batch_dict['shaped_env_rewards'] = a2c_common.swap_and_flatten01(shaped_env_rewards)
+
+        temp_combined_rewards = copy.deepcopy(mb_rewards).squeeze()
+        temp_energy_rewards = copy.deepcopy(dmp_rewards['energy_reward']).squeeze()
+        self.mean_combined_rewards.update(temp_combined_rewards.sum(dim=0))
+        self.mean_energy_rewards.update(temp_energy_rewards.sum(dim=0))
+        self.mean_shaped_task_rewards.update(shaped_env_rewards.sum(dim=0))
+        
+
+        # for i in range(temp_combined_rewards.shape[0]):
+        #     self.mean_combined_rewards.update(temp_combined_rewards[i])
+        #     self.mean_energy_rewards.update(temp_energy_rewards[i])
+        #     self.mean_shaped_task_rewards.update(shaped_env_rewards[i])
 
         return batch_dict
 
@@ -299,7 +316,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         paired_obs = paired_obs.view(shape)
         energy_rew = self._calc_energy(paired_obs)
 
-        print(f"Mean energy reward (across all envs): {energy_rew.mean()}")
+        print(f"Minibatch Stats - E(s_penultimate, s_last).mean(all envs): {energy_rew.mean()}")
 
     def _log_train_info(self, infos, frame):
         """Log dmp specific training information
@@ -330,13 +347,13 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         while True:
             epoch_num = self.update_epoch()
-            energy_rew, combined_rewards, step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
+            step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
             total_time += sum_time
             frame = self.frame // self.num_agents
 
             ## New Addition ##
-            dmp_infos = {'energy_reward': energy_rew, 'combined_rewards': combined_rewards}
-            mean_combined_reward = round(torch.mean(combined_rewards).item(), ndigits=4)
+            # dmp_infos = {'energy_reward': energy_rew, 'combined_rewards': combined_rewards, 'shaped_env_rewards': shaped_env_rewards}
+            # mean_combined_reward = round(torch.mean(combined_rewards).item(), ndigits=4)
 
             # cleaning memory to optimize space
             self.dataset.update_values_dict(None)
@@ -364,7 +381,16 @@ class DMPAgent(a2c_continuous.A2CAgent):
                     self.writer.add_scalar('losses/aug_loss', np.mean(aug_losses), frame)
 
                 ## New Addition ##
-                self._log_train_info(dmp_infos, frame)
+                # self._log_train_info(dmp_infos, frame)
+                if self.mean_combined_rewards.current_size > 0:
+                    mean_combined_reward = self.mean_combined_rewards.get_mean()
+                    mean_shaped_task_reward = self.mean_shaped_task_rewards.get_mean()
+                    mean_energy_reward = self.mean_energy_rewards.get_mean()
+
+                    self.writer.add_scalar('minibatch_combined_reward/step', mean_combined_reward, frame)
+                    self.writer.add_scalar('minibatch_shaped_task_reward/step', mean_shaped_task_reward, frame)
+                    self.writer.add_scalar('minibatch_energy_reward/step', mean_energy_reward, frame)
+
                 
                 if self.game_rewards.current_size > 0:
                     mean_rewards = self.game_rewards.get_mean()
@@ -452,8 +478,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
         rnn_masks = batch_dict.get('rnn_masks', None)
 
         ## New Addition ##
-        energy_rew = batch_dict.get('energy_reward', torch.zeros(self.num_agents))
-        combined_rewards = batch_dict.get('combined_rewards', torch.zeros(self.num_agents))
+        # energy_rew = batch_dict.get('energy_reward', torch.zeros(self.num_agents))
+        # combined_rewards = batch_dict.get('combined_rewards', torch.zeros(self.num_agents))
+        # shaped_env_rewards = batch_dict.get('shaped_env_rewards', torch.zeros(self.num_agents))
 
         self.set_train()
         self.curr_frames = batch_dict.pop('played_frames')
@@ -506,4 +533,4 @@ class DMPAgent(a2c_continuous.A2CAgent):
         update_time = update_time_end - update_time_start
         total_time = update_time_end - play_time_start
 
-        return energy_rew, combined_rewards, batch_dict['step_time'], play_time, update_time, total_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul
+        return batch_dict['step_time'], play_time, update_time, total_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul

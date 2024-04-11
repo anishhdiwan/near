@@ -31,10 +31,10 @@ elif environment == "pushT":
     auto_ends = True
 
 
-num_samples = 512
+num_samples = 64
 mode = "human"
 num_plays = 10
-sleep_time = 0.001
+sleep_time = 0.05
 
 
 
@@ -44,7 +44,7 @@ def test_non_episodic_dataloader():
     motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step, episodic=False, auto_ends=auto_ends, test_split=False)
 
     # A dataloader can also be returned to get shuffled or unshuffled samples of some required length. When shuffle=True, the dataloader essentially returns trajectories regardless of episode ends
-    dataloader = motion_lib.get_traj_agnostic_dataloader(batch_size=num_samples, shuffle=False)
+    dataloader = motion_lib.get_traj_agnostic_dataloader(batch_size=num_samples, shuffle=True)
 
     print("Playing unshuffled, trajectory agnostic motion data")
     obs = env.reset()
@@ -151,6 +151,6 @@ def play_all_episodes():
 
 
 # Calling functions
-# play_sampled_trajectories()
+play_sampled_trajectories()
 # play_all_episodes()
-test_non_episodic_dataloader()
+# test_non_episodic_dataloader()

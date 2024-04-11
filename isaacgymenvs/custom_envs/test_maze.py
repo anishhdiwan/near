@@ -2,19 +2,20 @@ from maze_env import MazeEnv
 import time
 import numpy as np
 
-env = MazeEnv()
-env.teleop_agent(record_data=True)
+# env = MazeEnv()
+# env.teleop_agent(record_data=True)
 
 
 # env = MazeEnv(normalise_action=True)
 # obs = env.reset()
 
-# for _ in range(10):
-#     action = np.array([0., 1.]) # env.action_space.sample()
+# for _ in range(100):
+#     action = np.array([1., 1.]) # env.action_space.sample()
 #     print(np.array(tuple(env.agent.position)))
 #     observation, reward, done, info = env.step(action)
+#     print(reward)
 #     env.render(mode="human")
-#     # time.sleep(0.1)
+#     time.sleep(0.1)
 
 # env.close()
 
@@ -25,7 +26,7 @@ env.teleop_agent(record_data=True)
 # _01-18-50-14.npy
 # _01-18-50-43.npy
 
-# states = np.load('data/maze_env/_08-12-32-48.npy')
+# states = np.load('data/maze_env/_10-22-08-24.npy')
 # print(len(states))
 
 # env = MazeEnv()

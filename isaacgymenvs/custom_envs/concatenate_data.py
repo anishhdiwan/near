@@ -4,7 +4,7 @@ import glob
 
 
 demo_list = []
-folders = ['ParticipantA', 'ParticipantB', 'ParticipantC', 'ParticipantD', 'ParticipantE']
+folders = ['ParticipantA', 'ParticipantB', 'ParticipantC', 'ParticipantD', 'ParticipantE', 'ParticipantF']
 ep_ends = []
 curr_idx = 0
 
@@ -18,6 +18,9 @@ for folder in folders:
 
 dataset = np.concatenate(demo_list, axis=0)
 ep_ends = np.array(ep_ends)
+
+print(f"Num Data Points: {len(dataset)}")
+print(f"Num Episodes: {len(ep_ends)}")
 
 store = zarr.DirectoryStore('data/maze_env/maze_motions.zarr')
 root = zarr.group(store=store)
