@@ -110,11 +110,11 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 8 # Must be in range(0,L)
+        sigma_level: 3 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_10-23-20-32/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_10-23-20-32/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/running_mean_std.pth"
 
 
     player:
