@@ -1,0 +1,100 @@
+params:  
+
+  algo:
+    name: cem_continuous
+    
+  config:
+    name: ${resolve_default:mazeCEM,${....experiment}}
+    full_experiment_name: ${.name}
+    max_epochs: ${resolve_default:500,${....max_iterations}}
+    env_name:  gym_env
+    reward_shaper:
+      scale_value: 0.1
+    normalize_advantage: True
+    gamma: 0.99
+    tau: 0.9
+    learning_rate: 1e-4
+    score_to_win: 2000 # Training stops if reached
+    save_best_after: 50
+    save_frequency: 30
+    grad_norm: 2.0
+    entropy_coef: 0.0
+    truncate_grads: True
+    e_clip: 0.2
+    clip_value: True
+    num_actors: ${....task.env.numEnvs} #16 num_envs to run
+    horizon_length: 32
+    minibatch_size: 64 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
+    mini_epochs: 4
+    critic_coef: 1
+    lr_schedule:  Adaptive
+    kl_threshold: 0.005
+    normalize_input: True
+    seq_length: 4
+    bounds_loss_coef: 0
+    
+    # This must be a multiple of (num_actors - 1)
+    num_sims: 32
+    # The top k percentage of the population to update the actions sampling distributions
+    elite_percentage: 0.4
+    
+    
+    # DMP Params
+    dmp_config:
+      
+      training:
+        batch_size: 128
+        n_epochs: 500000
+        n_iters: 50000
+        ngpu: 1
+        snapshot_freq: 5000
+        algo: 'dsm'
+        anneal_power: 2.0
+        normalize_energynet_input: True
+
+      data:
+        dataset: "maze"
+        # Relative to the train.py file
+        motion_file: "custom_envs/data/maze_env/maze_motions.zarr"
+      
+      model:
+        sigma_begin: 1
+        sigma_end: 0.01
+        L: 10
+        # number of features in an observation
+        in_dim: 2
+        # needed for standardization computation
+        numObsSteps: ${......task.env.numObsSteps}
+        encoder_hidden_layers: [32, 64]
+        latent_space_dim: 128
+        decoder_hidden_layers: [64, 32, 8]
+        # The out dim is set to 1 internally (out_dim: 1) 
+        
+      optim:
+        weight_decay: 1e-5
+        optimizer: "Adam"
+        lr: 0.0001
+        beta1: 0.9
+        amsgrad: false
+      
+      # Used to visualise learnt energies. Not relevant for high dimensional datasets  
+      visualise:
+        plot3d: True
+        colormask: True
+        plot_train_data: True
+
+      # Change these to use the learnt energies to train a policy
+      inference:
+        task_reward_w: 0.0
+        energy_reward_w: 1.0
+        sigma_level: 3 # Must be in range(0,L)
+        # Relative to the train.py file
+        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/checkpoint.pth"
+        # The running mean is used for standardization. Only used when normalize_energynet_input is true
+        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/running_mean_std.pth"
+
+
+    player:
+      render: True
+      render_sleep: 0.01 # Determines frame rate (how many seconds to wait between two frames)
+      games_num: 5 # Number of games to play

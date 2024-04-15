@@ -108,9 +108,13 @@ class CustomRayWorker:
     def render(self):
         self.env.render(mode = 'human') 
 
-    def reset(self):
-        obs = self.env.reset()
-        obs = self._obs_to_fp32(obs)
+    def reset(self, state=None):
+        if state is None:
+            obs = self.env.reset()
+        else:
+            obs = self.env.reset_to_state(state)
+        
+        obs = self._obs_to_fp32(obs)         
         return obs
 
     def get_action_mask(self):
@@ -232,11 +236,11 @@ class CustomRayVecEnv(IVecEnv):
         self.training_algo = self.ray.get(res)
 
         # Set up motion library to sample motions if AMP
-        if self.training_algo == "AMP":
+        if self.training_algo in ["AMP"]:
             # Set up the motions library
             self._setup_motions(setup_motionlib=True)
         # Only set up experience buffers for paired observations for DMP (saves unnecessary memory usage)
-        elif self.training_algo == "DMP":
+        elif self.training_algo in ["DMP", "CEM"]:
             # Set up the motions library
             self._setup_motions(setup_motionlib=False)
 
@@ -244,7 +248,66 @@ class CustomRayVecEnv(IVecEnv):
         res = self.workers[0].get_render_mode.remote()
         self.headless = self.ray.get(res)
         self.done_envs = None
-    
+
+    def step_selected(self, indices, actions):
+        """Step some selected environments
+
+        Args:
+            indices (list): list of env indices to step
+            actions (np array): array of actions to take in each env
+        """
+        assert self.num_agents == 1, "step_selected() can only be applied for single-agent environments"
+        newobs, newstates, newrewards, newdones, newinfos = [], [], [], [], []
+        res_obs = []
+        if self.num_agents == 1:
+            for idx, worker in enumerate(self.workers):
+                if idx in indices:
+                    res_obs.append(worker.step.remote(actions[indices.index(idx)]))
+
+        all_res = self.ray.get(res_obs)
+        for res in all_res:
+            cobs, crewards, cdones, cinfos = res
+            if self.use_global_obs:
+                newobs.append(cobs["obs"])
+                newstates.append(cobs["state"])
+            else:
+                newobs.append(cobs)
+            newrewards.append(crewards)
+            newdones.append(cdones)
+            newinfos.append(cinfos)
+
+        if self.obs_type_dict:
+            ret_obs = dicts_to_dict_with_arrays(newobs, self.num_agents == 1)
+        else:
+            ret_obs = self.concat_func(newobs)
+
+        if self.use_global_obs:
+            newobsdict = {}
+            newobsdict["obs"] = ret_obs
+            
+            if self.state_type_dict:
+                newobsdict["states"] = dicts_to_dict_with_arrays(newstates, True)
+            else:
+                newobsdict["states"] = np.stack(newstates)            
+            ret_obs = newobsdict
+        # if self.concat_infos:
+        newinfos = dicts_to_dict_with_arrays(newinfos, False)
+
+        if self.training_algo in ["AMP", "DMP", "CEM"]:
+            # Augmenting the infos dict
+            self.post_step_procedures(ret_obs, indices=indices)
+            newinfos = self.augment_infos(newinfos, newdones, indices=indices)
+
+        # Render the environment (doesn't do anything if headless is True). Only render if one environment is stepped
+        if len(indices) == 1:
+            self.render()
+
+        # print(newinfos)
+        self.done_envs = np.nonzero(newdones)[0]
+        self.last_obs = ret_obs
+
+        return ret_obs, self.concat_func(newrewards), self.concat_func(newdones), newinfos
+
     def step(self, actions):
         newobs, newstates, newrewards, newdones, newinfos = [], [], [], [], []
         res_obs = []
@@ -284,7 +347,7 @@ class CustomRayVecEnv(IVecEnv):
         # if self.concat_infos:
         newinfos = dicts_to_dict_with_arrays(newinfos, False)
 
-        if self.training_algo in ["AMP", "DMP"]:
+        if self.training_algo in ["AMP", "DMP", "CEM"]:
             # Augmenting the infos dict
             self.post_step_procedures(ret_obs)
             newinfos = self.augment_infos(newinfos, newdones)
@@ -342,6 +405,43 @@ class CustomRayVecEnv(IVecEnv):
                 newobsdict["states"] = np.stack(newstates)            
             ret_obs = newobsdict
         
+        return ret_obs
+
+    def reset_selected(self, indices=[0], state=None):
+        """
+        Reset only the selected workers (environments). Optionally reset the workers to a specific state
+        """
+
+        res_obs = []
+        for idx, worker in enumerate(self.workers):
+            if idx in indices:
+                res_obs.append(worker.reset.remote(state=state))
+
+        newobs, newstates = [],[]
+        for res in res_obs:
+            cobs = self.ray.get(res)
+            if self.use_global_obs:
+                newobs.append(cobs["obs"])
+                newstates.append(cobs["state"])
+            else:
+                newobs.append(cobs)
+
+        if self.obs_type_dict:
+            ret_obs = dicts_to_dict_with_arrays(newobs, self.num_agents == 1)
+        else:
+            ret_obs = self.concat_func(newobs)
+
+        if self.use_global_obs:
+            newobsdict = {}
+            newobsdict["obs"] = ret_obs
+            
+            if self.state_type_dict:
+                newobsdict["states"] = dicts_to_dict_with_arrays(newstates, True)
+            else:
+                newobsdict["states"] = np.stack(newstates)            
+            ret_obs = newobsdict
+        
+        self._past_obs_buf[indices] = torch.from_numpy(ret_obs).to(self.device)
         return ret_obs
 
     def reset_done(self):
@@ -454,18 +554,60 @@ class CustomRayVecEnv(IVecEnv):
         self._curr_obs_buf = torch.zeros_like(self._obs_buf[:, 0])
         self._past_obs_buf = torch.zeros_like(self._obs_buf[:, 1])
 
-    def post_step_procedures(self, newobs):
+
+    def post_step_procedures(self, newobs, indices=None):
         """
         Post step procedures to compute additional quantities needed by any algos. Pairs observation seen in rollouts to get s-s' vectors
 
         Computes the observation buffer needed by amp_continuous and similar algos
+
+        Args:
+            newobs (np array): New observations seen after stepping the env
+            indices (list): Indices of environments that were stepped (default: None)
         """
-        self._curr_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
-        self._obs_buf[:, 1] = copy.deepcopy(self._curr_obs_buf)
-        self._obs_buf[:, 0] = copy.deepcopy(self._past_obs_buf)
-        # self._obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_obs_buf, newobs), axis=1))
-        self._past_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
-        self._curr_obs_buf[:] = torch.zeros_like(self._obs_buf[:, 0], device=self.device)
+        if indices is None:
+            self._curr_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
+            self._obs_buf[:, 1] = copy.deepcopy(self._curr_obs_buf)
+            self._obs_buf[:, 0] = copy.deepcopy(self._past_obs_buf)
+            # self._obs_buf[:, 0] = torch.from_numpy(np.concatenate((self._past_obs_buf, newobs), axis=1))
+            self._past_obs_buf[:] = torch.from_numpy(newobs).to(self.device)
+            self._curr_obs_buf[:] = torch.zeros_like(self._obs_buf[:, 0], device=self.device)
+        else:
+            self._curr_obs_buf[indices] = torch.from_numpy(newobs).to(self.device)
+            self._obs_buf[:, 1] = copy.deepcopy(self._curr_obs_buf)
+            self._obs_buf[:, 0] = copy.deepcopy(self._past_obs_buf)
+            self._past_obs_buf[indices] = torch.from_numpy(newobs).to(self.device)
+            self._curr_obs_buf[:] = torch.zeros_like(self._obs_buf[:, 0], device=self.device)
+
+
+    def augment_infos(self, infos, dones, indices=None):
+        """Augment the infos dictionary returned by the step functions
+
+        Args:
+            infos (dict): The unmodified infos dict
+            dones (list): list of environment indices that were done)
+            indices (list): list of environment indices that were stepped (default: None)
+        """
+        if indices is None:
+            paired_obs= self._obs_buf.view(-1, self.num_obs)
+            # amp_obs and paired_obs contain the same observations
+            # amp_obs is added to maintain compatibility with adversatial motion priors
+            infos["amp_obs"] = paired_obs
+            infos["paired_obs"] = paired_obs
+            infos["terminate"] = torch.from_numpy(self.concat_func(dones)).to(self.device)
+            return infos
+
+        else:
+            paired_obs= self._obs_buf.view(-1, self.num_obs)
+            paired_obs = paired_obs[indices]
+            if len(indices) == 1:
+                infos = infos[0]
+            infos["amp_obs"] = paired_obs
+            infos["paired_obs"] = paired_obs
+            infos["terminate"] = torch.from_numpy(self.concat_func(dones)).to(self.device)
+            infos["stepped_indices"] = indices
+            return infos
+
 
     def render(self):
         """
@@ -477,12 +619,3 @@ class CustomRayVecEnv(IVecEnv):
             _ = self.ray.get(res)
 
             # time.sleep(0.04) # 50 fps = 0.08s wait
-
-    def augment_infos(self, infos, dones): 
-        paired_obs= self._obs_buf.view(-1, self.num_obs)
-        # amp_obs and paired_obs contain the same observations
-        # amp_obs is added to maintain compatibility with adversatial motion priors
-        infos["amp_obs"] = paired_obs
-        infos["paired_obs"] = paired_obs
-        infos["terminate"] = torch.from_numpy(self.concat_func(dones)).to(self.device)
-        return infos

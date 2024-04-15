@@ -106,6 +106,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     import isaacgymenvs
 
     from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous, dmp_players
+    from isaacgymenvs.learning.cem import cem_continuous
 
 
     # time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -139,7 +140,7 @@ def launch_rlg_hydra(cfg: DictConfig):
             env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
         elif cfg_dict["task_name"] in ["particle", "particleDMP"]:
             env = ParticleEnv(cfg=cfg_dict["task"])
-        elif cfg_dict["task_name"] in ["maze", "mazeDMP", "mazeAMP"]:
+        elif cfg_dict["task_name"] in ["maze", "mazeDMP", "mazeAMP", "mazeCEM"]:
             env = MazeEnv(cfg=cfg_dict["task"])
         
         return env
@@ -169,6 +170,10 @@ def launch_rlg_hydra(cfg: DictConfig):
         ## Registering Diffusion Motion Priors ##
         runner.algo_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_continuous.DMPAgent(**kwargs))
         runner.player_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_players.DMPPlayerContinuous(**kwargs))
+
+        ## Registering Cross Entropy Method ##
+        runner.algo_factory.register_builder('cem_continuous', lambda **kwargs : cem_continuous.CEMAgent(**kwargs))
+
 
         return runner
 

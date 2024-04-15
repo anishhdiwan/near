@@ -82,7 +82,7 @@ class MazeEnv(gym.Env):
 
     render_action (Bool): Whether to render actions
     render_size (Int): Render scaling
-    reset_to_state (gym.spaces.Box): Starting state on resetting the env
+    fixed_reset_state (gym.spaces.Box): Starting state on resetting the env
     cfg (dict config): Typically a hydra config with rendering settings or learning algorithm related params
     """
 
@@ -92,7 +92,7 @@ class MazeEnv(gym.Env):
     def __init__(self,
             render_action=True, damping=None,
             render_size=96,
-            reset_to_state=None,
+            fixed_reset_state=None,
             cfg=None,
             normalise_action=True,
         ):
@@ -193,7 +193,7 @@ class MazeEnv(gym.Env):
         self.latest_action = None
         shape = list(self.observation_space.shape)[0]
         self.last_states = []
-        self.reset_to_state = reset_to_state
+        self.fixed_reset_state = fixed_reset_state
 
 
     def seed(self, seed=None):
@@ -281,9 +281,23 @@ class MazeEnv(gym.Env):
         if self.damping is not None:
             self.space.damping = self.damping
         
-        state = self.reset_to_state
+        state = self.fixed_reset_state
         if state is None:
             state = np.random.randint(low=60, high=80, size=2)
+        self._set_state(state)
+
+        observation = self._get_obs()
+        return observation
+
+
+    def reset_to_state(self, state):
+        """
+        Reset the environment to a specified state
+        """
+        self._setup()
+        if self.damping is not None:
+            self.space.damping = self.damping
+        
         self._set_state(state)
 
         observation = self._get_obs()
