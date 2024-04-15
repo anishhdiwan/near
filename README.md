@@ -39,6 +39,12 @@ Adversarial Motion Priors
 python train_gym_envs.py task=pushTAMP
 ```
 
+Cross Entropy Method
+```bash
+python train_gym_envs.py task=mazeCEM train=mazeCEM
+```
+
+
 #### IsaacGym Envs
 
 PPO
