@@ -89,9 +89,7 @@ class CEMAgent(BaseAlgorithm):
             self.experiment_name = config['name'] + datetime.now().strftime("_%d-%H-%M-%S")
 
         self.config = config
-
         self.algo_device = config.get('device', 'cuda:0')
-        self.curr_frames = 0
         self.log_path = config.get('log_path', "runs/")
 
         self.env_config = config.get('env_config', {})
@@ -108,29 +106,16 @@ class CEMAgent(BaseAlgorithm):
 
 
         self.observation_space = self.env_info['observation_space']
-
-        # self.is_train = config.get('is_train', True)
-
-
-        self.save_freq = config.get('save_frequency', 0)
-        self.save_best_after = config.get('save_best_after', 100)
-        self.print_stats = config.get('print_stats', True)
         self.name = base_name
-
-        self.max_epochs = self.config.get('max_epochs', -1)
-        self.max_frames = self.config.get('max_frames', -1)
 
         self.num_sims = self.config['num_sims']
         self.elite_percentage = self.config['elite_percentage']
 
-
-
         self.rewards_shaper = config['reward_shaper']
         self.num_agents = self.env_info.get('agents', 1)
         self.horizon_length = config['horizon_length']
-        self.seq_len = self.config.get('seq_length', 4)
 
-        self.normalize_input = self.config['normalize_input']
+
 
 
         if isinstance(self.observation_space, gym.spaces.Dict):
@@ -139,30 +124,14 @@ class CEMAgent(BaseAlgorithm):
                 self.obs_shape[k] = v.shape
         else:
             self.obs_shape = self.observation_space.shape
- 
 
-        self.gamma = self.config['gamma']
 
         self.games_to_track = self.config.get('games_to_track', 100)
-
-        self.game_rewards = torch_ext.AverageMeter(1, self.games_to_track).to(self.algo_device)
-        self.game_lengths = torch_ext.AverageMeter(1, self.games_to_track).to(self.algo_device)
         self.obs = None
-
-        self.batch_size = self.horizon_length * self.num_actors * self.num_agents
         self.batch_size_envs = self.horizon_length * self.num_actors
-        assert(('minibatch_size_per_env' in self.config) or ('minibatch_size' in self.config))
-        self.minibatch_size_per_env = self.config.get('minibatch_size_per_env', 0)
-        self.minibatch_size = self.config.get('minibatch_size', self.num_actors * self.minibatch_size_per_env)
-        self.mini_epochs_num = self.config['mini_epochs']
-        self.num_minibatches = self.batch_size // self.minibatch_size
-        assert(self.batch_size % self.minibatch_size == 0)
+
 
         self.frame = 0
-        self.update_time = 0
-        self.mean_rewards = self.last_mean_rewards = -100500
-        self.play_time = 0
-        self.epoch_num = 0
         self.curr_frames = 0
         # allows us to specify a folder where all experiments will reside
         self.train_dir = config.get('train_dir', 'runs')
@@ -171,29 +140,20 @@ class CEMAgent(BaseAlgorithm):
         self.experiment_dir = os.path.join(self.train_dir, self.experiment_name)
 
         # folders inside <train_dir>/<experiment_dir> for a specific purpose
-        self.nn_dir = os.path.join(self.experiment_dir, 'nn')
         self.summaries_dir = os.path.join(self.experiment_dir, 'summaries')
 
         os.makedirs(self.train_dir, exist_ok=True)
         os.makedirs(self.experiment_dir, exist_ok=True)
-        os.makedirs(self.nn_dir, exist_ok=True)
         os.makedirs(self.summaries_dir, exist_ok=True)
 
-
         self.writer = SummaryWriter(self.summaries_dir)
-
-
         self.is_tensor_obses = False
-        self.last_state_indices = None
-
 
         action_space = self.env_info['action_space']
         self.actions_num = action_space.shape[0]
 
-        # todo introduce device instead of cuda()
         self.actions_low = torch.from_numpy(action_space.low.copy()).float().to(self.algo_device)
         self.actions_high = torch.from_numpy(action_space.high.copy()).float().to(self.algo_device)
-
 
         # Initialising the energy network
         self._load_config_params(config)

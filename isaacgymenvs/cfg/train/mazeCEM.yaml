@@ -6,35 +6,15 @@ params:
   config:
     name: ${resolve_default:mazeCEM,${....experiment}}
     full_experiment_name: ${.name}
-    max_epochs: ${resolve_default:500,${....max_iterations}}
     env_name:  gym_env
     reward_shaper:
       scale_value: 0.1
-    normalize_advantage: True
-    gamma: 0.99
-    tau: 0.9
-    learning_rate: 1e-4
-    score_to_win: 2000 # Training stops if reached
-    save_best_after: 50
-    save_frequency: 30
-    grad_norm: 2.0
-    entropy_coef: 0.0
-    truncate_grads: True
-    e_clip: 0.2
-    clip_value: True
+
     num_actors: ${....task.env.numEnvs} #16 num_envs to run
-    horizon_length: 32
-    minibatch_size: 64 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
-    mini_epochs: 4
-    critic_coef: 1
-    lr_schedule:  Adaptive
-    kl_threshold: 0.005
-    normalize_input: True
-    seq_length: 4
-    bounds_loss_coef: 0
-    
+    horizon_length: 8 
+
     # This must be a multiple of (num_actors - 1)
-    num_sims: 32
+    num_sims: 80
     # The top k percentage of the population to update the actions sampling distributions
     elite_percentage: 0.4
     
@@ -94,7 +74,3 @@ params:
         running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/running_mean_std.pth"
 
 
-    player:
-      render: True
-      render_sleep: 0.01 # Determines frame rate (how many seconds to wait between two frames)
-      games_num: 5 # Number of games to play
