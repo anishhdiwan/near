@@ -8,15 +8,15 @@ params:
     full_experiment_name: ${.name}
     env_name:  gym_env
     reward_shaper:
-      scale_value: 0.1
+      scale_value: 1.
 
     num_actors: ${....task.env.numEnvs} #16 num_envs to run
-    horizon_length: 8 
+    horizon_length: 8
 
     # This must be a multiple of (num_actors - 1)
-    num_sims: 80
+    num_sims: 160
     # The top k percentage of the population to update the actions sampling distributions
-    elite_percentage: 0.4
+    elite_percentage: 0.1
     
     
     # DMP Params

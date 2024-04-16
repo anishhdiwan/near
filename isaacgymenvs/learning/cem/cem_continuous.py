@@ -109,6 +109,7 @@ class CEMAgent(BaseAlgorithm):
         self.name = base_name
 
         self.num_sims = self.config['num_sims']
+        assert (self.num_sims % (self.num_actors - 1) == 0), "Num sims must be a multiple of num_actors - 1. The first actor is the 'real' agent and the rest are simulated "
         self.elite_percentage = self.config['elite_percentage']
 
         self.rewards_shaper = config['reward_shaper']
@@ -128,7 +129,7 @@ class CEMAgent(BaseAlgorithm):
 
         self.games_to_track = self.config.get('games_to_track', 100)
         self.obs = None
-        self.batch_size_envs = self.horizon_length * self.num_actors
+        self.num_frames_per_sim = self.horizon_length * (self.num_actors - 1)
 
 
         self.frame = 0
@@ -373,6 +374,7 @@ class CEMAgent(BaseAlgorithm):
             curr_state (np array): The real agent's current state
         """
         num_iters = self.num_sims // self.num_actors
+        elite_trajectories = []
 
         for _ in range(num_iters):
             sim_obs = self.sim_reset(self.obs_to_np(curr_state))
@@ -380,27 +382,35 @@ class CEMAgent(BaseAlgorithm):
             # Actions shape = [horizon length, num actors - 1, action dim]
             actions = (self.action_mu.repeat(self.num_actors-1,1,1) + (self.action_std * torch.randn(self.num_actors-1, self.horizon_length, self.actions_num, device=self.algo_device))).view(self.horizon_length, self.num_actors-1, -1)
 
+            # Keep track of the total reward across a trajectory
+            traj_rewards = torch.zeros((self.num_actors - 1, 1),device=self.algo_device)
             for n in range(self.horizon_length):
                 # Get action at step n of horizon
                 action = copy.deepcopy(actions[n])
 
                 # Step simulated envs
                 sim_obs, rewards, self.dones, infos = self.sim_step(action)
-
                 shaped_rewards = self.rewards_shaper(rewards)
 
                 # Compute energy and combined rewards using stepped obs
                 energy_rewards = self._calc_rewards(infos['paired_obs'])
                 sim_rewards = self._combine_rewards(shaped_rewards, energy_rewards)
 
-                # Compute the elite reward cutoff and mask
-                num_elite = floor(self.elite_percentage * len(infos["stepped_indices"]))
-                cutoff = torch.sort(sim_rewards, dim=0, descending=True).values[num_elite]
-                mask = sim_rewards.squeeze() >= cutoff
+                # Update the trajectory reward
+                traj_rewards += sim_rewards
 
-                # Update the action distribution of step n 
-                self.action_mu[n] = torch.mean(action[mask], dim=0)
-                self.action_std[n] = torch.std(action[mask], dim=0)
+            # Compute the elite reward cutoff and mask
+            num_elite = floor(self.elite_percentage * len(infos["stepped_indices"]))
+            cutoff = torch.sort(traj_rewards, dim=0, descending=True).values[num_elite]
+            mask = traj_rewards.squeeze() >= cutoff
+
+            # Update the action distribution of step
+            masked_actions = actions.view(self.num_actors-1,self.horizon_length, -1)[mask]
+            elite_trajectories.append(copy.deepcopy(masked_actions))
+
+        elite_trajectories = torch.cat(elite_trajectories, dim=0)
+        self.action_mu = torch.mean(elite_trajectories, dim=0)
+        self.action_std = torch.std(elite_trajectories, dim=0)
 
 
 
@@ -409,8 +419,9 @@ class CEMAgent(BaseAlgorithm):
         
         The first environment in the set of ray environments is the "real" agent's environment while the others are simulation copies
         """
+        num_iters = self.num_sims // self.num_actors
         self.obs = self.env_reset()
-        self.curr_frames = self.batch_size_envs
+        self.curr_frames = self.num_frames_per_sim * num_iters
 
 
         while True:
@@ -432,7 +443,7 @@ class CEMAgent(BaseAlgorithm):
             curr_frames = self.curr_frames
             self.frame += curr_frames
 
-            print(f"Frames (of simulations): {frame}")
+            print(f"Frames (of simulations): {frame} | Energy reward at last step {energy_rewards['energy_reward'][0]} | Combined reward at last step {combined_rewards[0]}")
 
 
             if self.mean_game_rewards.current_size > 0:
