@@ -105,7 +105,7 @@ class MazeEnv(gym.Env):
         self.render_size = render_size
         self.sim_hz = 100
         # step() returns done after this
-        self.max_env_steps = 6500
+        self.max_env_steps = 650
         self.quit_if_stuck = False
         self.teleop = False
 

@@ -228,7 +228,7 @@ class EpisodicSequentialSampler(Sampler):
 
 
 class MotionLib():
-    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=True, episodic=True, device=None, normalize=False, test_split=True):
+    def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=False, episodic=True, device=None, normalize=False, test_split=False):
         # By default the dataset is normalised. If not needed, it is unnormalized here. 
         # NOTE: AMP also normalizes data internally. It is hence advisable to set normalization to false while sampling and let AMP handle it internally
         self.normalize = normalize
