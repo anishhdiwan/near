@@ -25,6 +25,8 @@ pip install -e .
 
 ### Running the benchmarks
 
+Note: [hyperparams are explained here](./hyperparameters)
+
 #### OpenAIGym Envs 
 
 Currently only the pushT environment is included.
