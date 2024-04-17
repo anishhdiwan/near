@@ -25,7 +25,7 @@ pip install -e .
 
 ### Running the benchmarks
 
-Note: [hyperparams are explained here](./hyperparameters)
+Note: [hyperparams are explained here](hyperparameters.md)
 
 #### OpenAIGym Envs 
 
