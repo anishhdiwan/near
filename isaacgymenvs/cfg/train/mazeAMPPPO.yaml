@@ -18,7 +18,7 @@ params:
           name: default
         sigma_init:
           name: const_initializer
-          val: -2.9
+          val: -3.0
         fixed_sigma: True
         learn_sigma: False
         
@@ -95,8 +95,8 @@ params:
     disc_reward_scale: 2
     disc_weight_decay: 0.0001
     normalize_amp_input: True
-    task_reward_w: 1.0
-    disc_reward_w: 0.0
+    task_reward_w: 0.0
+    disc_reward_w: 1.0
 
     player:
       render: True

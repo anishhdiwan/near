@@ -7,7 +7,7 @@ params:
 
   network:
     name: actor_critic
-    separate: False
+    separate: True
     space:
       continuous:
         mu_activation: None
@@ -16,11 +16,12 @@ params:
           name: default
           scale: 0.02
         sigma_init:
+          # The neural network predicts actions by learning the mean and covariance for a gaussian distribution. With const_initializer, the covariance can be fixed to a certain value. Actions are sampled using a normal_dist(learnt_mu, exp(learnt_sigma)). 
           name: const_initializer
-          val: 0
+          val: -3.0
         fixed_sigma: True
     mlp:
-      units: [64, 128, 256]
+      units: [1024, 512]
       activation: relu
       initializer:
           name: default
@@ -36,31 +37,33 @@ params:
     max_epochs: ${resolve_default:500,${....max_iterations}}
     env_name:  gym_env
     reward_shaper:
-      scale_value: 0.1
+      scale_value: 1.
     normalize_advantage: True
     gamma: 0.99
     tau: 0.9
 
-    learning_rate: 1e-4
-    score_to_win: 2000 # Training stops if reached
+    learning_rate: 5e-5
+    score_to_win: 250 # Training stops if reached
     save_best_after: 50
     save_frequency: 30
-    grad_norm: 2.0
+    grad_norm: 0.5
     entropy_coef: 0.0
-    truncate_grads: True
+    truncate_grads: False
     e_clip: 0.2
-    clip_value: True
+    clip_value: False
     num_actors: ${....task.env.numEnvs} #16 num_envs to run
-    horizon_length: 256
-    minibatch_size: 64 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
+    horizon_length: 32
+    minibatch_size: 16 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
     mini_epochs: 4
     critic_coef: 1
-    lr_schedule:  Adaptive
-    kl_threshold: 0.005
+    lr_schedule:  constant
+    kl_threshold: 0.008
     normalize_input: True
-    seq_length: 4
+    normalize_value: True
+    value_bootstrap: True
     bounds_loss_coef: 0
-    
+    mixed_precision: False
+    print_stats: True
     
     # DMP Params
     dmp_config:
@@ -108,9 +111,9 @@ params:
 
       # Change these to use the learnt energies to train a policy
       inference:
-        task_reward_w: 0.0
+        task_reward_w: 1.0
         energy_reward_w: 1.0
-        sigma_level: 3 # Must be in range(0,L)
+        sigma_level: 9 # Must be in range(0,L)
         # Relative to the train.py file
         eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true

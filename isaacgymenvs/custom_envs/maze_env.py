@@ -106,7 +106,7 @@ class MazeEnv(gym.Env):
         self.sim_hz = 100
         # step() returns done after this
         self.max_env_steps = 650
-        self.quit_if_stuck = False
+        self.quit_if_stuck = True
         self.teleop = False
 
         # Local controller params.
@@ -362,22 +362,22 @@ class MazeEnv(gym.Env):
 
 
         dist_to_goal = np.linalg.norm(np.absolute(np.array(self.agent.position)) - np.absolute(self.goal_pose))/np.linalg.norm(np.absolute(self.goal_pose))
-        reward = -dist_to_goal
+        # reward = -dist_to_goal
 
-        # reward = 0.
+        reward = 0.
 
         # done = dist_to_goal < 0.05
         done = False
 
         if dist_to_goal < 0.05:
             done = True
-            reward += 5000
+            reward += 1000
 
         if self.quit_if_stuck:
             if self.env_steps > 250:
                 if self.is_stuck():
                     done = True
-                    # reward += -5000
+                    reward += -500
         
         
         observation = self._get_obs()
