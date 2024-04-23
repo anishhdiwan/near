@@ -167,7 +167,6 @@ class PushTEnv(gym.Env):
         return self._obs_space
     
     def reset(self):
-        seed = self._seed
         self._setup()
         if self.block_cog is not None:
             self.block.center_of_gravity = self.block_cog
@@ -177,11 +176,11 @@ class PushTEnv(gym.Env):
         # use legacy RandomState for compatibility
         state = self.reset_to_state
         if state is None:
-            rs = np.random.RandomState(seed=seed)
+            # rs = np.random.RandomState(seed=seed)
             state = np.array([
-                rs.randint(50, 450), rs.randint(50, 450),
-                rs.randint(100, 400), rs.randint(100, 400),
-                rs.randn() * 2 * np.pi - np.pi
+                self.np_random.integers(low=50, high=450), self.np_random.integers(low=50, high=450),
+                self.np_random.integers(low=100, high=400), self.np_random.integers(low=100, high=400),
+                self.np_random.normal() * 2 * np.pi - np.pi
                 ])
         self._set_state(state)
 

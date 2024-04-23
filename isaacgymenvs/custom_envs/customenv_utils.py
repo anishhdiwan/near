@@ -99,11 +99,13 @@ class CustomRayWorker:
 
     def seed(self, seed):
         if hasattr(self.env, 'seed'):
-            torch.manual_seed(seed)
-            torch.cuda.manual_seed_all(seed)
-            np.random.seed(seed)
-            random.seed(seed)
             self.env.seed(seed)
+            print(f"Env instantiated with RNG seed {self.env._seed}")
+            
+
+    # Each ray worker operates with its own RNG with its own state
+    def test_seed(self):
+        print(self.env.np_random.__getstate__())
             
     def render(self):
         self.env.render(mode = 'human') 
@@ -203,10 +205,11 @@ class CustomRayVecEnv(IVecEnv):
         self.use_torch = False
         self.seed = kwargs.pop('seed', None)
 
-        
         self.remote_worker = self.ray.remote(CustomRayWorker)
         self.workers = [self.remote_worker.remote(self.config_dict, self.config_name, kwargs) for i in range(self.num_actors)]
 
+        # Seed is passed via kwargs while the class is instantiated (done in the algo class in rl_games)
+        print(f"Main seed {self.seed}. Setting different seeds for each parallel env")
         if self.seed is not None:
             seeds = range(self.seed, self.seed + self.num_actors)
             seed_set = []

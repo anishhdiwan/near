@@ -34,6 +34,9 @@ params:
     full_experiment_name: ${.name}
     max_epochs: ${resolve_default:500,${....max_iterations}}
     env_name:  gym_env
+    # Gets passed on the the multi-env class
+    env_config:
+      seed: ${resolve_default:-1,${.....seed}}
     reward_shaper:
       scale_value: 0.1
     normalize_advantage: True

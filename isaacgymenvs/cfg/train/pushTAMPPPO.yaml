@@ -48,6 +48,9 @@ params:
     name: ${resolve_default:pushTAMP,${....experiment}}
     full_experiment_name: ${.name}
     env_name:  gym_env
+    # Gets passed on the the multi-env class
+    env_config:
+      seed: ${resolve_default:-1,${.....seed}}
     ppo: True
     multi_gpu: ${....multi_gpu}
     mixed_precision: False

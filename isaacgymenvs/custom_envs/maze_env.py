@@ -276,14 +276,13 @@ class MazeEnv(gym.Env):
         """
         Reset the environment 
         """
-        seed = self._seed
         self._setup()
         if self.damping is not None:
             self.space.damping = self.damping
         
         state = self.fixed_reset_state
         if state is None:
-            state = np.random.randint(low=60, high=80, size=2)
+            state = self.np_random.integers(low=60, high=80, size=2)
         self._set_state(state)
 
         observation = self._get_obs()

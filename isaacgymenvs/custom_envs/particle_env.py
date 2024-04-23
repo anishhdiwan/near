@@ -181,7 +181,7 @@ class ParticleEnv(gym.Env):
         
         state = self.reset_to_state
         if state is None:
-            state = np.random.randint(low=50, high=450, size=2)
+            state = self.np_random.integers(low=50, high=450, size=2)
         self._set_state(state)
 
         observation = self._get_obs()
