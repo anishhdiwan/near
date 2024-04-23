@@ -1,4 +1,6 @@
-params:  
+params:
+  seed: ${...seed}
+    
   algo:
     name: a2c_continuous
 

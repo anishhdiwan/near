@@ -1,4 +1,6 @@
-params:  
+params:
+  seed: ${...seed}
+  
   algo:
     name: dmp_continuous
 
