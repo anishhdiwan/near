@@ -153,6 +153,18 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
                 self.algo_observer.after_print_stats(frame, epoch_num, total_time)
                 
+                ## New Addition ##
+                if hasattr(self, 'mean_combined_rewards'):
+                    if self.mean_combined_rewards.current_size > 0:
+                        mean_combined_reward = self.mean_combined_rewards.get_mean()
+                        mean_shaped_task_reward = self.mean_shaped_task_rewards.get_mean()
+                        mean_disc_reward = self.mean_disc_rewards.get_mean()
+
+                        self.writer.add_scalar('minibatch_combined_reward/step', mean_combined_reward, frame)
+                        self.writer.add_scalar('minibatch_shaped_task_reward/step', mean_shaped_task_reward, frame)
+                        self.writer.add_scalar('minibatch_disc_reward/step', mean_disc_reward, frame)
+
+
                 if self.game_rewards.current_size > 0:
                     mean_rewards = self.game_rewards.get_mean()
                     mean_lengths = self.game_lengths.get_mean()

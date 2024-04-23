@@ -35,6 +35,7 @@ from rl_games.common import vecenv
 from isaacgymenvs.utils.torch_jit_utils import to_torch
 
 import time
+import copy
 from datetime import datetime
 import numpy as np
 from torch import optim
@@ -62,6 +63,12 @@ class AMPAgent(common_agent.CommonAgent):
     def init_tensors(self):
         super().init_tensors()
         self._build_amp_buffers()
+
+        ## Newly Added ##
+        self.mean_shaped_task_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+        self.mean_disc_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+        self.mean_combined_rewards = torch_ext.AverageMeter(self.value_size, self.games_to_track).to(self.ppo_device)
+
         return
     
     def set_eval(self):
@@ -153,6 +160,9 @@ class AMPAgent(common_agent.CommonAgent):
         mb_rewards = self.experience_buffer.tensor_dict['rewards']
         mb_amp_obs = self.experience_buffer.tensor_dict['amp_obs']
 
+        ## New Addition ##
+        shaped_env_rewards = copy.deepcopy(mb_rewards).squeeze()
+
         ## TESTING ###
         # print("TESTING")
         # print(f"play_steps mb_amp_obs {mb_amp_obs.shape}")
@@ -171,6 +181,13 @@ class AMPAgent(common_agent.CommonAgent):
 
         for k, v in amp_rewards.items():
             batch_dict[k] = a2c_common.swap_and_flatten01(v)
+
+        ## New Addition ##
+        temp_combined_rewards = copy.deepcopy(mb_rewards).squeeze()
+        temp_disc_rewards = copy.deepcopy(amp_rewards['disc_rewards']).squeeze()
+        self.mean_combined_rewards.update(temp_combined_rewards.sum(dim=0))
+        self.mean_disc_rewards.update(temp_disc_rewards.sum(dim=0))
+        self.mean_shaped_task_rewards.update(shaped_env_rewards.sum(dim=0))
 
         return batch_dict
 
