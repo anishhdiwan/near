@@ -9,7 +9,7 @@ import torch
 import time
 import copy
 
-from .motion_lib import MotionLib
+from .gym_motion_lib import GymMotionLib
 
 class PushTAlgoObserver(AlgoObserver):
     ## TODO: Figure out a way to record episode returns with asynchronous environments...
@@ -548,7 +548,7 @@ class CustomRayVecEnv(IVecEnv):
         
         if setup_motionlib:
             # TODO: set device=self.device
-            self._motion_lib = MotionLib(motion_file, num_obs_steps, num_obs_per_step)
+            self._motion_lib = GymMotionLib(motion_file, num_obs_steps, num_obs_per_step)
 
         # TODO: set device=self.device
         # Set up the observations buffer. This contains s-s' pairs and has the shape [num envs, num_obs_steps*num_obs_per_step]

@@ -205,6 +205,8 @@ class HumanoidAMPBase(VecTask):
         self.num_dof = self.gym.get_asset_dof_count(humanoid_asset)
         self.num_joints = self.gym.get_asset_joint_count(humanoid_asset)
 
+        print(f"Loading humanoid asset. Asset has {self.num_bodies} bodies {self.num_dof} dofs and {self.num_joints} joints")
+
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(*get_axis_params(0.89, self.up_axis_idx))
         start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)

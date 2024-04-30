@@ -227,8 +227,21 @@ class EpisodicSequentialSampler(Sampler):
 
 
 
-class MotionLib():
+class GymMotionLib():
+
     def __init__(self, motion_file, num_obs_steps, num_obs_per_step, auto_ends=False, episodic=True, device=None, normalize=False, test_split=False):
+        """ Motion sampling library for gym-based environments
+
+        Args:
+            motion_file (.zarr array): A compressed motion file with a tree-like structure with observations and episode ends
+            num_obs_steps (int): Number of steps in the paired observations
+            num_obs_per_step (int): Number of features in the observation vector
+            auto_ends (bool): Whether to automatically detect episode ends in the dataset
+            episodic (bool): Whether to sample motion trajectories isolated as per episode
+            device: Data device
+            normalize (bool): Whether to normalize the data. Normally set to false as the algo also implements norm
+            test_split (bool): Whether to split the motions into train/test sets 
+        """
         # By default the dataset is normalised. If not needed, it is unnormalized here. 
         # NOTE: AMP also normalizes data internally. It is hence advisable to set normalization to false while sampling and let AMP handle it internally
         self.normalize = normalize

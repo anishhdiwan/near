@@ -34,10 +34,10 @@ params:
 
 
   config:
-    name: ${resolve_default:mazeDMP,${....experiment}}
+    name: ${resolve_default:humanoidDMP,${....experiment}}
     full_experiment_name: ${.name}
-    max_epochs: ${resolve_default:500,${....max_iterations}}
-    env_name:  gym_env
+    max_epochs: ${resolve_default:5000,${....max_iterations}}
+    env_name: rlgpu
     # Gets passed on the the multi-env class
     env_config:
       seed: ${resolve_default:-1,${.....seed}}
@@ -84,9 +84,21 @@ params:
         normalize_energynet_input: True
 
       data:
-        dataset: "maze"
-        # Relative to the train.py file
-        motion_file: "custom_envs/data/maze_env/maze_motions.zarr"
+        dataset: "humanoid"
+        
+        # Copying over env and sim params from the task cfg. These will be used to instantiate the motion library
+        numEnvs: ${......task.env.numEnvs}
+        physics_engine: ${......task.physics_engine}
+        use_gpu_pipeline: ${......task.sim.physx.num_threads}
+        num_threads: ${......task.sim.use_gpu_pipeline}
+        solver_type: ${......task.sim.physx.solver_type}
+        num_subscenes: ${......task.sim.physx.num_subscenes}
+        use_gpu: ${......task.sim.physx.use_gpu}
+        
+        # motion_file: ${....task.env.motion_file}
+        # motion file passed through env params
+        env_params: ${......task.env}
+        sim_params: ${......task.sim}
       
       model:
         sigma_begin: 1

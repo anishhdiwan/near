@@ -10,18 +10,11 @@ sys.path.append(FILE_PATH)
 
 from datetime import datetime
 import argparse
-from utils.ncsn_utils import dict2namespace
+# from utils.ncsn_utils import dict2namespace
 
 @hydra.main(version_base="1.1", config_name="gym_env_config", config_path="./cfg")
 def launch_hydra(cfg: DictConfig):
 
-    # import argparse
-    # import traceback
-    # import time
-    # import shutil
-    # import logging
-    # import torch
-    # import numpy as np
     from learning.motion_ncsn.runners.anneal_runner import AnnealRunner
     from isaacgymenvs.utils.reformat import omegaconf_to_dict, print_dict
 
