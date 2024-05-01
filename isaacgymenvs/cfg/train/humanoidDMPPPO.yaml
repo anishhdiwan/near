@@ -75,6 +75,7 @@ params:
       
       training:
         batch_size: 128
+        buffer_size: 10000
         n_epochs: 500000
         n_iters: 50000
         ngpu: 1
@@ -105,7 +106,7 @@ params:
         sigma_end: 0.01
         L: 10
         # number of features in an observation
-        in_dim: 2
+        in_dim: 105
         # needed for standardization computation
         numObsSteps: ${......task.env.numObsSteps}
         encoder_hidden_layers: [32, 64]

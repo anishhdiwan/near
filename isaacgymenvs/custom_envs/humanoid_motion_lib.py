@@ -47,6 +47,7 @@ class HumanoidMotionDataset():
 
         self.batch_size = None
         self.sample_buffer = None
+        self.buffer_size = None
         self.gotten_items = 0
 
         self._load_motions()
@@ -118,7 +119,7 @@ class HumanoidMotionDataset():
 
 
     def sample_paired_traj(self, num_samples):
-        _dummy_obs_demo_buf = torch.zeros((num_samples, self._num_obs_steps, NUM_OBS_PER_STEP), device=self.device, dtype=torch.float)
+        out_shape = (num_samples, self._num_obs_steps, NUM_OBS_PER_STEP)
         dt = self.dt
         motion_ids = self._motion_lib.sample_motions(num_samples)
             
@@ -137,35 +138,42 @@ class HumanoidMotionDataset():
                                       self._local_root_obs)
         
         
-        obs_demo = obs_demo.view(_dummy_obs_demo_buf.shape)
+        obs_demo = obs_demo.view(out_shape)
 
         obs_demo_flat = obs_demo.view(-1, self.num_obs)
         return obs_demo_flat
 
-    def set_batch_size(self, batch_size):
+    def set_batch_and_buffer_size(self, batch_size, buffer_size):
         self.batch_size = batch_size
+        self.buffer_size = buffer_size
 
     def __len__(self):
-        return self._motion_lib.get_total_length()
+        # return self._motion_lib.get_total_length()
+        # Since data is sampled from within a buffer (and a buffer is a trajectory of length buffer_size), the length of the dataset is just the buffer size.
+        return self.buffer_size
 
     def __getitem__(self, idx):
-        assert self.batch_size is not None, "Please set dataset batch size using set_batch_size() before creating the dataloader"
+        assert self.batch_size is not None, "Please set dataset batch size using set_batch_and_buffer_size() before creating the dataloader"
+        assert self.buffer_size is not None, "Please set data buffer size using set_batch_and_buffer_size() before creating the dataloader"
         
         # Build a temporary buffer of traj samples
         if self.sample_buffer is None:
-            self.sample_buffer = self.sample_paired_traj(self.batch_size)
+            self.sample_buffer = self._create_sample_buffer(self.buffer_size)
             
         # Sample an element from the buffer and update the current item count
         sample = self.sample_buffer[idx]
         self.gotten_items += 1
 
         # If a batch is already sampled then reset the buffer and item counter
-        if self.gotten_items == self.batch_size:
+        if self.gotten_items == self.buffer_size:
             self.sample_buffer = None
             self.gotten_items = 0
 
-
         return sample
+
+    def _create_sample_buffer(self, buffer_size):
+        return self.sample_paired_traj(buffer_size)
+
 
     def __parse_sim_params(self, physics_engine: str, config_sim: Dict[str, Any]) -> gymapi.SimParams:
         """Parse the config dictionary for physics stepping settings.
@@ -223,16 +231,16 @@ class HumanoidMotionLib():
     def __init__(self, motion_file, humanoid_cfg, device):
         self.dataset = HumanoidMotionDataset(motion_file, humanoid_cfg, device)
 
-    def get_dataloader(self, batch_size, shuffle=False):
+    def get_dataloader(self, batch_size, buffer_size, shuffle=False):
         """Returns a dataloader that can be used to sample a batch of observation pairs. 
 
         """
-        self.dataset.set_batch_size(batch_size)
+        self.dataset.set_batch_and_buffer_size(batch_size, buffer_size)
         dataloader = torch.utils.data.DataLoader(
                     self.dataset,
                     batch_size=batch_size,
-                    num_workers=1,
+                    num_workers=0,
                     shuffle=shuffle,
-                    # accelerate cpu-gpu transfer
-                    pin_memory=True,
                     )
+
+        return dataloader
