@@ -34,13 +34,10 @@ params:
 
 
   config:
-    name: ${resolve_default:humanoidDMP,${....experiment}}
+    name: ${resolve_default:HumanoidDMP,${....experiment}}
     full_experiment_name: ${.name}
     max_epochs: ${resolve_default:5000,${....max_iterations}}
     env_name: rlgpu
-    # Gets passed on the the multi-env class
-    env_config:
-      seed: ${resolve_default:-1,${.....seed}}
     reward_shaper:
       scale_value: 1.
     normalize_advantage: True
@@ -58,7 +55,7 @@ params:
     clip_value: False
     num_actors: ${....task.env.numEnvs} #16 num_envs to run
     horizon_length: 32
-    minibatch_size: 16 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
+    minibatch_size: 2048 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
     mini_epochs: 4
     critic_coef: 1
     lr_schedule:  constant
@@ -133,9 +130,9 @@ params:
         energy_reward_w: 0.0
         sigma_level: 9 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/humanoidDMP_NCSN_01-10-14-39/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_11-16-29-10/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/humanoidDMP_NCSN_01-10-14-39/nn/running_mean_std.pth"
 
 
     player:

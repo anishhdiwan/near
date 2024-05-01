@@ -30,7 +30,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import hydra
-
 from omegaconf import DictConfig, OmegaConf
 
 # Importing from the file path

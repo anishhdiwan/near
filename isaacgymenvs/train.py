@@ -30,9 +30,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import hydra
+from omegaconf import DictConfig, OmegaConf
 
-from omegaconf import DictConfig, OmegaConf
-from omegaconf import DictConfig, OmegaConf
+
+# Importing from the file path
+import sys
+import os
+FILE_PATH = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(FILE_PATH)
 
 
 def preprocess_train_config(cfg, config_dict):
@@ -99,6 +104,8 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning import amp_network_builder
     import isaacgymenvs
 
+    from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous, dmp_players
+    from isaacgymenvs.learning.cem import cem_continuous
 
     time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_name = f"{cfg.wandb_name}_{time_str}"
@@ -109,6 +116,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     cfg_dict = omegaconf_to_dict(cfg)
     print_dict(cfg_dict)
+    print("-----")
 
     # set numpy formatting for printing only
     set_np_formatting()
@@ -189,6 +197,14 @@ def launch_rlg_hydra(cfg: DictConfig):
         runner.player_factory.register_builder('amp_continuous', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
         model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
+
+
+        ## Registering Diffusion Motion Priors ##
+        runner.algo_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_continuous.DMPAgent(**kwargs))
+        runner.player_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_players.DMPPlayerContinuous(**kwargs))
+
+        ## Registering Cross Entropy Method ##
+        runner.algo_factory.register_builder('cem_continuous', lambda **kwargs : cem_continuous.CEMAgent(**kwargs))
 
         return runner
 

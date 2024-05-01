@@ -234,7 +234,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
             self.experience_buffer.update_data('dones', n, self.dones)
             ## New Addition ##
-            self.experience_buffer.update_data('paired_obs', n, infos['paired_obs'])
+            try:
+                self.experience_buffer.update_data('paired_obs', n, infos['paired_obs'])
+            except KeyError:
+                self.experience_buffer.update_data('paired_obs', n, infos['amp_obs'])
 
             self.current_rewards += rewards
             self.current_lengths += 1
@@ -296,8 +299,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
             infos (dict): Dictionary containing infos passed to the algorithms after stepping the environment
         """
 
-        # TODO: Handle the case where paired obs is not provided (isaacgym envs)
-        paired_obs = infos['paired_obs']
+        try:
+            paired_obs = infos['paired_obs']
+        except KeyError:
+            paired_obs = infos['amp_obs']
 
         shape = list(paired_obs.shape)
         shape.insert(0,1)

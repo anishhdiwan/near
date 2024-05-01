@@ -107,6 +107,7 @@ isaacgym_task_map = {
     "FrankaCubeStack": FrankaCubeStack,
     "Humanoid": Humanoid,
     "HumanoidAMP": HumanoidAMP,
+    "HumanoidDMP": HumanoidAMP,
     "Ingenuity": Ingenuity,
     "Quadcopter": Quadcopter,
     "ShadowHand": ShadowHand,
