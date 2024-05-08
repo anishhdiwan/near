@@ -238,6 +238,9 @@ class Matplotlib3DPlotter(BasePlotter):
     def __init__(self, task: "BasePlotterTask") -> None:
         self._fig = plt.figure()
         self._ax = p3.Axes3D(self._fig)
+        self._ax.set_xlabel("x")
+        self._ax.set_ylabel("y")
+        self._ax.set_zlabel("z")
         self._artist_cache = {}
 
         self._create_impl_callables = {
