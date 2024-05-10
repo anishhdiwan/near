@@ -37,6 +37,12 @@ import torch
 from ..core import *
 from .backend.fbx.fbx_read_wrapper import fbx_to_array
 import scipy.ndimage.filters as filters
+
+import sys
+POSELIB_PATH = os.path.join(os.path.dirname(__file__),
+                               '../..')
+sys.path.append(POSELIB_PATH)
+
 from poselib.visualization.common import plot_skeleton_state
 
 
