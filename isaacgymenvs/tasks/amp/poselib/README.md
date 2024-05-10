@@ -61,3 +61,14 @@ Additionally, a SkeletonState T-Pose file and retargeting config file are also p
 
 ### Documentation
 We provide a description of the functions and classes available in poselib in the comments of the APIs. Please check them out for more details.
+
+
+### Pipelines
+
+A few additional data translation pipelines are also included, specifically to transform the CMU mo-cap dataset into motions compatible with the Adversarial Motion Priors .mjcf skeleton file. 
+- `fbx_motion_to_npy.py` is a pipeline to convert a dataset of CMU .fbx motions into .npy files.
+- `generate_tpose_from_motion.py` is a script that obtains a T-Pose state from an .fbx motion file
+- `motion_viewer.py` allows viewing skeleton motions and skeleton states
+- `generate_retargeted_dataset.py` retargets a set of .npy files obtained from the CMU .fbx files into AMP .mjcf skeleton
+
+The .fbx version of the CMU mo-cap dataset has the z-axis pointing in the direction in which the humanoid faces. While Isaacgym requires the z-axis to point opposite to the direction of gravity. To transform and retarget such motion files, first use `generate_tpose_from_motion.py` to generate a T-Pose that aligns with the motions in the dataset. Then use `fbx_motion_to_npy.py` to convert all motions of a certain task into .npy files. Finally, use `generate_retargeted_dataset.py` to transform the horizontal motions such that the z-axis points up. The retargeted motions can directly be used for training. 
