@@ -37,6 +37,7 @@ import torch
 from ..core import *
 from .backend.fbx.fbx_read_wrapper import fbx_to_array
 import scipy.ndimage.filters as filters
+from poselib.visualization.common import plot_skeleton_state
 
 
 class SkeletonTree(Serializable):
@@ -1246,6 +1247,69 @@ class SkeletonMotion(SkeletonState):
         return cls.from_skeleton_state(
             skeleton_state=skeleton_state, fps=fps
         )
+
+
+    @classmethod
+    def tpose_from_fbx(
+        cls: Type["SkeletonMotion"],
+        fbx_file_path,
+        skeleton_tree=None,
+        is_local=True,
+        fps=120,
+        root_joint="",
+        root_trans_index=0,
+        file_name="tpose",
+        *args,
+        **kwargs,
+    ) -> "SkeletonMotion":
+        """
+        Construct the tpose of the first frame of the skeleton motion from a fbx file (TODO - generalize this). If the skeleton tree
+        is not given, it will use the first frame of the mocap to construct the skeleton tree.
+
+        :param fbx_file_path: the path of the fbx file
+        :type fbx_file_path: string
+        :param fbx_configs: the configuration in terms of {"tmp_path": ..., "fbx_py27_path": ...}
+        :type fbx_configs: dict
+        :param skeleton_tree: the optional skeleton tree that the rotation will be applied to
+        :type skeleton_tree: SkeletonTree, optional
+        :param is_local: the state vector uses local or global rotation as the representation
+        :type is_local: bool, optional, default=True
+        :param fps: FPS of the FBX animation
+        :type fps: int, optional, default=120
+        :param root_joint: the name of the root joint for the skeleton
+        :type root_joint: string, optional, default="" or the first node in the FBX scene with animation data
+        :param root_trans_index: index of joint to extract root transform from
+        :type root_trans_index: int, optional, default=0 or the root joint in the parsed skeleton
+        :rtype: SkeletonMotion
+        """
+        joint_names, joint_parents, transforms, fps = fbx_to_array(
+            fbx_file_path, root_joint, fps
+        )
+        # swap the last two axis to match the convention
+        local_transform = euclidean_to_transform(
+            transformation_matrix=torch.from_numpy(
+                np.swapaxes(np.array(transforms), -1, -2),
+            ).float()
+        )
+        local_rotation = transform_rotation(local_transform)
+        root_translation = transform_translation(local_transform)[..., root_trans_index, :]
+        joint_parents = torch.from_numpy(np.array(joint_parents)).int()
+
+        if skeleton_tree is None:
+            local_translation = transform_translation(local_transform).reshape(
+                -1, len(joint_parents), 3
+            )[0]
+            skeleton_tree = SkeletonTree(joint_names, joint_parents, local_translation)
+        skeleton_state = SkeletonState.from_rotation_and_root_translation(
+            skeleton_tree, r=local_rotation, t=root_translation, is_local=True
+        )
+        if not is_local:
+            skeleton_state = skeleton_state.global_repr()
+
+        # Extracting the first frame
+        skeleton_state.tensor = skeleton_state.tensor[0] 
+        skeleton_state.to_file(f"data/{file_name}.npy")
+        plot_skeleton_state(skeleton_state)
 
     @staticmethod
     def _compute_velocity(p, time_delta, guassian_filter=True):
