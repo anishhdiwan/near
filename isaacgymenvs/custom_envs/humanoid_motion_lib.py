@@ -33,7 +33,17 @@ class HumanoidMotionDataset():
             device (torch device): Device to use 
         """
         self.device = device
-        self.motion_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/amp/motions', motion_file) 
+
+        # First try to find motions in the main assets folder. Then try in the dataset directory
+        motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/amp/motions', motion_file)
+        if os.path.exists(motion_file_path):
+            self.motion_file = motion_file_path
+        else:
+            motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/humanoid', motion_file)
+            assert os.path.exists(motion_file_path), "Provided motion file can not be found in the assets/amp/motions or data/humanoid directories"
+            self.motion_file = motion_file_path
+
+
         self.humanoid_cfg = humanoid_cfg
         self._num_obs_steps = self.humanoid_cfg["env"].get("numObsSteps", 2)
         self.num_obs = self._num_obs_steps * NUM_OBS_PER_STEP
