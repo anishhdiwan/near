@@ -53,7 +53,7 @@ params:
     truncate_grads: False
     e_clip: 0.2
     clip_value: False
-    num_actors: ${....task.env.numEnvs} #16 num_envs to run
+    num_actors: ${....task.env.numEnvs} # um_envs to run
     horizon_length: 32
     minibatch_size: 2048 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
     mini_epochs: 4
@@ -126,13 +126,13 @@ params:
 
       # Change these to use the learnt energies to train a policy
       inference:
-        task_reward_w: 1.0
-        energy_reward_w: 0.0
-        sigma_level: 9 # Must be in range(0,L)
+        task_reward_w: 0.0
+        energy_reward_w: 1.0
+        sigma_level: 2 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/humanoidDMP_NCSN_01-10-14-39/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_12-19-10-38/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/humanoidDMP_NCSN_01-10-14-39/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_12-19-10-38/nn/running_mean_std.pth"
 
 
     player:

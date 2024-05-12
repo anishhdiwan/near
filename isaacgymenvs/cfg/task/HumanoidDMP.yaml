@@ -9,7 +9,7 @@ headless: ${resolve_default:False,${..headless}}
 # TODO: change amp specific vecenv configs also for DMP
 training_algo: DMP 
 env: 
-  numEnvs: ${resolve_default:512,${...num_envs}}
+  numEnvs: ${resolve_default:1024,${...num_envs}}
   numObsSteps: 2
   
   envSpacing: 5
