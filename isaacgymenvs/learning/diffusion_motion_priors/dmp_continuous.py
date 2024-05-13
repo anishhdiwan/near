@@ -134,12 +134,25 @@ class DMPAgent(a2c_continuous.A2CAgent):
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
         """
 
-        energy_rew = self._calc_energy(paired_obs)
+        # energy_rew = - self._calc_energy(paired_obs)
+        energy_rew = self._transform_rewards(self._calc_energy(paired_obs))
         output = {
             'energy_reward': energy_rew
         }
 
         return output
+
+    def _transform_rewards(self, rewards):
+        """ Apply a transformation function to the rewards (scale, clip, and offset rewards in desirable range)
+
+        Args:
+            rewards (torch.Tensor): Rewards to transform
+        """
+
+        rewards = (0.0001/(1 + rewards**2)) + (torch.exp(-torch.abs(rewards)))
+
+        return rewards
+
 
     def _calc_energy(self, paired_obs):
         """Run the pre-trained energy-based model to compute rewards as energies
@@ -160,7 +173,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * self._c # c ranges from [0,L-1]
         
         with torch.no_grad():
-            energy_rew = -self._energynet(paired_obs, labels)
+            energy_rew = self._energynet(paired_obs, labels)
             original_shape[-1] = energy_rew.shape[-1]
             energy_rew = energy_rew.reshape(original_shape)
 
