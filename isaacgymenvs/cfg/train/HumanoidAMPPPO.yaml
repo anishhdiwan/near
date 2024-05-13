@@ -27,7 +27,6 @@ params:
       units: [1024, 512]
       activation: relu
       d2rl: False
-
       initializer:
         name: default
       regularizer:
@@ -57,7 +56,7 @@ params:
     value_bootstrap: True
     num_actors: ${....task.env.numEnvs}
     reward_shaper:
-      scale_value: 1
+      scale_value: 1.
     normalize_advantage: True
     gamma: 0.99
     tau: 0.95

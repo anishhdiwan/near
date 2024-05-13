@@ -16,18 +16,22 @@ params:
         sigma_activation: None
         mu_init:
           name: default
-          scale: 0.02
+          # scale: 0.02
         sigma_init:
           # The neural network predicts actions by learning the mean and covariance for a gaussian distribution. With const_initializer, the covariance can be fixed to a certain value. Actions are sampled using a normal_dist(learnt_mu, exp(learnt_sigma)). 
           name: const_initializer
-          val: -3.0
+          val: -2.9
         fixed_sigma: True
+        learn_sigma: False
     mlp:
       units: [1024, 512]
       activation: relu
+      d2rl: False
       initializer:
           name: default
-          scale: 2
+          # scale: 2
+      regularizer:
+        name: None
 
   load_checkpoint: ${if:${...checkpoint},True,False} #Training checkpint. Set to True if the main config has a checkpoint given. Is irrelevant when playing policies
   load_path: ${...checkpoint} # path to the checkpoint to load
@@ -42,28 +46,28 @@ params:
       scale_value: 1.
     normalize_advantage: True
     gamma: 0.99
-    tau: 0.9
+    tau: 0.95
 
     learning_rate: 5e-5
-    score_to_win: 250 # Training stops if reached
+    score_to_win: 2000 # Training stops if reached
     save_best_after: 50
     save_frequency: 30
-    grad_norm: 0.5
+    grad_norm: 1.0
     entropy_coef: 0.0
     truncate_grads: False
     e_clip: 0.2
     clip_value: False
-    num_actors: ${....task.env.numEnvs} # um_envs to run
-    horizon_length: 32
+    num_actors: ${....task.env.numEnvs} # num_envs to run
+    horizon_length: 16
     minibatch_size: 2048 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
-    mini_epochs: 4
-    critic_coef: 1
+    mini_epochs: 6
+    critic_coef: 5
     lr_schedule:  constant
     kl_threshold: 0.008
     normalize_input: True
     normalize_value: True
     value_bootstrap: True
-    bounds_loss_coef: 0
+    bounds_loss_coef: 10
     mixed_precision: False
     print_stats: True
     
@@ -73,7 +77,9 @@ params:
       training:
         batch_size: 128
         buffer_size: 10000
+        # An epoch of training contains several iters. An iter is one minibatch of training.
         n_epochs: 500000
+        # Use n_iters as a stop criteria with n_epochs set to some upper bound.
         n_iters: 50000
         ngpu: 1
         snapshot_freq: 5000
@@ -106,15 +112,15 @@ params:
         in_dim: 105
         # needed for standardization computation
         numObsSteps: ${......task.env.numObsSteps}
-        encoder_hidden_layers: [32, 64]
-        latent_space_dim: 128
-        decoder_hidden_layers: [64, 32, 8]
+        encoder_hidden_layers: [256, 512]
+        latent_space_dim: 1024
+        decoder_hidden_layers: [512, 256, 128]
         # The out dim is set to 1 internally (out_dim: 1) 
         
       optim:
         weight_decay: 1e-5
         optimizer: "Adam"
-        lr: 0.0001
+        lr: 5e-4
         beta1: 0.9
         amsgrad: false
       
@@ -128,11 +134,11 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 2 # Must be in range(0,L)
+        sigma_level: 5 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_12-19-10-38/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_13-15-20-24/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_12-19-10-38/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_13-15-20-24/nn/running_mean_std.pth"
 
 
     player:
