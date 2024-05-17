@@ -5,7 +5,7 @@ physics_engine: ${..physics_engine}
 
 # if given, will override the device setting in gym.
 env: 
-  numEnvs: ${resolve_default:4096,${...num_envs}}
+  numEnvs: ${resolve_default:1024,${...num_envs}}
   envSpacing: 5
   episodeLength: 300
   cameraFollow: True # if the camera follows humanoid or not
@@ -26,12 +26,13 @@ env:
   # animation files to learn from
   # these motions should use hyperparameters from HumanoidAMPPPO.yaml
   #motion_file: "amp_humanoid_walk.npy"
-  motion_file: "amp_humanoid_run.npy"
+  #motion_file: "amp_humanoid_run.npy"
   #motion_file: "amp_humanoid_dance.npy"
 
   # these motions should use hyperparameters from HumanoidAMPPPOLowGP.yaml
   #motion_file: "amp_humanoid_hop.npy"
   #motion_file: "amp_humanoid_backflip.npy"
+  motion_file: "amp_humanoid_walk.yaml"
 
   asset:
     assetFileName: "mjcf/amp_humanoid.xml"
