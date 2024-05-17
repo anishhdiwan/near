@@ -48,11 +48,19 @@ class CommonPlayer(players.PpoPlayerContinuous):
         self.mask = [False]
         
         net_config = self._build_net_config()
-        self._build_net(net_config)   
+        self._build_net(net_config)
+
+        self.visualise_disc = self.config['player'].get('visualise_disc', False)
         
         return
 
     def run(self):
+
+        if self.visualise_disc:
+            print(f"Visualising discriminator at checkpoint")
+            self.visualise_2d_disc()
+            quit()
+
         n_games = self.games_num
         render = self.render_env
         n_game_life = self.n_game_life

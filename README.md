@@ -80,6 +80,18 @@ python train_ncsn.py task=particleDMP
 
 Note: set DMP params in the `dsm_config` part of the `train/particleDMP.yml` file. The motions are currently preset within the ncsn script but will soon be passable as config params. 
 
+### Visualising the energy function or AMP discriminator
+
+```bash
+python train_ncsn.py task=particleDMP test=True
+```
+
+```bash
+python train_gym_envs.py task=mazeDMP test=True checkpoint=runs/run_name/nn/mazeAMP_datetime.pth
+```
+
+
+
 
 
 ## Troubleshooting

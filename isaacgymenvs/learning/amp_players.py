@@ -31,6 +31,7 @@ import torch
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.common.player import BasePlayer
+import matplotlib.pyplot as plt
 
 import isaacgymenvs.learning.common_player as common_player
 
@@ -71,7 +72,11 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
     def _build_net_config(self):
         config = super()._build_net_config()
         if (hasattr(self, 'env')):
-            config['amp_input_shape'] = self.env.amp_observation_space.shape
+            try:
+                config['amp_input_shape'] = self.env.amp_observation_space.shape
+            except AttributeError as e:
+                config['amp_input_shape'] = self.env.paired_observation_space.shape
+
         else:
             config['amp_input_shape'] = self.env_info['amp_observation_space']
 
@@ -113,3 +118,75 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
             disc_r = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.device)))
             disc_r *= self._disc_reward_scale
         return disc_r
+
+
+    def visualise_2d_disc(self):
+        """Visualise the energy function for 2D maze environment
+
+        An observation in the maze env is a 2D vector. The energy net is trained using s-s' pairs so the input is 4D. To visualise this in a 2D plane:
+        - First a meshgrid of the same size as the env is created
+        - For every point in the meshgrid, a window of the agent's reachable set is computed
+        - s-s' pairs are the ncomputed by pairing every meshgrid point with another point in the window (reachable set)
+        - The energy function is then computed in using this 4D input and the average energy is assigned to that meshgrid point
+        """
+        device = self.device
+        viz_min = 0
+        viz_max = 512
+        kernel_size = 3 # must be odd
+        grid_steps = 128
+        window_idx_left = int((kernel_size - 1)/2)
+        window_idx_right = int((kernel_size + 1)/2)
+
+
+        xs = torch.linspace(viz_min, viz_max, steps=grid_steps)
+        ys = torch.linspace(viz_min, viz_max, steps=grid_steps)
+        x, y = torch.meshgrid(xs, ys, indexing='xy')
+
+        grid_points = torch.cat((x.flatten().view(-1, 1),y.flatten().view(-1,1)), 1).to(device=self.device)
+        grid_points = grid_points.reshape(grid_steps,grid_steps,2)
+        disc_grid = torch.zeros(grid_steps,grid_steps,1)
+        rew_grid = torch.zeros(grid_steps,grid_steps,1)
+
+        for i in range(grid_points.shape[0]):
+            for j in range(grid_points.shape[1]):
+                if i in [viz_min,viz_max] or j in [viz_min,viz_max]:
+                    pass
+                    
+                else:
+                    window = grid_points[i-window_idx_left:i+window_idx_right,j-window_idx_left:j+window_idx_right,:]
+                    grid_pt_window = torch.zeros_like(window)
+                    grid_pt_window[:,:,:] = grid_points[i,j]
+
+                    obs_pairs = torch.cat((window, grid_pt_window), 2)
+                    obs_pairs = obs_pairs.reshape(-1,4)
+
+                    disc_pred = self._eval_disc(obs_pairs.to(self.device))
+                    amp_rewards = self._calc_amp_rewards(obs_pairs.to(self.device))['disc_rewards']
+
+                    mean_amp_rew = torch.mean(amp_rewards).item()
+                    mean_disc_pred = torch.mean(disc_pred).item()
+                    disc_grid[i,j] = mean_disc_pred
+                    rew_grid[i,j] = mean_amp_rew
+
+        disc_grid = disc_grid.reshape(-1,x.shape[0])
+        rew_grid = rew_grid.reshape(-1,x.shape[0])
+
+
+        plt.figure(figsize=(8, 6))
+        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), disc_grid.cpu().detach().numpy(), cmap ='gray')
+        plt.gca().invert_yaxis()
+        plt.xlabel("env - x")
+        plt.ylabel("env - y")
+        plt.title(f"Maze Env disc(s,s') | Mean disc pred in agent's reachable set")
+        plt.colorbar(mesh)
+        plt.show()
+
+
+        plt.figure(figsize=(8, 6))
+        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), rew_grid.cpu().detach().numpy(), cmap ='gray')
+        plt.gca().invert_yaxis()
+        plt.xlabel("env - x")
+        plt.ylabel("env - y")
+        plt.title(f"Maze Env amp_reward(s,s') | Mean amp reward in agent's reachable set")
+        plt.colorbar(mesh)
+        plt.show()
