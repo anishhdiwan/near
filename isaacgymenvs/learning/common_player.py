@@ -50,7 +50,10 @@ class CommonPlayer(players.PpoPlayerContinuous):
         net_config = self._build_net_config()
         self._build_net(net_config)
 
-        self.visualise_disc = self.config['player'].get('visualise_disc', False)
+        try:
+            self.visualise_disc = self.config['player'].get('visualise_disc', False)
+        except KeyError as e:
+            self.visualise_disc = False
         
         return
 
