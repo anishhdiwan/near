@@ -31,10 +31,10 @@ pip install -r requirements.txt
 
 5. If you plan to modify or visualise the Humanoid environment training data, you will also need to install the Autodesk .fbx Python SDK. Follow the instructions [here](https://help.autodesk.com/view/FBX/2020/ENU/?guid=FBX_Developer_Help_scripting_with_python_fbx_installing_python_fbx_html) to download the Python SDK. Once, installed, the Python package and libraries then need to be copied over to the conda environment to be accessible by other Python programs. Follow the instructions [here](https://download.autodesk.com/us/fbx/20112/fbx_sdk_help/index.html?url=WS73099cc142f48755-751de9951262947c01c-6dc7.htm,topicNumber=d0e8430) to do so. The whole procedure is also transcribed below. Note that you need to install the Python SDK and NOT the standard FBX SDK. The latest version that was tested with this repository is version 2020.2.1 for Python 3.7.
 
-  -- Download the Python SDK from [here](https://aps.autodesk.com/developer/overview/fbx-sdk)
-  -- Once downloaded, extract the archive and follow the instructions in the readme file (it is recommended to make a new folder for the SDK to avoid clutter)
-  -- Once installed, navigate to the `lib` directory in the installation folder. Copy the contents of <yourFBXSDKpath>\lib\<Pythonxxxxxx>\ to conda\envs\rlgpu\lib\python3.7\site-packages\.
-  -- NOTE: for the sdk to work, you need to add the environment variable LD_LIB_PATH:=<conda path>/envs/rlgpu/lib
+  - Download the Python SDK from [here](https://aps.autodesk.com/developer/overview/fbx-sdk)
+  - Once downloaded, extract the archive and follow the instructions in the readme file (it is recommended to make a new folder for the SDK to avoid clutter)
+  - Once installed, navigate to the `lib` directory in the installation folder. Copy the contents of <yourFBXSDKpath>\lib\<Pythonxxxxxx>\ to conda\envs\rlgpu\lib\python3.7\site-packages\.
+  - NOTE: for the sdk to work, you need to add the environment variable LD_LIB_PATH:=<conda path>/envs/rlgpu/lib
 
 
 ### Running the benchmarks

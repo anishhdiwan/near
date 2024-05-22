@@ -1,0 +1,9 @@
+pygame==2.5.2
+ray==1.13.0
+scikit-image==0.19.3
+zarr==2.12.0
+pymunk==6.6.0
+shapely==2.0.2
+matplotlib==3.5.3
+seaborn==0.12.2
+tqdm==4.66.4
