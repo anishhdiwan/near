@@ -361,7 +361,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self.dataset.update_values_dict(None)
             should_exit = False
 
-            if self.rank == 0:
+            if self.global_rank == 0:
                 self.diagnostics.epoch(self, current_epoch = epoch_num)
                 # do we need scaled_time?
                 scaled_time = self.num_agents * sum_time
