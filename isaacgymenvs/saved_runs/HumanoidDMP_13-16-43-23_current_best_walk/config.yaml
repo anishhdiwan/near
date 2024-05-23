@@ -1,0 +1,296 @@
+task:
+  name: HumanoidDMP
+  physics_engine: ${..physics_engine}
+  headless: ${resolve_default:False,${..headless}}
+  training_algo: DMP
+  env:
+    numEnvs: ${resolve_default:1024,${...num_envs}}
+    numObsSteps: 2
+    envSpacing: 5
+    episodeLength: 300
+    cameraFollow: true
+    enableDebugVis: false
+    pdControl: true
+    powerScale: 1.0
+    controlFrequencyInv: 2
+    stateInit: Random
+    hybridInitProb: 0.5
+    numAMPObsSteps: ${.numObsSteps}
+    localRootObs: false
+    contactBodies:
+    - right_foot
+    - left_foot
+    terminationHeight: 0.5
+    enableEarlyTermination: true
+    motion_file: amp_humanoid_walk.yaml
+    asset:
+      assetFileName: mjcf/amp_humanoid.xml
+    plane:
+      staticFriction: 1.0
+      dynamicFriction: 1.0
+      restitution: 0.0
+  sim:
+    dt: 0.0166
+    substeps: 2
+    up_axis: z
+    use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+    gravity:
+    - 0.0
+    - 0.0
+    - -9.81
+    physx:
+      num_threads: ${....num_threads}
+      solver_type: ${....solver_type}
+      use_gpu: ${contains:"cuda",${....sim_device}}
+      num_position_iterations: 4
+      num_velocity_iterations: 0
+      contact_offset: 0.02
+      rest_offset: 0.0
+      bounce_threshold_velocity: 0.2
+      max_depenetration_velocity: 10.0
+      default_buffer_size_multiplier: 5.0
+      max_gpu_contact_pairs: 8388608
+      num_subscenes: ${....num_subscenes}
+      contact_collection: 2
+  task:
+    randomize: false
+    randomization_params:
+      frequency: 600
+      observations:
+        range:
+        - 0
+        - 0.002
+        operation: additive
+        distribution: gaussian
+      actions:
+        range:
+        - 0.0
+        - 0.02
+        operation: additive
+        distribution: gaussian
+      sim_params:
+        gravity:
+          range:
+          - 0
+          - 0.4
+          operation: additive
+          distribution: gaussian
+          schedule: linear
+          schedule_steps: 3000
+      actor_params:
+        humanoid:
+          color: true
+          rigid_body_properties:
+            mass:
+              range:
+              - 0.5
+              - 1.5
+              operation: scaling
+              distribution: uniform
+              setup_only: true
+              schedule: linear
+              schedule_steps: 3000
+          rigid_shape_properties:
+            friction:
+              num_buckets: 500
+              range:
+              - 0.7
+              - 1.3
+              operation: scaling
+              distribution: uniform
+              schedule: linear
+              schedule_steps: 3000
+            restitution:
+              range:
+              - 0.0
+              - 0.7
+              operation: scaling
+              distribution: uniform
+              schedule: linear
+              schedule_steps: 3000
+          dof_properties:
+            damping:
+              range:
+              - 0.5
+              - 1.5
+              operation: scaling
+              distribution: uniform
+              schedule: linear
+              schedule_steps: 3000
+            stiffness:
+              range:
+              - 0.5
+              - 1.5
+              operation: scaling
+              distribution: uniform
+              schedule: linear
+              schedule_steps: 3000
+            lower:
+              range:
+              - 0
+              - 0.01
+              operation: additive
+              distribution: gaussian
+              schedule: linear
+              schedule_steps: 3000
+            upper:
+              range:
+              - 0
+              - 0.01
+              operation: additive
+              distribution: gaussian
+              schedule: linear
+              schedule_steps: 3000
+train:
+  params:
+    seed: ${...seed}
+    algo:
+      name: dmp_continuous
+    model:
+      name: continuous_a2c_logstd
+    network:
+      name: actor_critic
+      separate: true
+      space:
+        continuous:
+          mu_activation: None
+          sigma_activation: None
+          mu_init:
+            name: default
+          sigma_init:
+            name: const_initializer
+            val: -2.9
+          fixed_sigma: true
+          learn_sigma: false
+      mlp:
+        units:
+        - 1024
+        - 512
+        activation: relu
+        d2rl: false
+        initializer:
+          name: default
+        regularizer:
+          name: None
+    load_checkpoint: ${if:${...checkpoint},True,False}
+    load_path: ${...checkpoint}
+    config:
+      name: ${resolve_default:HumanoidDMP,${....experiment}}
+      full_experiment_name: ${.name}
+      max_epochs: ${resolve_default:5000,${....max_iterations}}
+      env_name: rlgpu
+      reward_shaper:
+        scale_value: 1.0
+      normalize_advantage: true
+      gamma: 0.99
+      tau: 0.95
+      learning_rate: 5.0e-05
+      score_to_win: 2000
+      save_best_after: 50
+      save_frequency: 30
+      grad_norm: 1.0
+      entropy_coef: 0.0
+      truncate_grads: false
+      e_clip: 0.2
+      clip_value: false
+      num_actors: ${....task.env.numEnvs}
+      horizon_length: 16
+      minibatch_size: 2048
+      mini_epochs: 6
+      critic_coef: 5
+      lr_schedule: constant
+      kl_threshold: 0.008
+      normalize_input: true
+      normalize_value: true
+      value_bootstrap: true
+      bounds_loss_coef: 10
+      mixed_precision: false
+      print_stats: true
+      dmp_config:
+        training:
+          batch_size: 128
+          buffer_size: 10000
+          n_epochs: 500000
+          n_iters: 50000
+          ngpu: 1
+          snapshot_freq: 5000
+          algo: dsm
+          anneal_power: 2.0
+          normalize_energynet_input: true
+        data:
+          dataset: humanoid
+          numEnvs: ${......task.env.numEnvs}
+          physics_engine: ${......task.physics_engine}
+          use_gpu_pipeline: ${......task.sim.physx.num_threads}
+          num_threads: ${......task.sim.use_gpu_pipeline}
+          solver_type: ${......task.sim.physx.solver_type}
+          num_subscenes: ${......task.sim.physx.num_subscenes}
+          use_gpu: ${......task.sim.physx.use_gpu}
+          env_params: ${......task.env}
+          sim_params: ${......task.sim}
+        model:
+          sigma_begin: 1
+          sigma_end: 0.01
+          L: 10
+          in_dim: 105
+          numObsSteps: ${......task.env.numObsSteps}
+          encoder_hidden_layers:
+          - 256
+          - 512
+          latent_space_dim: 1024
+          decoder_hidden_layers:
+          - 512
+          - 256
+          - 128
+        optim:
+          weight_decay: 1.0e-05
+          optimizer: Adam
+          lr: 0.0005
+          beta1: 0.9
+          amsgrad: false
+        visualise:
+          plot3d: true
+          colormask: true
+          plot_train_data: true
+        inference:
+          task_reward_w: 0.0
+          energy_reward_w: 1.0
+          sigma_level: 5
+          eb_model_checkpoint: ncsn_runs/HumanoidDMP_NCSN_13-15-20-24/nn/checkpoint.pth
+          running_mean_std_checkpoint: ncsn_runs/HumanoidDMP_NCSN_13-15-20-24/nn/running_mean_std.pth
+      player:
+        render: true
+        render_sleep: 0.01
+        games_num: 5
+pbt:
+  enabled: false
+task_name: ${task.name}
+experiment: ''
+num_envs: ''
+seed: 42
+torch_deterministic: false
+max_iterations: ''
+physics_engine: physx
+pipeline: gpu
+sim_device: cuda:0
+rl_device: cuda:0
+graphics_device_id: 0
+num_threads: 4
+solver_type: 1
+num_subscenes: 4
+test: false
+checkpoint: ''
+sigma: ''
+multi_gpu: false
+wandb_activate: false
+wandb_group: ''
+wandb_name: ${train.params.config.name}
+wandb_entity: ''
+wandb_project: isaacgymenvs
+wandb_tags: []
+wandb_logcode_dir: ''
+capture_video: false
+capture_video_freq: 1464
+capture_video_len: 100
+force_render: true
+headless: false
