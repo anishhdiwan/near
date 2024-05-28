@@ -138,7 +138,7 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 7 # Must be in range(0,L)
+        sigma_level: 7 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
         eb_model_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_28-15-50-02/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true

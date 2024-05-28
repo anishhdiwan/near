@@ -5,6 +5,7 @@ import numpy as np
 import os
 import time
 import yaml
+from math import floor
 
 from rl_games.algos_torch import a2c_continuous
 from rl_games.algos_torch import torch_ext
@@ -67,7 +68,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         self._paired_observation_space = self.env_info['paired_observation_space']
         self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
-        self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1]
+        self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
+        if self._c = -1:
+            self.ncsn_annealing = True
+            # When c=-1, noise level annealing is used.
+            self._c = 0
         self._sigma_begin = config['dmp_config']['model']['sigma_begin']
         self._sigma_end = config['dmp_config']['model']['sigma_end']
         self._L = config['dmp_config']['model']['L']
@@ -204,6 +209,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
             obs = self._energynet_input_norm(obs)
         return obs
 
+    def _anneal_noise_level(self):
+        """If NCSN annealing is used, change the currently used noise level self._c
+        """
+        if self.ncsn_annealing == True:
+            max_level_iters = 1e6
+            num_levels = self._L
+            self._c = floor((self.frame * num_levels)/max_level_iters)
+
 
     def play_steps(self):
         """Rollout the current policy for some horizon length to obtain experience samples (s, s', r, info). 
@@ -285,6 +298,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
 
         ## New Addition ##
+        self._anneal_noise_level()
         dmp_rewards = self._calc_rewards(mb_paired_obs)
         mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
 
