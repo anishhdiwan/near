@@ -48,7 +48,7 @@ params:
     name: ${resolve_default:HumanoidAMP,${....experiment}}
     full_experiment_name: ${.name}
     env_name: rlgpu
-    ppo: True
+    # ppo: True
     multi_gpu: ${....multi_gpu}
     mixed_precision: False
     normalize_input: True
@@ -79,6 +79,8 @@ params:
     clip_value: False
     seq_len: 4
     bounds_loss_coef: 10
+    
+    
     amp_obs_demo_buffer_size: 200000
     amp_replay_buffer_size: 1000000
     amp_replay_keep_prob: 0.01

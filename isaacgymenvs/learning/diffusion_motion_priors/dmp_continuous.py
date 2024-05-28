@@ -149,7 +149,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
             rewards (torch.Tensor): Rewards to transform
         """
 
-        rewards = (0.0001/(1 + rewards**2)) + (torch.exp(-torch.abs(rewards)))
+        # rewards = (0.0001/(1 + rewards**2)) + (torch.exp(-torch.abs(rewards)))
+
+        rewards = -torch.log(1/(1 + torch.exp(-rewards)))
 
         return rewards
 

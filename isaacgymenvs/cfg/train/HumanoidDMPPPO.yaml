@@ -40,36 +40,40 @@ params:
   config:
     name: ${resolve_default:HumanoidDMP,${....experiment}}
     full_experiment_name: ${.name}
-    max_epochs: ${resolve_default:5000,${....max_iterations}}
     env_name: rlgpu
+    # ppo: True
+    # multi_gpu: ${....multi_gpu}
+    mixed_precision: False
+    normalize_input: True
+    normalize_value: True
+    value_bootstrap: True
+    num_actors: ${....task.env.numEnvs} # num_envs to run
     reward_shaper:
       scale_value: 1.
     normalize_advantage: True
     gamma: 0.99
     tau: 0.95
-
     learning_rate: 5e-5
+    lr_schedule:  constant
+    kl_threshold: 0.008 # only used for adaptive lr_schedule
     score_to_win: 2000 # Training stops if reached
+    max_epochs: ${resolve_default:5000,${....max_iterations}}
     save_best_after: 50
     save_frequency: 30
+    print_stats: True
     grad_norm: 1.0
     entropy_coef: 0.0
     truncate_grads: False
     e_clip: 0.2
-    clip_value: False
-    num_actors: ${....task.env.numEnvs} # num_envs to run
     horizon_length: 16
-    minibatch_size: 2048 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents   
+    minibatch_size: 2048 # batch_size % minibatch_size == 0 | batch_size = horizon_len * num_actors * num_agents       
     mini_epochs: 6
     critic_coef: 5
-    lr_schedule:  constant
-    kl_threshold: 0.008
-    normalize_input: True
-    normalize_value: True
-    value_bootstrap: True
+    clip_value: False
+    # seq_len: 4
     bounds_loss_coef: 10
-    mixed_precision: False
-    print_stats: True
+    
+    
     
     # DMP Params
     dmp_config:
