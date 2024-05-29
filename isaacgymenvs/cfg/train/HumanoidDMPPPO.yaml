@@ -84,7 +84,7 @@ params:
         # An epoch of training contains several iters. An iter is one minibatch of training.
         n_epochs: 500000
         # Use n_iters as a stop criteria with n_epochs set to some upper bound.
-        n_iters: 50000
+        n_iters: 10000
         ngpu: 1
         snapshot_freq: 5000
         algo: 'dsm'
@@ -116,16 +116,18 @@ params:
         in_dim: 105
         # needed for standardization computation
         numObsSteps: ${......task.env.numObsSteps}
-        encoder_hidden_layers: [256, 512]
-        latent_space_dim: 1024
-        decoder_hidden_layers: [512, 256, 128]
+        encoder_hidden_layers: [512, 1024]
+        latent_space_dim: 2048
+        decoder_hidden_layers: [1024, 512, 128]
         # The out dim is set to 1 internally (out_dim: 1) 
         
       optim:
-        weight_decay: 1e-5
+        weight_decay: 0.0
         optimizer: "Adam"
-        lr: 5e-4
+        lr: 1e-5
+        # ADAM beta (default: 0.9)
         beta1: 0.9
+        # Whether to use AMSGrad
         amsgrad: false
       
       # Used to visualise learnt energies. Not relevant for high dimensional datasets  
@@ -138,7 +140,7 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 7 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
+        sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
         eb_model_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_28-15-50-02/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true

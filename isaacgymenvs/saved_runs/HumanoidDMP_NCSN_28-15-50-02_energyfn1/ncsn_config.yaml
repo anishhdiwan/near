@@ -1,0 +1,52 @@
+training:
+  batch_size: 128
+  buffer_size: 10000
+  n_epochs: 500000
+  n_iters: 50000
+  ngpu: 1
+  snapshot_freq: 5000
+  algo: dsm
+  anneal_power: 2.0
+  normalize_energynet_input: true
+data:
+  dataset: humanoid
+  numEnvs: ${......task.env.numEnvs}
+  physics_engine: ${......task.physics_engine}
+  use_gpu_pipeline: ${......task.sim.physx.num_threads}
+  num_threads: ${......task.sim.use_gpu_pipeline}
+  solver_type: ${......task.sim.physx.solver_type}
+  num_subscenes: ${......task.sim.physx.num_subscenes}
+  use_gpu: ${......task.sim.physx.use_gpu}
+  env_params: ${......task.env}
+  sim_params: ${......task.sim}
+model:
+  sigma_begin: 1
+  sigma_end: 0.01
+  L: 10
+  in_dim: 105
+  numObsSteps: ${......task.env.numObsSteps}
+  encoder_hidden_layers:
+  - 256
+  - 512
+  latent_space_dim: 1024
+  decoder_hidden_layers:
+  - 512
+  - 256
+  - 128
+optim:
+  weight_decay: 1.0e-05
+  optimizer: Adam
+  lr: 0.0005
+  beta1: 0.9
+  amsgrad: false
+visualise:
+  plot3d: true
+  colormask: true
+  plot_train_data: true
+inference:
+  task_reward_w: 0.0
+  energy_reward_w: 1.0
+  sigma_level: 5
+  eb_model_checkpoint: ncsn_runs/HumanoidDMP_NCSN_28-15-28-28/nn/checkpoint.pth
+  running_mean_std_checkpoint: ncsn_runs/HumanoidDMP_NCSN_28-15-28-28/nn/running_mean_std.pth
+device: cuda:0

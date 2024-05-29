@@ -69,7 +69,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._paired_observation_space = self.env_info['paired_observation_space']
         self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
         self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
-        if self._c = -1:
+        if self._c == -1:
             self.ncsn_annealing = True
             # When c=-1, noise level annealing is used.
             self._c = 0
