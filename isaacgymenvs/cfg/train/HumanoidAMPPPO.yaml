@@ -64,7 +64,7 @@ params:
     lr_schedule: constant
     kl_threshold: 0.008
     score_to_win: 20000
-    max_epochs: ${resolve_default:5000,${....max_iterations}}
+    max_frames: ${resolve_default:10e6,${....max_iterations}}
     save_best_after: 100
     save_frequency: 50
     print_stats: True

@@ -76,7 +76,7 @@ params:
       training:
         batch_size: 128
         n_epochs: 500000
-        n_iters: 50000
+        n_iters: 15000
         ngpu: 1
         snapshot_freq: 5000
         algo: 'dsm'
@@ -102,9 +102,9 @@ params:
         # The out dim is set to 1 internally (out_dim: 1) 
         
       optim:
-        weight_decay: 1e-5
+        weight_decay: 0.0
         optimizer: "Adam"
-        lr: 0.0001
+        lr: 1e-4
         beta1: 0.9
         amsgrad: false
       
@@ -118,11 +118,11 @@ params:
       inference:
         task_reward_w: 1.0
         energy_reward_w: 0.0
-        sigma_level: 9 # Must be in range(0,L)
+        sigma_level: 7 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_22-20-41-19/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_30-15-42-04/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_22-20-41-19/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_30-15-42-04/nn/running_mean_std.pth"
 
 
     player:

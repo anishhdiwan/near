@@ -57,7 +57,7 @@ params:
     lr_schedule:  constant
     kl_threshold: 0.008 # only used for adaptive lr_schedule
     score_to_win: 2000 # Training stops if reached
-    max_epochs: ${resolve_default:5000,${....max_iterations}}
+    max_frames: ${resolve_default:10e6,${....max_iterations}}
     save_best_after: 50
     save_frequency: 30
     print_stats: True
@@ -82,9 +82,9 @@ params:
         batch_size: 128
         buffer_size: 10000
         # An epoch of training contains several iters. An iter is one minibatch of training.
-        n_epochs: 500000
+        n_epochs: 250000
         # Use n_iters as a stop criteria with n_epochs set to some upper bound.
-        n_iters: 10000
+        n_iters: 50000
         ngpu: 1
         snapshot_freq: 5000
         algo: 'dsm'
@@ -140,11 +140,11 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
+        sigma_level: 9 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_28-15-50-02/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/Humanoid_SM_run2/nn/checkpoint_15000.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/HumanoidDMP_NCSN_28-15-50-02/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_run2/nn/running_mean_std.pth"
 
 
     player:

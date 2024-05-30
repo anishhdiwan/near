@@ -70,9 +70,12 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
         self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
         if self._c == -1:
+            print("Using Annealed Rewards")
             self.ncsn_annealing = True
             # When c=-1, noise level annealing is used.
             self._c = 0
+        else:
+            self.ncsn_annealing = False
         self._sigma_begin = config['dmp_config']['model']['sigma_begin']
         self._sigma_end = config['dmp_config']['model']['sigma_end']
         self._L = config['dmp_config']['model']['L']
