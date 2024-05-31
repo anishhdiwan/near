@@ -184,7 +184,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                     if (epoch_num % self.save_freq == 0):
                         self.save(self.model_output_file + "_" + str(epoch_num))
 
-                if epoch_num > self.max_epochs and self.max_frames != -1:
+                if epoch_num > self.max_epochs and self.max_epochs != -1:
                     self.save(self.model_output_file)
                     print('MAX EPOCHS NUM!')
                     return self.last_mean_rewards, epoch_num

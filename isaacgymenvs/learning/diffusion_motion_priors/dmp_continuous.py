@@ -70,12 +70,24 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
         self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
         if self._c == -1:
-            print("Using Annealed Rewards")
-            self.ncsn_annealing = True
             # When c=-1, noise level annealing is used.
-            self._c = 0
+            print("Using Annealed Rewards!")
+            self.ncsn_annealing = True
+            
+            # Index of the current noise level used to compute energies
+            self._c_idx = 0
+            # Value to add to reward to ensure that the annealed rewards are non-decreasing
+            self._curr_reward_offset = 0.0
+            # Sigma levels to use to compute energies
+            self._anneal_levels = [3,4,5,6,7,8,9]
+            # Noise level being used right now
+            self._c = self._anneal_levels[self._c_idx]
+            # Minimum energy value after which noise level is changed
+            self._anneal_threshold = 100.0 - self._c * 10
+
         else:
             self.ncsn_annealing = False
+
         self._sigma_begin = config['dmp_config']['model']['sigma_begin']
         self._sigma_end = config['dmp_config']['model']['sigma_end']
         self._L = config['dmp_config']['model']['L']
@@ -159,17 +171,25 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         # rewards = (0.0001/(1 + rewards**2)) + (torch.exp(-torch.abs(rewards)))
 
-        rewards = -torch.log(1/(1 + torch.exp(-rewards)))
+        # rewards = -torch.log(1/(1 + torch.exp(rewards)))
+
+        rewards = rewards + self._curr_reward_offset
 
         return rewards
 
 
-    def _calc_energy(self, paired_obs):
-        """Run the pre-trained energy-based model to compute rewards as energies
+    def _calc_energy(self, paired_obs, c=None):
+        """Run the pre-trained energy-based model to compute rewards as energies. 
+        
+        If a noise level is passed in then the energy for that level is returned. Else the current noise_level is used
 
         Args:
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
+            c (int): Noise level to use to condition the energy based model. If not given then the class variable (self._c) is used
         """
+
+        if c is None:
+            c = self._c
 
         # ### TESTING - ONLY FOR PARTICLE ENV 2D ###
         # paired_obs = paired_obs[:,:,:2]
@@ -180,7 +200,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         paired_obs = paired_obs.reshape(-1, original_shape[-1])
 
         # Tensor of noise level to condition the energynet
-        labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * self._c # c ranges from [0,L-1]
+        labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * c # c ranges from [0,L-1]
         
         with torch.no_grad():
             energy_rew = self._energynet(paired_obs, labels)
@@ -212,13 +232,35 @@ class DMPAgent(a2c_continuous.A2CAgent):
             obs = self._energynet_input_norm(obs)
         return obs
 
-    def _anneal_noise_level(self):
+    def _anneal_noise_level(self, **kwargs):
         """If NCSN annealing is used, change the currently used noise level self._c
         """
-        if self.ncsn_annealing == True:
-            max_level_iters = 1e6
-            num_levels = self._L
-            self._c = floor((self.frame * num_levels)/max_level_iters)
+        ANNEAL_STRATEGY = "non-decreasing-linear" # options are "linear" or "non-decreasing-linear"
+        
+        if ANNEAL_STRATEGY == "linear":
+            if self.ncsn_annealing == True:
+                max_level_iters = 1e6
+                num_levels = self._L
+                self._c = floor((self.frame * num_levels)/max_level_iters)
+
+        elif ANNEAL_STRATEGY == "non-decreasing-linear":
+            # Make sure that an observation pair is passed in 
+            assert "paired_obs" in list(kwargs.keys())
+            paired_obs = kwargs["paired_obs"]
+
+            # If already at the max noise level, do nothing
+            if not self._c_idx == len(self._anneal_levels) - 1:
+
+                # If the next noise level's average energy is lower than some threshold then keep using the current noise level
+                if self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx+1]).mean().item() < self._anneal_threshold:
+                    self._c = self._anneal_levels[self._c_idx]
+                # If the next noise level's average energy is higher than some threshold then change the noise level and 
+                # add the average energy of the current noise level to the reward offset. This ensures that rewards are non-decreasing
+                else:
+                    self._curr_reward_offset += self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]).mean().item()
+                    self._c_idx += 1
+                    self._c = self._anneal_levels[self._c_idx]
+                    self._anneal_threshold = 100.0 - self._c * 10
 
 
     def play_steps(self):
@@ -301,7 +343,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
 
         ## New Addition ##
-        self._anneal_noise_level()
+        self._anneal_noise_level(paired_obs=mb_paired_obs)
         dmp_rewards = self._calc_rewards(mb_paired_obs)
         mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
 
@@ -411,6 +453,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
                     self.writer.add_scalar('minibatch_combined_reward/step', mean_combined_reward, frame)
                     self.writer.add_scalar('minibatch_shaped_task_reward/step', mean_shaped_task_reward, frame)
                     self.writer.add_scalar('minibatch_energy_reward/step', mean_energy_reward, frame)
+                    self.writer.add_scalar('ncsn_perturbation_level/step', self._c, frame)
 
                 
                 if self.game_rewards.current_size > 0:

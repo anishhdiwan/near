@@ -56,7 +56,7 @@ params:
     learning_rate: 5e-5
     lr_schedule:  constant
     kl_threshold: 0.008 # only used for adaptive lr_schedule
-    score_to_win: 2000 # Training stops if reached
+    score_to_win: 50000 # Training stops if reached
     max_frames: ${resolve_default:10e6,${....max_iterations}}
     save_best_after: 50
     save_frequency: 30
@@ -140,11 +140,11 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 9 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
+        sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/Humanoid_SM_run2/nn/checkpoint_15000.pth"
+        eb_model_checkpoint: "ncsn_runs/Humanoid_SM_run0/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_run2/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_run0/nn/running_mean_std.pth"
 
 
     player:
