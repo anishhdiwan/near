@@ -87,6 +87,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
             # Initialise a replay memory style class to return the average energy of the last k policies (for both noise levels)
             self._nextlv_energy_buffer = LastKMovingAvg()
             self._thislv_energy_buffer = LastKMovingAvg()
+            # Initialise a replay memory style class to return the average reward encounter by the last k policies
+            self._transformed_rewards_buffer = LastKMovingAvg()
 
         else:
             self.ncsn_annealing = False
@@ -177,6 +179,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # rewards = -torch.log(1/(1 + torch.exp(rewards)))
 
         rewards = rewards + self._curr_reward_offset
+
+        # Update the reward transformation once every few frames
+        if (self.epoch_num % 3==0) or (self.epoch_num==1):
+            self.mean_offset_rew = self._transformed_rewards_buffer.append(rewards)
+        else:
+            self._transformed_rewards_buffer.append(rewards, return_avg=False)
+
+        rewards = torch.tanh((rewards - self.mean_offset_rew)/10) # 10 tanh((x - mean)/10) Rewards range between +/-1 . Division by 10 expands the range of non-asympotic inputs
 
         return rewards
 
