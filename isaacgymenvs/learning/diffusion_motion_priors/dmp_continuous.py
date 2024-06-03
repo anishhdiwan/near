@@ -23,7 +23,7 @@ from torch import optim
 
 from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet
-from utils.ncsn_utils import dict2namespace
+from utils.ncsn_utils import dict2namespace, LastKMovingAvg
 
 class DMPAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
@@ -84,6 +84,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self._c = self._anneal_levels[self._c_idx]
             # Minimum energy value after which noise level is changed
             self._anneal_threshold = 100.0 - self._c * 10
+            # Initialise a replay memory style class to return the average energy of the last k policies (for both noise levels)
+            self._nextlv_energy_buffer = LastKMovingAvg()
+            self._thislv_energy_buffer = LastKMovingAvg()
 
         else:
             self.ncsn_annealing = False
@@ -252,15 +255,21 @@ class DMPAgent(a2c_continuous.A2CAgent):
             if not self._c_idx == len(self._anneal_levels) - 1:
 
                 # If the next noise level's average energy is lower than some threshold then keep using the current noise level
-                if self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx+1]).mean().item() < self._anneal_threshold:
+                if self._nextlv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx+1])) < self._anneal_threshold:
                     self._c = self._anneal_levels[self._c_idx]
+
+                    # Computing energies for current level twice (once again during play loop). A bit redundant but done for readability and reusability
+                    self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]), return_avg=False)
                 # If the next noise level's average energy is higher than some threshold then change the noise level and 
                 # add the average energy of the current noise level to the reward offset. This ensures that rewards are non-decreasing
                 else:
-                    self._curr_reward_offset += self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]).mean().item()
+                    self._curr_reward_offset += self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]))
                     self._c_idx += 1
                     self._c = self._anneal_levels[self._c_idx]
                     self._anneal_threshold = 100.0 - self._c * 10
+
+                    self._thislv_energy_buffer.reset()
+                    self._nextlv_energy_buffer.reset()
 
 
     def play_steps(self):
