@@ -1,0 +1,19 @@
+motions:
+- file: amp_cmu_forward_jump_task/amp_cmu_13_13.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_16_07.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_13_19.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_16_06.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_13_11.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_16_10.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_13_32.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_16_09.npy
+  weight: 1.0
+- file: amp_cmu_forward_jump_task/amp_cmu_16_05.npy
+  weight: 1.0

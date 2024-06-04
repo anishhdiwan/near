@@ -137,6 +137,18 @@ python train_gym_envs.py task=mazeAMP test=True checkpoint=<path-to-saved-checkp
 
 <br><br>
 
+## Datasets
+**NOTE: The data used in this project was obtained from [http://mocap.cs.cmu.edu/](http://mocap.cs.cmu.edu/). The database was created with funding from NSF EIA-0196217**
+
+Processed demonstration data for training both AMP and the proposed approach is also available in the repository. This data was obtained from the CMU mo-cap dataset, then filtered and processed. The Adversarial Motion Priors codebase provides useful tools to process this data. This repository extends these tools. To process your own demonstration data first obtain the dataset in the .fbx format.
+
+1. The `isaacgymenvs/tasks/amp/poselib` directory houses some scripts for data processing. Use the `fbx_motion_to_npy.py` script to convert the .fbx dataset into .npy files
+2. Then use the `generate_retargeted_dataset.py` script to retarget these motions from the CMU skeleton to the .mjcf skeleton used for experiments in the work.
+3. You might have to first obtain a skeleton to retarget the data. Use `generate_tpose_from_motion.py` to generate a skeleton .npy file based on which motions are retargeted.
+
+The final motions are then placed in the `isaacgymenvs/custom_envs/data/humanoid` directory and a .yaml file is created to pass them all together to the learning algorithm.
+
+<br><br>
 
 ## Troubleshooting
 

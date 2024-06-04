@@ -211,10 +211,10 @@ def main():
     home = str(Path.home())
     # fbx data path
     data_path = home + "/thesis_background/Datasets/CMU_humanoid_fbx/"
-    motion_path = data_path + "cmu_walk_task/"
+    motion_path = data_path + "cmu_forward_jump_task/"
     motion_files = [f for f in os.listdir(motion_path) if isfile(join(motion_path, f))]
 
-    savepath = data_path + "amp_cmu_walk_task/" 
+    savepath = data_path + "amp_cmu_forward_jump_task/" 
     if not os.path.exists(savepath):
         os.makedirs(savepath)
 
