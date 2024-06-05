@@ -64,7 +64,7 @@ class MotionLib():
 
         return motion_ids
 
-    def sample_time(self, motion_ids, truncate_time=None):
+    def sample_time(self, motion_ids, truncate_time=None, **kwargs):
         n = len(motion_ids)
         phase = np.random.uniform(low=0.0, high=1.0, size=motion_ids.shape)
         
@@ -75,7 +75,11 @@ class MotionLib():
 
         motion_time = phase * motion_len
 
-        return motion_time
+        if "return_phase" in list(kwargs.keys()):
+            if kwargs["return_phase"] == True:
+                return motion_time, phase    
+        else:
+            return motion_time
 
     def get_motion_length(self, motion_ids):
         return self._motion_lengths[motion_ids]

@@ -24,7 +24,7 @@ def _create_sim_once(gym, *args, **kwargs):
 
 class HumanoidMotionDataset():
 
-    def __init__(self, motion_file, humanoid_cfg, device):
+    def __init__(self, motion_file, humanoid_cfg, device, encode_temporal_feature=False):
         """Motion library for the humanoid motions dataset
 
         Args:
@@ -33,6 +33,7 @@ class HumanoidMotionDataset():
             device (torch device): Device to use 
         """
         self.device = device
+        self.encode_temporal_feature = encode_temporal_feature
 
         # First try to find motions in the main assets folder. Then try in the dataset directory
         motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/amp/motions', motion_file)
@@ -128,14 +129,20 @@ class HumanoidMotionDataset():
                                      device=self.device)
 
 
-    def sample_paired_traj(self, num_samples):
+    def sample_paired_traj(self, num_samples, encode_temporal_feature=False):
         out_shape = (num_samples, self._num_obs_steps, NUM_OBS_PER_STEP)
         dt = self.dt
         motion_ids = self._motion_lib.sample_motions(num_samples)
-            
-        motion_times0 = self._motion_lib.sample_time(motion_ids)
+
+        if encode_temporal_feature:
+            motion_times0, motion_phase0 = self._motion_lib.sample_time(motion_ids, return_phase=True)
+        else:
+            motion_times0 = self._motion_lib.sample_time(motion_ids)
+
         motion_ids = np.tile(np.expand_dims(motion_ids, axis=-1), [1, self._num_obs_steps])
         motion_times = np.expand_dims(motion_times0, axis=-1)
+        
+
         time_steps = -dt * np.arange(0, self._num_obs_steps)
         motion_times = motion_times + time_steps
 
@@ -146,12 +153,17 @@ class HumanoidMotionDataset():
         root_states = torch.cat([root_pos, root_rot, root_vel, root_ang_vel], dim=-1)
         obs_demo = build_amp_observations(root_states, dof_pos, dof_vel, key_pos,
                                       self._local_root_obs)
-        
-        
         obs_demo = obs_demo.view(out_shape)
-
         obs_demo_flat = obs_demo.view(-1, self.num_obs)
-        return obs_demo_flat
+        
+        if encode_temporal_feature:
+            # Add temporal information to state transition vectors
+            motion_phase = np.expand_dims(motion_phase0, axis=-1)
+            obs_demo_temporal = torch.cat((to_torch(motion_phase, device=self.device), obs_demo_flat),1)
+            return obs_demo_temporal
+        
+        else:
+            return obs_demo_flat
 
     def set_batch_and_buffer_size(self, batch_size, buffer_size):
         self.batch_size = batch_size
@@ -182,7 +194,7 @@ class HumanoidMotionDataset():
         return sample
 
     def _create_sample_buffer(self, buffer_size):
-        return self.sample_paired_traj(buffer_size)
+        return self.sample_paired_traj(buffer_size, encode_temporal_feature=self.encode_temporal_feature)
 
 
     def __parse_sim_params(self, physics_engine: str, config_sim: Dict[str, Any]) -> gymapi.SimParams:
@@ -238,8 +250,8 @@ class HumanoidMotionDataset():
 
 class HumanoidMotionLib():
 
-    def __init__(self, motion_file, humanoid_cfg, device):
-        self.dataset = HumanoidMotionDataset(motion_file, humanoid_cfg, device)
+    def __init__(self, motion_file, humanoid_cfg, device, encode_temporal_feature=False):
+        self.dataset = HumanoidMotionDataset(motion_file, humanoid_cfg, device, encode_temporal_feature=encode_temporal_feature)
 
     def get_dataloader(self, batch_size, buffer_size, shuffle=False):
         """Returns a dataloader that can be used to sample a batch of observation pairs. 
