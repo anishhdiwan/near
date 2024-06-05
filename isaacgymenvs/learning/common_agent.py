@@ -170,11 +170,11 @@ class CommonAgent(a2c_continuous.A2CAgent):
                     mean_lengths = self.game_lengths.get_mean()
 
                     for i in range(self.value_size):
-                        self.writer.add_scalar('rewards/frame'.format(i), mean_rewards[i], frame)
+                        self.writer.add_scalar('rewards/step'.format(i), mean_rewards[i], frame)
                         self.writer.add_scalar('rewards/iter'.format(i), mean_rewards[i], epoch_num)
                         self.writer.add_scalar('rewards/time'.format(i), mean_rewards[i], total_time)
 
-                    self.writer.add_scalar('episode_lengths/frame', mean_lengths, frame)
+                    self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
                     self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
 
                     if self.has_self_play_config:
