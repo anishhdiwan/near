@@ -45,7 +45,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
             # self._energynet_input_norm = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
             ## TESTING ONLY ##
 
-            self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
+            if self._encode_temporal_feature:
+                self._energynet_input_norm = RunningMeanStd(self._temporal_paired_observation_space.shape).to(self.ppo_device)
+            else:
+                self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
+
             # Since the running mean and std are pre-computed on the demo data, only eval is needed here
 
             energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.ppo_device)
@@ -101,6 +105,22 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._L = config['dmp_config']['model']['L']
         self._normalize_energynet_input = config['dmp_config']['training'].get('normalize_energynet_input', True)
         self._energynet_input_norm_checkpoint = config['dmp_config']['inference']['running_mean_std_checkpoint']
+        
+        # If temporal features are encoded in the paired observations then a new space for the temporal states is made. The energy net and normalization use this space
+        self._encode_temporal_feature = config['dmp_config']['model']['encode_temporal_feature']
+        if self._encode_temporal_feature:
+            temporal_paired_observation_space_shape = self._paired_observation_space.shape[0] + 1
+            self._temporal_paired_observation_space = spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
+
+        try:
+            self._max_episode_length = self.vec_env.env.max_episode_length
+        except AttributeError as e:
+            self._max_episode_length = None
+        
+        if self._encode_temporal_feature:
+            assert self._max_episode_length != None, "A max episode length must be known when using temporal state features"
+
+        
 
 
     def init_tensors(self):
@@ -126,7 +146,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
         energynet_config = dict2namespace(energynet_config)
 
         eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
-        energynet = SimpleNet(energynet_config).to(self.ppo_device)
+        if self._encode_temporal_feature:
+            energynet = SimpleNet(energynet_config, in_dim=self._temporal_paired_observation_space.shape[0]).to(self.ppo_device)
+        else:
+            energynet = SimpleNet(energynet_config, in_dim=self._paired_observation_space.shape[0]).to(self.ppo_device)
         energynet = torch.nn.DataParallel(energynet)
         energynet.load_state_dict(eb_model_states[0])
 
@@ -143,6 +166,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         batch_shape = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['paired_obs'] = torch.zeros(batch_shape + self._paired_observation_space.shape,
+                                                                    device=self.ppo_device)
+        
+        # Keeping a buffer of the progress of each environment where a progress value is just the time steps ranging from 0 to max_episode_length
+        if self._encode_temporal_feature:
+            self.experience_buffer.tensor_dict['env_progress'] = torch.zeros(batch_shape + (1,),
                                                                     device=self.ppo_device)
         
 
@@ -250,6 +278,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
             obs = self._energynet_input_norm(obs)
         return obs
 
+
     def _anneal_noise_level(self, **kwargs):
         """If NCSN annealing is used, change the currently used noise level self._c
         """
@@ -287,6 +316,19 @@ class DMPAgent(a2c_continuous.A2CAgent):
                         self._nextlv_energy_buffer.reset()
 
 
+
+    def _append_temporal_feature(self, paired_obs, progress=None):
+        """ Concatenate the provided progress feature with the observation pair. 
+
+        Do nothing if the progress pair is none
+        """
+
+        if progress is None:
+            return paired_obs
+        else:
+            return torch.cat((progress, paired_obs), -1)
+
+
     def play_steps(self):
         """Rollout the current policy for some horizon length to obtain experience samples (s, s', r, info). 
         
@@ -318,11 +360,15 @@ class DMPAgent(a2c_continuous.A2CAgent):
             if self.has_central_value:
                 self.experience_buffer.update_data('states', n, self.obs['states'])
 
+            # Take an action in each environment
             step_time_start = time.time()
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
             step_time_end = time.time()
-
             step_time += (step_time_end - step_time_start)
+
+            # If a temporal feature is being used, record the progress status of every environment
+            if self._encode_temporal_feature:
+                self.experience_buffer.update_data('env_progress', n, torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, 1))
 
             shaped_rewards = self.rewards_shaper(rewards)
             if self.value_bootstrap and 'time_outs' in infos:
@@ -352,10 +398,18 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             ## New Addition ##
             if (self.vec_env.env.viewer and (n == (self.horizon_length - 1))):
+
+                # Append the environment progess to the paired observations if using a temporal feature
+                if self._encode_temporal_feature:
+                    try:
+                        infos['paired_obs'] = self._append_temporal_feature(paired_obs=infos['paired_obs'], progress=torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, 1)) 
+                    except KeyError:
+                        infos['amp_obs'] = self._append_temporal_feature(paired_obs=infos['amp_obs'], progress=torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, 1)) 
+                
                 self._print_debug_stats(infos)
 
-        last_values = self.get_values(self.obs)
 
+        last_values = self.get_values(self.obs)
         fdones = self.dones.float()
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
         mb_values = self.experience_buffer.tensor_dict['values']
@@ -365,6 +419,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         ## New Addition ##
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
+        
+        # Sample the environment progress values if encoding a temporal feature and append to the paired obs vector
+        if self._encode_temporal_feature:
+            mb_progress = self.experience_buffer.tensor_dict['env_progress']
+        else:
+            mb_progress = None
+
+        mb_paired_obs = self._append_temporal_feature(paired_obs=mb_paired_obs, progress=mb_progress)
 
         ## New Addition ##
         self._anneal_noise_level(paired_obs=mb_paired_obs)

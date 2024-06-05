@@ -121,7 +121,7 @@ params:
         decoder_hidden_layers: [1024, 512, 128]
         # The out dim is set to 1 internally (out_dim: 1)
         # Whether to encode a temporal feature in the state transition pair when training
-        encode_temporal_feature: False 
+        encode_temporal_feature: True 
         
       optim:
         weight_decay: 0.0
@@ -142,11 +142,11 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 5 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
+        sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/Humanoid_SM_jumptask/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/Humanoid_SM_temporal_jumptask/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_jumptask/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_temporal_jumptask/nn/running_mean_std.pth"
 
 
     player:
