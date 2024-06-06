@@ -259,14 +259,17 @@ class RLGPUEnv(vecenv.IVecEnv):
         
         if "temporal_feature" in list(kwargs.keys()):
             if kwargs["temporal_feature"] == True:
+                assert "temporal_emb_dim" in list(kwargs.keys()), "A temporal embedding dim must be provided if encoding temporal features"
+                temporal_emb_dim = kwargs["temporal_emb_dim"]
+
                 info = {}
                 info['action_space'] = self.env.action_space
                 # Increase the observation space dims by 1 to account for the added temporal feature
-                info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + 1) * -np.Inf, np.ones(self.env.num_obs + 1) * np.Inf)
+                info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + temporal_emb_dim) * -np.Inf, np.ones(self.env.num_obs + temporal_emb_dim) * np.Inf)
 
                 if hasattr(self.env, "amp_observation_space"):
                     # Increase the paired observation space dims by numObsSteps to account for the added temporal feature for each state in the pair
-                    temporal_paired_observation_space_shape = self.env.amp_observation_space.shape[0] + self.env._num_amp_obs_steps
+                    temporal_paired_observation_space_shape = self.env.amp_observation_space.shape[0] + temporal_emb_dim*self.env._num_amp_obs_steps
                     info['amp_observation_space'] = gym.spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
                     info['paired_observation_space'] = gym.spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
 

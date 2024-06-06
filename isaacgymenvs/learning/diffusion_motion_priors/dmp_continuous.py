@@ -22,7 +22,7 @@ from torch import optim
 # from . import amp_datasets as amp_datasets
 
 from tensorboardX import SummaryWriter
-from learning.motion_ncsn.models.motion_scorenet import SimpleNet
+from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
 from utils.ncsn_utils import dict2namespace, LastKMovingAvg
 
 class DMPAgent(a2c_continuous.A2CAgent):
@@ -41,8 +41,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
             env_config = config.get('env_config', {})
             num_actors = config['num_actors']
             env_name = config['env_name']
+            temporal_emb_dim = config['dmp_config']['model']['temporal_emb_dim']
             vec_env = vecenv.create_vec_env(env_name, num_actors, **env_config)
-            self.env_info = vec_env.get_env_info(temporal_feature=True)
+            self.env_info = vec_env.get_env_info(temporal_feature=True, temporal_emb_dim=temporal_emb_dim)
             params['config']['env_info'] = self.env_info
 
         super().__init__(base_name, params)
@@ -69,7 +70,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
 
             self._energynet_input_norm.eval()
-
+        
         print("Diffusion Motion Priors Initialised!")
 
 
@@ -122,10 +123,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # If temporal features are encoded in the paired observations then a new space for the temporal states is made. The energy net and normalization use this space
         self._encode_temporal_feature = config['dmp_config']['model']['encode_temporal_feature']
 
-        # if self._encode_temporal_feature:
-        #     temporal_paired_observation_space_shape = self._paired_observation_space.shape[0] + 1
-        #     self._temporal_paired_observation_space = spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
-
         try:
             self._max_episode_length = self.vec_env.env.max_episode_length
         except AttributeError as e:
@@ -133,6 +130,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
         
         if self._encode_temporal_feature:
             assert self._max_episode_length != None, "A max episode length must be known when using temporal state features"
+
+            # Positional embedding for temporal information
+            self.emb_dim = config['dmp_config']['model']['temporal_emb_dim']
+            self.embed = SinusoidalPosEmb(dim=self.emb_dim, steps=512)
+            self.embed.eval()
 
         
 
@@ -341,7 +343,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             # Append temporal feature to observations if needed
             if self._encode_temporal_feature:
-                progress0 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                # progress0 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                progress0 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
                 self.obs['obs'] = torch.cat((progress0, self.obs['obs']), -1)
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
@@ -365,13 +368,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             # Append temporal feature to observations if needed
             if self._encode_temporal_feature:
-                progress1 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                # progress1 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                progress1 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
                 self.obs['obs'] = torch.cat((progress1, self.obs['obs']), -1)
                 
                 try:
                     obs1, obs0 = torch.chunk(infos['paired_obs'], chunks=2, dim=-1)
-                    obs1 = torch.cat((progress1,obs1), -1)
-                    obs0 = torch.cat((progress0,obs0), -1)
+                    obs1 = torch.cat((progress1, obs1), -1)
+                    obs0 = torch.cat((progress0, obs0), -1)
                     infos['paired_obs'] = torch.cat((obs1, obs0), -1)
                 except KeyError:
                     obs1, obs0 = torch.chunk(infos['amp_obs'], chunks=2, dim=-1)

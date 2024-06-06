@@ -8,6 +8,7 @@ from isaacgymenvs.tasks.amp.utils_amp.motion_lib import MotionLib
 from isaacgymenvs.utils.torch_jit_utils import get_axis_params, to_torch
 from isaacgymenvs.tasks.humanoid_amp import build_amp_observations
 import torch
+from learning.motion_ncsn.models.motion_scorenet import SinusoidalPosEmb 
 
 EXISTING_SIM = None
 KEY_BODY_NAMES = ["right_hand", "left_hand", "right_foot", "left_foot"]
@@ -24,7 +25,7 @@ def _create_sim_once(gym, *args, **kwargs):
 
 class HumanoidMotionDataset():
 
-    def __init__(self, motion_file, humanoid_cfg, device, encode_temporal_feature=False):
+    def __init__(self, motion_file, humanoid_cfg, device, encode_temporal_feature=False, temporal_emb_dim=None):
         """Motion library for the humanoid motions dataset
 
         Args:
@@ -34,6 +35,10 @@ class HumanoidMotionDataset():
         """
         self.device = device
         self.encode_temporal_feature = encode_temporal_feature
+
+        if self.encode_temporal_feature:
+            assert temporal_emb_dim is not None, "An embedding dim must be given to encode temporal features"
+
 
         # First try to find motions in the main assets folder. Then try in the dataset directory
         motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/amp/motions', motion_file)
@@ -62,6 +67,12 @@ class HumanoidMotionDataset():
         self.gotten_items = 0
 
         self._load_motions()
+
+        # Positional embedding for temporal information
+        if self.encode_temporal_feature:
+            self.emb_dim = self.temporal_emb_dim
+            self.embed = SinusoidalPosEmb(dim=self.emb_dim, steps=512)
+            self.embed.eval()
 
 
     def _get_motionlib_args(self):
@@ -158,12 +169,22 @@ class HumanoidMotionDataset():
 
         if encode_temporal_feature:
             # Add temporal information to state vectors
-            motion_phase_1 = np.expand_dims(np.expand_dims(motion_phase_1, axis=-1), axis=-1)
-            motion_phase_0 = np.expand_dims(np.expand_dims(motion_phase_0, axis=-1), axis=-1)
-            motion_phase = torch.cat((to_torch(motion_phase_1, device=self.device), to_torch(motion_phase_0, device=self.device)), dim=1)
+            # motion_phase_1 = np.expand_dims(np.expand_dims(motion_phase_1, axis=-1), axis=-1)
+            # motion_phase_0 = np.expand_dims(np.expand_dims(motion_phase_0, axis=-1), axis=-1)
+
+            motion_phase_1 = np.expand_dims(motion_phase_1, axis=-1)
+            motion_phase_0 = np.expand_dims(motion_phase_0, axis=-1)
+
+            motion_phase_1 = self.embed(to_torch(motion_phase_1, device=self.device))
+            motion_phase_0 = self.embed(to_torch(motion_phase_0, device=self.device))
+
+            # motion_phase = torch.cat((to_torch(motion_phase_1, device=self.device), to_torch(motion_phase_0, device=self.device)), dim=1)
+
+            motion_phase = torch.cat((motion_phase_1, motion_phase_0), dim=1)
+
             obs_demo_temporal = torch.cat((motion_phase, obs_demo),-1)
-            obs_demo_temporal = obs_demo_temporal.view(-1, self.num_obs+self._num_obs_steps)
-        
+            obs_demo_temporal = obs_demo_temporal.view(-1, self.num_obs + self.emb_dim*self._num_obs_steps)
+
             return obs_demo_temporal
         
         else:
@@ -255,8 +276,11 @@ class HumanoidMotionDataset():
 
 class HumanoidMotionLib():
 
-    def __init__(self, motion_file, humanoid_cfg, device, encode_temporal_feature=False):
-        self.dataset = HumanoidMotionDataset(motion_file, humanoid_cfg, device, encode_temporal_feature=encode_temporal_feature)
+    def __init__(self, motion_file, humanoid_cfg, device, encode_temporal_feature=False, temporal_emb_dim=None):
+        if encode_temporal_feature:
+            assert temporal_emb_dim is not None, "An embedding dim must be given to encode temporal features"
+
+        self.dataset = HumanoidMotionDataset(motion_file, humanoid_cfg, device, encode_temporal_feature=encode_temporal_feature, temporal_emb_dim=temporal_emb_dim)
 
     def get_dataloader(self, batch_size, buffer_size, shuffle=False):
         """Returns a dataloader that can be used to sample a batch of observation pairs. 
