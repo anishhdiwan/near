@@ -70,7 +70,7 @@ class HumanoidMotionDataset():
 
         # Positional embedding for temporal information
         if self.encode_temporal_feature:
-            self.emb_dim = self.temporal_emb_dim
+            self.emb_dim = temporal_emb_dim
             self.embed = SinusoidalPosEmb(dim=self.emb_dim, steps=512)
             self.embed.eval()
 
