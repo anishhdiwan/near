@@ -144,9 +144,9 @@ params:
         energy_reward_w: 1.0
         sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/Humanoid_SM_temporal_jumptask/nn/checkpoint.pth"
+        eb_model_checkpoint: "ncsn_runs/Humanoid_SM_temporal_pi_jumptask/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_temporal_jumptask/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_temporal_pi_jumptask/nn/running_mean_std.pth"
 
 
     player:

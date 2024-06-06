@@ -135,7 +135,7 @@ class HumanoidMotionDataset():
         motion_ids = self._motion_lib.sample_motions(num_samples)
 
         if encode_temporal_feature:
-            motion_times0, motion_phase0 = self._motion_lib.sample_time(motion_ids, return_phase=True)
+            motion_times0, motion_phase_1, motion_phase_0 = self._motion_lib.sample_time(motion_ids, return_phase=True, dt=dt)
         else:
             motion_times0 = self._motion_lib.sample_time(motion_ids)
 
@@ -154,15 +154,20 @@ class HumanoidMotionDataset():
         obs_demo = build_amp_observations(root_states, dof_pos, dof_vel, key_pos,
                                       self._local_root_obs)
         obs_demo = obs_demo.view(out_shape)
-        obs_demo_flat = obs_demo.view(-1, self.num_obs)
-        
+
+
         if encode_temporal_feature:
-            # Add temporal information to state transition vectors
-            motion_phase = np.expand_dims(motion_phase0, axis=-1)
-            obs_demo_temporal = torch.cat((to_torch(motion_phase, device=self.device), obs_demo_flat),1)
+            # Add temporal information to state vectors
+            motion_phase_1 = np.expand_dims(np.expand_dims(motion_phase_1, axis=-1), axis=-1)
+            motion_phase_0 = np.expand_dims(np.expand_dims(motion_phase_0, axis=-1), axis=-1)
+            motion_phase = torch.cat((to_torch(motion_phase_1, device=self.device), to_torch(motion_phase_0, device=self.device)), dim=1)
+            obs_demo_temporal = torch.cat((motion_phase, obs_demo),-1)
+            obs_demo_temporal = obs_demo_temporal.view(-1, self.num_obs+self._num_obs_steps)
+        
             return obs_demo_temporal
         
         else:
+            obs_demo_flat = obs_demo.view(-1, self.num_obs)
             return obs_demo_flat
 
     def set_batch_and_buffer_size(self, batch_size, buffer_size):

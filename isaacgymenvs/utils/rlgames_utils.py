@@ -255,22 +255,45 @@ class RLGPUEnv(vecenv.IVecEnv):
     def get_number_of_agents(self):
         return self.env.get_number_of_agents()
 
-    def get_env_info(self):
-        info = {}
-        info['action_space'] = self.env.action_space
-        info['observation_space'] = self.env.observation_space
+    def get_env_info(self, **kwargs):
+        
+        if "temporal_feature" in list(kwargs.keys()):
+            if kwargs["temporal_feature"] == True:
+                info = {}
+                info['action_space'] = self.env.action_space
+                # Increase the observation space dims by 1 to account for the added temporal feature
+                info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + 1) * -np.Inf, np.ones(self.env.num_obs + 1) * np.Inf)
 
-        if hasattr(self.env, "amp_observation_space"):
-            info['amp_observation_space'] = self.env.amp_observation_space
-            info['paired_observation_space'] = self.env.amp_observation_space
+                if hasattr(self.env, "amp_observation_space"):
+                    # Increase the paired observation space dims by numObsSteps to account for the added temporal feature for each state in the pair
+                    temporal_paired_observation_space_shape = self.env.amp_observation_space.shape[0] + self.env._num_amp_obs_steps
+                    info['amp_observation_space'] = gym.spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
+                    info['paired_observation_space'] = gym.spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
 
-        if self.env.num_states > 0:
-            info['state_space'] = self.env.state_space
-            print(info['action_space'], info['observation_space'], info['state_space'])
+                if self.env.num_states > 0:
+                    info['state_space'] = self.env.state_space
+                    print(info['action_space'], info['observation_space'], info['state_space'])
+                else:
+                    print(info['action_space'], info['observation_space'])
+
+                return info
+
         else:
-            print(info['action_space'], info['observation_space'])
+            info = {}
+            info['action_space'] = self.env.action_space
+            info['observation_space'] = self.env.observation_space
 
-        return info
+            if hasattr(self.env, "amp_observation_space"):
+                info['amp_observation_space'] = self.env.amp_observation_space
+                info['paired_observation_space'] = self.env.amp_observation_space
+
+            if self.env.num_states > 0:
+                info['state_space'] = self.env.state_space
+                print(info['action_space'], info['observation_space'], info['state_space'])
+            else:
+                print(info['action_space'], info['observation_space'])
+
+            return info
 
     def set_train_info(self, env_frames, *args_, **kwargs_):
         """

@@ -14,7 +14,7 @@ from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.common import a2c_common
 # from rl_games.common import datasets
 # from rl_games.common import schedulers
-# from rl_games.common import vecenv
+from rl_games.common import vecenv
 
 import torch
 from torch import optim
@@ -34,8 +34,24 @@ class DMPAgent(a2c_continuous.A2CAgent):
             params (:obj `dict`): Algorithm parameters
 
         """
-        super().__init__(base_name, params)
         config = params['config']
+
+        # If using temporal feature in the state vector, create the environment first and then augment the env_info to account for extra dims
+        if config['dmp_config']['model']['encode_temporal_feature']:
+            env_config = config.get('env_config', {})
+            num_actors = config['num_actors']
+            env_name = config['env_name']
+            vec_env = vecenv.create_vec_env(env_name, num_actors, **env_config)
+            self.env_info = vec_env.get_env_info(temporal_feature=True)
+            params['config']['env_info'] = self.env_info
+
+        super().__init__(base_name, params)
+
+        # Set the self.vec_env attribute
+        if config['dmp_config']['model']['encode_temporal_feature']:
+            self.vec_env = vec_env
+
+
         self._load_config_params(config)
         self._init_network(config['dmp_config'])
 
@@ -45,10 +61,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
             # self._energynet_input_norm = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
             ## TESTING ONLY ##
 
-            if self._encode_temporal_feature:
-                self._energynet_input_norm = RunningMeanStd(self._temporal_paired_observation_space.shape).to(self.ppo_device)
-            else:
-                self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
+            self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
 
             # Since the running mean and std are pre-computed on the demo data, only eval is needed here
 
@@ -108,9 +121,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
         
         # If temporal features are encoded in the paired observations then a new space for the temporal states is made. The energy net and normalization use this space
         self._encode_temporal_feature = config['dmp_config']['model']['encode_temporal_feature']
-        if self._encode_temporal_feature:
-            temporal_paired_observation_space_shape = self._paired_observation_space.shape[0] + 1
-            self._temporal_paired_observation_space = spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
+
+        # if self._encode_temporal_feature:
+        #     temporal_paired_observation_space_shape = self._paired_observation_space.shape[0] + 1
+        #     self._temporal_paired_observation_space = spaces.Box(np.ones(temporal_paired_observation_space_shape) * -np.Inf, np.ones(temporal_paired_observation_space_shape) * np.Inf)
 
         try:
             self._max_episode_length = self.vec_env.env.max_episode_length
@@ -146,16 +160,12 @@ class DMPAgent(a2c_continuous.A2CAgent):
         energynet_config = dict2namespace(energynet_config)
 
         eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
-        if self._encode_temporal_feature:
-            energynet = SimpleNet(energynet_config, in_dim=self._temporal_paired_observation_space.shape[0]).to(self.ppo_device)
-        else:
-            energynet = SimpleNet(energynet_config, in_dim=self._paired_observation_space.shape[0]).to(self.ppo_device)
+        energynet = SimpleNet(energynet_config, in_dim=self._paired_observation_space.shape[0]).to(self.ppo_device)
         energynet = torch.nn.DataParallel(energynet)
         energynet.load_state_dict(eb_model_states[0])
 
         self._energynet = energynet
         self._energynet.eval()
-        # self._sigmas = np.exp(np.linspace(np.log(self._sigma_begin), np.log(self._sigma_end), self._L))
 
 
     def _build_buffers(self):
@@ -166,11 +176,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         batch_shape = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['paired_obs'] = torch.zeros(batch_shape + self._paired_observation_space.shape,
-                                                                    device=self.ppo_device)
-        
-        # Keeping a buffer of the progress of each environment where a progress value is just the time steps ranging from 0 to max_episode_length
-        if self._encode_temporal_feature:
-            self.experience_buffer.tensor_dict['env_progress'] = torch.zeros(batch_shape + (1,),
                                                                     device=self.ppo_device)
         
 
@@ -210,6 +215,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # rewards = -torch.log(1/(1 + torch.exp(rewards)))
 
         rewards = rewards + self._curr_reward_offset
+
+        # Keep track of the energy as learning progresses
         self.mean_energy.update(rewards.sum(dim=0))
 
         # Update the reward transformation once every few frames
@@ -316,19 +323,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
                         self._nextlv_energy_buffer.reset()
 
 
-
-    def _append_temporal_feature(self, paired_obs, progress=None):
-        """ Concatenate the provided progress feature with the observation pair. 
-
-        Do nothing if the progress pair is none
-        """
-
-        if progress is None:
-            return paired_obs
-        else:
-            return torch.cat((progress, paired_obs), -1)
-
-
     def play_steps(self):
         """Rollout the current policy for some horizon length to obtain experience samples (s, s', r, info). 
         
@@ -344,6 +338,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
             ## New Addition ##
             # Reset the environments that are in the done state. Needed to get the initial observation of the paired observation.
             self.obs, done_env_ids = self._env_reset_done()
+
+            # Append temporal feature to observations if needed
+            if self._encode_temporal_feature:
+                progress0 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                self.obs['obs'] = torch.cat((progress0, self.obs['obs']), -1)
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
             if self.use_action_masks:
@@ -351,9 +350,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
                 res_dict = self.get_masked_action_values(self.obs, masks)
             else:
                 res_dict = self.get_action_values(self.obs)
-            
-            # self.experience_buffer.update_data('obses', n, self.obs['obs'])
-            # self.experience_buffer.update_data('dones', n, self.dones)
+
 
             for k in update_list:
                 self.experience_buffer.update_data(k, n, res_dict[k]) 
@@ -366,9 +363,21 @@ class DMPAgent(a2c_continuous.A2CAgent):
             step_time_end = time.time()
             step_time += (step_time_end - step_time_start)
 
-            # If a temporal feature is being used, record the progress status of every environment
+            # Append temporal feature to observations if needed
             if self._encode_temporal_feature:
-                self.experience_buffer.update_data('env_progress', n, torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, 1))
+                progress1 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                self.obs['obs'] = torch.cat((progress1, self.obs['obs']), -1)
+                
+                try:
+                    obs1, obs0 = torch.chunk(infos['paired_obs'], chunks=2, dim=-1)
+                    obs1 = torch.cat((progress1,obs1), -1)
+                    obs0 = torch.cat((progress0,obs0), -1)
+                    infos['paired_obs'] = torch.cat((obs1, obs0), -1)
+                except KeyError:
+                    obs1, obs0 = torch.chunk(infos['amp_obs'], chunks=2, dim=-1)
+                    obs1 = torch.cat((progress1,obs1), -1)
+                    obs0 = torch.cat((progress0,obs0), -1)
+                    infos['amp_obs'] = torch.cat((obs1, obs0), -1)
 
             shaped_rewards = self.rewards_shaper(rewards)
             if self.value_bootstrap and 'time_outs' in infos:
@@ -398,14 +407,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             ## New Addition ##
             if (self.vec_env.env.viewer and (n == (self.horizon_length - 1))):
-
-                # Append the environment progess to the paired observations if using a temporal feature
-                if self._encode_temporal_feature:
-                    try:
-                        infos['paired_obs'] = self._append_temporal_feature(paired_obs=infos['paired_obs'], progress=torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, 1)) 
-                    except KeyError:
-                        infos['amp_obs'] = self._append_temporal_feature(paired_obs=infos['amp_obs'], progress=torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, 1)) 
-                
                 self._print_debug_stats(infos)
 
 
@@ -419,20 +420,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         ## New Addition ##
         mb_paired_obs = self.experience_buffer.tensor_dict['paired_obs']
-        
-        # Sample the environment progress values if encoding a temporal feature and append to the paired obs vector
-        if self._encode_temporal_feature:
-            mb_progress = self.experience_buffer.tensor_dict['env_progress']
-        else:
-            mb_progress = None
-
-        mb_paired_obs = self._append_temporal_feature(paired_obs=mb_paired_obs, progress=mb_progress)
 
         ## New Addition ##
         self._anneal_noise_level(paired_obs=mb_paired_obs)
         dmp_rewards = self._calc_rewards(mb_paired_obs)
         mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
-
 
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
         mb_returns = mb_advs + mb_values

@@ -76,8 +76,15 @@ class MotionLib():
         motion_time = phase * motion_len
 
         if "return_phase" in list(kwargs.keys()):
+            assert "dt" in list(kwargs.keys()), "Dt must be provided for phases to be returned"
             if kwargs["return_phase"] == True:
-                return motion_time, phase    
+                dt = kwargs["dt"]
+                # What percentage of the motion length is dt?
+                dt_phase = dt/self._motion_lengths[motion_ids]
+                phase0 = phase - dt_phase
+                phase1 = phase
+
+                return motion_time, phase1, phase0    
         else:
             return motion_time
 
