@@ -38,10 +38,13 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         # If using temporal feature in the state vector, create the environment first and then augment the env_info to account for extra dims
         if config['dmp_config']['model']['encode_temporal_feature']:
+            print("Using Temporal Features")
             env_config = config.get('env_config', {})
             num_actors = config['num_actors']
             env_name = config['env_name']
-            temporal_emb_dim = config['dmp_config']['model']['temporal_emb_dim']
+            temporal_emb_dim = config['dmp_config']['model'].get('temporal_emb_dim', None)
+            assert temporal_emb_dim != None, "A temporal embedding dim must be provided if encoding temporal features"
+
             vec_env = vecenv.create_vec_env(env_name, num_actors, **env_config)
             self.env_info = vec_env.get_env_info(temporal_feature=True, temporal_emb_dim=temporal_emb_dim)
             params['config']['env_info'] = self.env_info
