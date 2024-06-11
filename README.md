@@ -138,6 +138,12 @@ python train_gym_envs.py task=mazeAMP test=True checkpoint=<path-to-saved-checkp
 <br><br>
 
 ## Datasets
+<p align="center">
+  <img src="./docs/images/walk_demo_trajectory.gif" alt="Example Demonstration Trajectory - Humanoid Walk" width="400"/> </br>
+  <em>Expert Demonstration Trajectory - Humanoid Walk</em>
+</p>
+
+
 **NOTE: The data used in this project was obtained from [http://mocap.cs.cmu.edu/](http://mocap.cs.cmu.edu/). The database was created with funding from NSF EIA-0196217**
 
 Processed demonstration data for training both AMP and the proposed approach is also available in the repository. This data was obtained from the CMU mo-cap dataset, then filtered and processed. The Adversarial Motion Priors codebase provides useful tools to process this data. This repository extends these tools. To process your own demonstration data first obtain the dataset in the .fbx format.
@@ -158,7 +164,7 @@ python fbx_motion_to_npy.py --no_save --view --task="indian dance"
 python fbx_motion_to_npy.py --task="indian dance"
 ```
 
-2. Then use the `generate_retargeted_dataset.py` script to retarget these motions from the CMU skeleton to the .mjcf skeleton used for experiments in the work.
+2. Then use the `generate_retargeted_dataset.py` script to retarget these motions from the CMU skeleton to the .mjcf skeleton used for experiments in this work.
 
 ```bash
 # Retarget motions in a data_dir. A data_dir must be provided. 
