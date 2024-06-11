@@ -159,6 +159,15 @@ python fbx_motion_to_npy.py --task="indian dance"
 ```
 
 2. Then use the `generate_retargeted_dataset.py` script to retarget these motions from the CMU skeleton to the .mjcf skeleton used for experiments in the work.
+
+```bash
+# Retarget motions in a data_dir. A data_dir must be provided. 
+# The save dir is assumed to be in the home dir but can also be provided with the --save_path option (note that this directory must contain the data_dir)
+# The source and target skeletons can be viewed with the --view_srg_tgt option and the source and target motions can be viewed using the --view option
+# A retarget config must be preset. It is assumed that this is present in poselib but a custom one can also be passed with the --cfg_pth option 
+python generate_retargeted_dataset.py --data_dir=cmu_jump_task --view --view_srg_tgt
+```
+
 3. You might have to first obtain a skeleton to retarget the data. Use `generate_tpose_from_motion.py` to generate a skeleton .npy file based on which motions are retargeted.
 
 The final motions are then placed in the `isaacgymenvs/custom_envs/data/humanoid` directory and a .yaml file is created to pass them all together to the learning algorithm.
