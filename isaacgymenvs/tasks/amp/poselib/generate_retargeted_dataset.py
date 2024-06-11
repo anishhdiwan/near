@@ -14,6 +14,7 @@ from isaacgymenvs.utils.torch_jit_utils import quat_mul, quat_from_angle_axis
 import torch
 import json
 import numpy as np
+import argparse
 
 from poselib.core.rotation3d import *
 from poselib.skeleton.skeleton3d import SkeletonTree, SkeletonState, SkeletonMotion
@@ -187,19 +188,24 @@ def project_joints(motion):
     return new_motion
 
 
-def main():
+def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
     # load retarget config
-    retarget_data_path = "data/configs/retarget_horizontal_cmu_to_amp.json"
+    # retarget_data_path = "data/configs/retarget_horizontal_cmu_to_amp.json"
+
+    VISUALIZE = visualise
+
     with open(retarget_data_path) as f:
         retarget_data = json.load(f)
 
     # load and visualize t-pose files
     source_tpose = SkeletonState.from_file(retarget_data["source_tpose"])
-    if VISUALIZE:
+    if visualise_src_tgt:
+        print("Plotting the source pose")
         plot_skeleton_state(source_tpose)
 
     target_tpose = SkeletonState.from_file(retarget_data["target_tpose"])
-    if VISUALIZE:
+    if visualise_src_tgt:
+        print("Plotting the target pose")
         plot_skeleton_state(target_tpose)
 
     # parse data from retarget config
@@ -211,10 +217,10 @@ def main():
     home = str(Path.home())
     # fbx data path
     data_path = home + "/thesis_background/Datasets/CMU_humanoid_fbx/"
-    motion_path = data_path + "cmu_forward_jump_task/"
+    motion_path = data_path + data_dir + "/"
     motion_files = [f for f in os.listdir(motion_path) if isfile(join(motion_path, f))]
 
-    savepath = data_path + "amp_cmu_forward_jump_task/" 
+    savepath = data_path + "amp_" + data_dir + "/" 
     if not os.path.exists(savepath):
         os.makedirs(savepath)
 
@@ -225,6 +231,7 @@ def main():
         # load and visualize source motion sequence
         source_motion = SkeletonMotion.from_file(source_file_path)
         if VISUALIZE:
+            print("Viewing the source motion")
             plot_skeleton_motion_interactive(source_motion)
 
         # run retargeting
@@ -275,9 +282,32 @@ def main():
         target_motion.to_file(target_file_path)
 
         # visualize retargeted motion
-        plot_skeleton_motion_interactive(target_motion)
+        if VISUALIZE:
+            print("Viewing the target motion")
+            plot_skeleton_motion_interactive(target_motion)
+    
         print("----------")
     
 
 if __name__ == '__main__':
-    main()
+
+    print("""
+
+    This script retargets a dataset of motions from one skeleton body to another. It takes in a directory with .npy format motions.
+    Run with the option --help for more info
+
+    """)
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-dir", "--data_dir", type=str, required=True, help="name of the directory where the source skeleton motions are stored")
+    parser.add_argument("-cfg", "--cfg_pth", type=str, default="data/configs/retarget_horizontal_cmu_to_amp.json", required=False, help="path to the retarget config json file (relative to poselib)")
+    parser.add_argument("-spth", "--save_path", type=str, default="/thesis_background/Datasets/CMU_humanoid_fbx/", required=False, help="path where data is stored (relative to home)")
+    parser.add_argument("-v", "--view", default=False, action='store_true', required=False, help="view the source and retargeted motion")
+    parser.add_argument("-vst", "--view_src_tgt", default=False, action='store_true', required=False, help="view the source and target skeletons")
+    args = parser.parse_args()
+
+    view = args.view
+    view_src_tgt = args.view_src_tgt
+
+    main(retarget_data_path=args.cfg_pth, data_path=args.save_path, data_dir=args.data_dir, visualise_src_tgt=view_src_tgt, visualise=view)

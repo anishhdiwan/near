@@ -21,13 +21,11 @@ if __name__ == "__main__":
 
     print("""
 
-    This script converts .fx format motion files to .npy format files. It also has an option to just visualise a motion task demostration data.
+    This script converts .fbx format motion files to .npy format files. It also has an option to just visualise a motions. Run with the option --help for more info.
+    Available options for the task argument can be found in the "task" column of the cmu-mocap-index sheet (https://docs.google.com/spreadsheets/d/1v8lSJoWWd4lB4HvEyHF8n48rNzNNzfmHYWz_yVBDTfc/edit?usp=sharing)
     
-    Run with the option --help for more info
-
-    Available options for the task argument can be found in the "task" column of the cmu-mocap-index sheet (https://docs.google.com/spreadsheets/d/1ZW5a8w7mewPjhc0sIlnG2uqvQRUIQV_X5Ps9RxQlD20/edit?usp=sharing)
-    Note: The passed path must have the "cmu_mocap_task_index.csv" file
-
+    Note: The passed path must have the "cmu_mocap_task_index.csv" file and the CMU_fbx directory containing motion files. Motion files can be obtained from https://academictorrents.com/details/8e21416d1584981ef3e9d8a97ee4278f93390623
+    
     """)
 
     parser = argparse.ArgumentParser() 
@@ -71,7 +69,7 @@ if __name__ == "__main__":
         motion_files = task_index['motion_file'].to_list()
         motion_indices = task_index['motion_index'].to_list()
 
-        savepath = data_path + "cmu_" + task_name[0] + "_task/" 
+        savepath = data_path + "cmu_" + task_name[0].replace(" ", "_") + "_task/" 
         if save:
             if not os.path.exists(savepath):
                 os.makedirs(savepath)
