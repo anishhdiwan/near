@@ -37,6 +37,7 @@ if __name__ == "__main__":
     parser.add_argument("-pv", "--preview", default=False, action='store_true', required=False, help="preview the first few motion files")
     parser.add_argument("-v", "--view", default=False, action='store_true', required=False, help="view all motion files")
     parser.add_argument("-spth", "--save_path", type=str, default="/thesis_background/Datasets/CMU_humanoid_fbx/", required=False, help="path to save the data (relative to home)")
+    parser.add_argument("-m", "--motion", type=str, default="", required=False, help="motion index if visualising a specific motion file")
     args = parser.parse_args()
 
     save = args.no_save
@@ -62,25 +63,30 @@ if __name__ == "__main__":
     # fbx data path
     data_path = home + args.save_path
 
+    if args.motion == "":
+        data_index = pd.read_csv(data_path + "cmu_mocap_task_index.csv")
+        task_name = [args.task]
+        task_index = data_index.loc[data_index['task'].isin(task_name)]
+        task_index['motion_file'] = data_path + "CMU_fbx/" + task_index['motion_index'] + ".fbx"
+        motion_files = task_index['motion_file'].to_list()
+        motion_indices = task_index['motion_index'].to_list()
 
-    data_index = pd.read_csv(data_path + "cmu_mocap_task_index.csv")
-    task_name = [args.task]
-    task_index = data_index.loc[data_index['task'].isin(task_name)]
-    task_index['motion_file'] = data_path + "CMU_fbx/" + task_index['motion_index'] + ".fbx"
-    motion_files = task_index['motion_file'].to_list()
-    motion_indices = task_index['motion_index'].to_list()
+        savepath = data_path + "cmu_" + task_name[0] + "_task/" 
+        if save:
+            if not os.path.exists(savepath):
+                os.makedirs(savepath)
 
-    savepath = data_path + "cmu_" + task_name[0] + "_task/" 
-    if save:
-        if not os.path.exists(savepath):
-            os.makedirs(savepath)
+        print(f"Number of mo-cap files for the {task_name[0]} task: {len(motion_files)}")
 
-    print(f"Number of mo-cap files for the {task_name[0]} task: {len(motion_files)}")
+        if preview:
+            motion_files = motion_files[:1]
 
-    if preview:
-        motion_files = motion_files[:2]
-
-
+    else:
+        save = False
+        preview = True
+        motion_files = []
+        motion_pth = data_path + "CMU_fbx/" + args.motion + ".fbx"
+        motion_files.append(motion_pth)
 
 
     for idx, fbx_file in enumerate(motion_files):

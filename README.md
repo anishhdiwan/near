@@ -142,7 +142,22 @@ python train_gym_envs.py task=mazeAMP test=True checkpoint=<path-to-saved-checkp
 
 Processed demonstration data for training both AMP and the proposed approach is also available in the repository. This data was obtained from the CMU mo-cap dataset, then filtered and processed. The Adversarial Motion Priors codebase provides useful tools to process this data. This repository extends these tools. To process your own demonstration data first obtain the dataset in the .fbx format.
 
-1. The `isaacgymenvs/tasks/amp/poselib` directory houses some scripts for data processing. Use the `fbx_motion_to_npy.py` script to convert the .fbx dataset into .npy files
+1. The `isaacgymenvs/tasks/amp/poselib` directory houses some scripts for data processing. Use the `fbx_motion_to_npy.py` script to convert the .fbx dataset into .npy files.
+
+```bash
+# Viewing individual motions
+python fbx_motion_to_npy.py --motion=49_06
+
+# Preview motions categorised as tasks
+python fbx_motion_to_npy.py --no_save --task="indian dance"
+
+# Viewing all motions
+python fbx_motion_to_npy.py --no_save --view --task="indian dance"
+
+# Converting all motions to .npy files
+python fbx_motion_to_npy.py --task="indian dance"
+```
+
 2. Then use the `generate_retargeted_dataset.py` script to retarget these motions from the CMU skeleton to the .mjcf skeleton used for experiments in the work.
 3. You might have to first obtain a skeleton to retarget the data. Use `generate_tpose_from_motion.py` to generate a skeleton .npy file based on which motions are retargeted.
 
