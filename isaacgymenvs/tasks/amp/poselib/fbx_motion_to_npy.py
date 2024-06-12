@@ -63,8 +63,8 @@ if __name__ == "__main__":
 
     if args.motion == "":
         data_index = pd.read_csv(data_path + "cmu_mocap_task_index.csv")
-        task_name = [args.task]
-        task_index = data_index.loc[data_index['task'].isin(task_name)]
+        task_name = [args.task.lower()]
+        task_index = data_index.loc[data_index['task'].str.lower().isin(task_name)]
         task_index['motion_file'] = data_path + "CMU_fbx/" + task_index['motion_index'] + ".fbx"
         motion_files = task_index['motion_file'].to_list()
         motion_indices = task_index['motion_index'].to_list()

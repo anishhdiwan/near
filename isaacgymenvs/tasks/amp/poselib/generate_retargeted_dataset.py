@@ -224,13 +224,13 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
     if not os.path.exists(savepath):
         os.makedirs(savepath)
 
-    print(f"Number of mo-cap files for to remap: {len(motion_files)}")
+    print(f"Number of mo-cap files to remap: {len(motion_files)}")
     for source_file_name in motion_files:
         source_file_path = motion_path + source_file_name
         print(f"Remapping {source_file_path}")
         # load and visualize source motion sequence
         source_motion = SkeletonMotion.from_file(source_file_path)
-        if VISUALIZE:
+        if visualise_src_tgt:
             print("Viewing the source motion")
             plot_skeleton_motion_interactive(source_motion)
 
