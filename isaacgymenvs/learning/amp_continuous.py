@@ -306,6 +306,7 @@ class AMPAgent(common_agent.CommonAgent):
 
         amp_obs = input_dict['amp_obs'][0:self._amp_minibatch_size]
         amp_obs = self._preproc_amp_obs(amp_obs)
+        amp_obs.requires_grad_(True)
         amp_obs_replay = input_dict['amp_obs_replay'][0:self._amp_minibatch_size]
         amp_obs_replay = self._preproc_amp_obs(amp_obs_replay)
 
@@ -356,7 +357,7 @@ class AMPAgent(common_agent.CommonAgent):
             a_loss, c_loss, entropy, b_loss = losses[0], losses[1], losses[2], losses[3]
             
             disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
-            disc_info = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo)
+            disc_info = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo, amp_obs)
             disc_loss = disc_info['disc_loss']
 
             loss = a_loss + self.critic_coef * c_loss - self.entropy_coef * entropy + self.bounds_loss_coef * b_loss \
@@ -435,11 +436,24 @@ class AMPAgent(common_agent.CommonAgent):
         self._init_amp_demo_buf()
         return
 
-    def _disc_loss(self, disc_agent_logit, disc_demo_logit, obs_demo):
+    def _disc_loss(self, disc_agent_logit, disc_demo_logit, obs_demo, obs):
         # prediction loss
         disc_loss_agent = self._disc_loss_neg(disc_agent_logit)
         disc_loss_demo = self._disc_loss_pos(disc_demo_logit)
         disc_loss = 0.5 * (disc_loss_agent + disc_loss_demo)
+
+
+        # tracking just the least squares discriminator objective
+        disc_loss_least_sq = disc_loss.clone()
+
+        # tracking the gradients of the discriminator least squares loss w.r.t policy observations
+        grad_disc_obs = torch.autograd.grad(disc_loss, obs, grad_outputs=torch.ones_like(disc_loss), create_graph=False, retain_graph=True)[0].detach().clone()
+        if self.multi_gpu:
+            self.optimizer.zero_grad()
+        else:
+            for param in self.model.parameters():
+                param.grad = None
+        grad_disc_obs = torch.mean(torch.linalg.norm(grad_disc_obs, dim=-1))
 
         # logit reg
         logit_weights = self.model.a2c_network.get_disc_logit_weights()
@@ -470,7 +484,9 @@ class AMPAgent(common_agent.CommonAgent):
             'disc_agent_acc': disc_agent_acc,
             'disc_demo_acc': disc_demo_acc,
             'disc_agent_logit': disc_agent_logit,
-            'disc_demo_logit': disc_demo_logit
+            'disc_demo_logit': disc_demo_logit,
+            'disc_loss_least_sq': disc_loss_least_sq,
+            'grad_disc_obs': grad_disc_obs,
         }
         return disc_info
 
@@ -591,6 +607,8 @@ class AMPAgent(common_agent.CommonAgent):
         self.writer.add_scalar('info/disc_demo_logit', torch_ext.mean_list(train_info['disc_demo_logit']).item(), frame)
         self.writer.add_scalar('info/disc_grad_penalty', torch_ext.mean_list(train_info['disc_grad_penalty']).item(), frame)
         self.writer.add_scalar('info/disc_logit_loss', torch_ext.mean_list(train_info['disc_logit_loss']).item(), frame)
+        self.writer.add_scalar('info/disc_loss_least_sq', torch_ext.mean_list(train_info['disc_loss_least_sq']).item(), frame)
+        self.writer.add_scalar('info/grad_disc_obs', torch_ext.mean_list(train_info['grad_disc_obs']).item(), frame)
 
         disc_reward_std, disc_reward_mean = torch.std_mean(train_info['disc_rewards'])
         self.writer.add_scalar('info/disc_reward_mean', disc_reward_mean.item(), frame)
