@@ -1,0 +1,7 @@
+motions:
+- file: amp_cmu_arabesque_dance_task/amp_cmu_05_18.npy
+  weight: 1.0
+- file: amp_cmu_arabesque_dance_task/amp_cmu_05_20.npy
+  weight: 1.0
+- file: amp_cmu_arabesque_dance_task/amp_cmu_05_19.npy
+  weight: 1.0

@@ -1,0 +1,7 @@
+motions:
+- file: amp_cmu_crane_pose_task/amp_cmu_49_18.npy
+  weight: 1.0
+- file: amp_cmu_crane_pose_task/amp_cmu_49_20.npy
+  weight: 1.0
+- file: amp_cmu_crane_pose_task/amp_cmu_49_19.npy
+  weight: 1.0

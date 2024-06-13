@@ -1,0 +1,7 @@
+motions:
+- file: amp_cmu_cartwheel_sideways_task/amp_cmu_90_02.npy
+  weight: 1.0
+- file: amp_cmu_cartwheel_sideways_task/amp_cmu_90_03.npy
+  weight: 1.0
+- file: amp_cmu_cartwheel_sideways_task/amp_cmu_90_04.npy
+  weight: 1.0

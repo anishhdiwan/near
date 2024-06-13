@@ -1,0 +1,5 @@
+motions:
+- file: amp_cmu_jump_in_place_low_task/amp_cmu_16_02.npy
+  weight: 1.0
+- file: amp_cmu_jump_in_place_low_task/amp_cmu_16_01.npy
+  weight: 1.0
