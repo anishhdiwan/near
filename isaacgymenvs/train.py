@@ -54,7 +54,7 @@ def preprocess_train_config(cfg, config_dict):
     train_cfg['population_based_training'] = cfg.pbt.enabled
     train_cfg['pbt_idx'] = cfg.pbt.policy_idx if cfg.pbt.enabled else None
 
-    train_cfg['full_experiment_name'] = cfg.get('full_experiment_name')
+    # train_cfg['full_experiment_name'] = cfg.get('full_experiment_name')
 
     print(f'Using rl_device: {cfg.rl_device}')
     print(f'Using sim_device: {cfg.sim_device}')
@@ -218,12 +218,20 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # dump config dict
     if not cfg.test:
-        experiment_dir = os.path.join('runs/configs', cfg.train.params.config.name + 
-        '_{date:%d-%H-%M}'.format(date=datetime.now()) + '_exp_cfg')
+
+        full_experiment_name = cfg.train.params.config.get('full_experiment_name', None)
+        if full_experiment_name:
+            print(f'Storing experiment config at the requested name: {full_experiment_name}')
+            experiment_dir = os.path.join('runs/configs', cfg.train.params.config.full_experiment_name)
+        
+        else:
+            experiment_dir = os.path.join('runs/configs', cfg.train.params.config.name + 
+            '_{date:%d-%H-%M}'.format(date=datetime.now()))
 
         os.makedirs(experiment_dir, exist_ok=True)
         with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
             f.write(OmegaConf.to_yaml(cfg))
+
 
     runner.run({
         'train': not cfg.test,

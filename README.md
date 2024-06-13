@@ -45,7 +45,7 @@ pip install -r requirements.txt
 
 ## Training 
 
-> [Hyperparams are explained here](hyperparameters.md)
+> [Hyperparams are explained here](./docs/hyperparameters.md)
 
 **Training is a two-step procedure. First we train the energy-based model and subsequently use the trained model to learn a policy.**
 
