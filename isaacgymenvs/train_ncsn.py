@@ -53,10 +53,10 @@ def launch_hydra(cfg: DictConfig):
         full_experiment_name = cfg.train.params.config.get('full_experiment_name', None)
         if full_experiment_name:
             print(f'Storing experiment config at the requested name: {full_experiment_name}')
-            experiment_dir = os.path.join('ncsn_runs', cfg.train.params.config.full_experiment_name + '_NCSN')
+            experiment_dir = os.path.join('ncsn_runs', cfg.train.params.config.full_experiment_name)
 
         else:
-            experiment_dir = os.path.join('ncsn_runs', cfg.train.params.config.name + '_NCSN' + 
+            experiment_dir = os.path.join('ncsn_runs', cfg.train.params.config.name + 
             '_{date:%d-%H-%M-%S}'.format(date=datetime.now()))
 
         os.makedirs(experiment_dir, exist_ok=True)
