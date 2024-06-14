@@ -562,11 +562,13 @@ class DMPAgent(a2c_continuous.A2CAgent):
                     if self.has_self_play_config:
                         self.self_play_manager.update(self)
 
-                    checkpoint_name = self.config['name'] + '_ep_' + str(epoch_num) + '_combined_rew_' + str(mean_combined_reward)
+                    # checkpoint_name = self.config['name'] + '_ep_' + str(epoch_num) + '_combined_rew_' + str(mean_combined_reward)
+                    checkpoint_name = f"{self.config['name']}_combined_rew_{str(mean_combined_reward)}_{'{date:%d-%H-%M-%S}'.format(date=datetime.now())}_{str(frame)}"
 
                     if self.save_freq > 0:
-                        if (epoch_num % self.save_freq == 0) and (mean_combined_reward <= self.last_mean_rewards):
-                            self.save(os.path.join(self.nn_dir, 'last_' + checkpoint_name))
+                        #  and (mean_combined_reward <= self.last_mean_rewards)
+                        if (frame % (self.save_freq * self.curr_frames) == 0):
+                            self.save(os.path.join(self.nn_dir, checkpoint_name))
 
                     if mean_combined_reward > self.last_mean_rewards and epoch_num >= self.save_best_after:
                         print('saving next best rewards: ', mean_combined_reward)

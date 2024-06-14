@@ -181,8 +181,8 @@ class CommonAgent(a2c_continuous.A2CAgent):
                         self.self_play_manager.update(self)
 
                 if self.save_freq > 0:
-                    if (epoch_num % self.save_freq == 0):
-                        self.save(self.model_output_file + "_" + str(epoch_num))
+                    if (frame % (self.save_freq * self.curr_frames) == 0):
+                        self.save(self.model_output_file + "_" + str(frame))
 
                 if epoch_num > self.max_epochs and self.max_epochs != -1:
                     self.save(self.model_output_file)

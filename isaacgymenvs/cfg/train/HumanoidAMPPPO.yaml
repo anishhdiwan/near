@@ -65,8 +65,8 @@ params:
     kl_threshold: 0.008
     score_to_win: 20000
     max_frames: ${resolve_default:10e6,${....max_iterations}}
-    save_best_after: 100
-    save_frequency: 50
+    save_best_after: 50
+    save_frequency: 30
     print_stats: True
     grad_norm: 1.0
     entropy_coef: 0.0
