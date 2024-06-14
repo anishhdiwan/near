@@ -1,7 +1,3 @@
-"""
-This script generates k random seeds to seed the k trials of each experiment. Seeds are stored in a .yaml file in the same directory
-"""
-
 import random
 import yaml
 import os, sys
@@ -32,13 +28,14 @@ task_specific_cfg = {
     "amp_humanoid_martial_arts_bassai.yaml":[],
 }
 
-def generate_seeds(start=0, end=int(1e4), k=5):
+manual_seeds = []
 
-    seeds = random.sample(range(start, end), k)
-    # seeds = [{"seeds": random.sample(range(start, end), k)}]
+def generate_seeds(start=0, end=int(1e4), k=5, manual_seeds=[]):
 
-    # with open(f'experiment_seeds_{datetime.now().strftime("_%d-%H-%M-%S")}.yml', 'w') as yaml_file:
-    #     yaml.dump(seeds, yaml_file, default_flow_style=False)
+    if manual_seeds != []:
+        seeds = manual_seeds
+    else:
+        seeds = random.sample(range(start, end), k)
 
     return seeds
 
@@ -50,7 +47,7 @@ def generate_train_commands():
 
     else:
 
-        seeds = generate_seeds()
+        seeds = generate_seeds(manual_seeds=manual_seeds)
         # print(f"algos {algos}")
         # print(f"motions {motions}")
         # print(f"seeds {seeds}")
