@@ -222,9 +222,10 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # dump config dict
     if not cfg.test:
-
-        full_experiment_name = cfg.train.params.config.get('full_experiment_name', None)
-        if full_experiment_name:
+        
+        experiment = cfg.get('experiment', None)
+        if experiment:
+            full_experiment_name = cfg.train.params.config.get('full_experiment_name', None)
             print(f'Storing experiment config at the requested name: {full_experiment_name}')
             experiment_dir = os.path.join('runs/configs', cfg.train.params.config.full_experiment_name)
         
