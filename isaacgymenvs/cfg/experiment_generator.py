@@ -90,8 +90,13 @@ if __name__ == "__main__":
             print(exc)
 
     if args.model == "ncsn":
-        # get the first one
-        next_cmd = cmds[0]['pending_cmds'][0]
+        try:
+            # get the first one
+            next_cmd = cmds[0]['pending_cmds'][0]
+        except IndexError as e:
+            print("done")
+            quit()
+
         if 'HumanoidDMP' in next_cmd[0]:
             # add experiment name to cmd and add it to the completed cmds
             command_to_pass = next_cmd[0] + f" experiment={next_cmd[1]}"
@@ -107,8 +112,13 @@ if __name__ == "__main__":
             print("") 
 
     elif args.model == "rl":
-        # pop the first one
-        next_cmd = cmds[0]['pending_cmds'].pop(0)
+
+        try:
+            # pop the first one
+            next_cmd = cmds[0]['pending_cmds'].pop(0)
+        except IndexError as e:
+            print("done")
+            quit()
 
         if 'HumanoidDMP' in next_cmd[0]:
             # pass ncsn checkpoint as well
