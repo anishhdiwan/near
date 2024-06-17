@@ -45,6 +45,8 @@ NUM_ACTIONS = 28
 
 
 KEY_BODY_NAMES = ["right_hand", "left_hand", "right_foot", "left_foot"]
+POSSIBLE_BODY_NAMES = ['pelvis', 'torso', 'head', 'right_upper_arm', 'right_lower_arm', 'right_hand',
+'left_upper_arm', 'left_lower_arm', 'left_hand', 'right_thigh', 'right_shin', 'right_foot', 'left_thigh', 'left_shin', 'left_foot']
 
 class HumanoidAMPBase(VecTask):
 
@@ -254,6 +256,7 @@ class HumanoidAMPBase(VecTask):
         self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self.device)
 
         self._key_body_ids = self._build_key_body_ids_tensor(env_ptr, handle)
+        self._build_body_ids_dict(env_ptr, handle)
         self._contact_body_ids = self._build_contact_body_ids_tensor(env_ptr, handle)
         
         if (self._pd_control):
@@ -407,6 +410,17 @@ class HumanoidAMPBase(VecTask):
 
         body_ids = to_torch(body_ids, device=self.device, dtype=torch.long)
         return body_ids
+
+    def _build_body_ids_dict(self, env_ptr, actor_handle):
+        body_ids = {}
+        for body_name in POSSIBLE_BODY_NAMES:
+            try:
+                body_id = self.gym.find_actor_rigid_body_handle(env_ptr, actor_handle, body_name)
+                body_ids[body_name] = body_id
+            except Exception:
+                pass
+
+        self.body_ids_dict = body_ids
 
     def _build_contact_body_ids_tensor(self, env_ptr, actor_handle):
         body_ids = []

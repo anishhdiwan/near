@@ -325,6 +325,7 @@ class HumanoidAMP(HumanoidAMPBase):
         # Sample joint poses at the selected frames for each motion
         joint_pose_trajectories = []
         parent_idx = None
+        parent_joint_name = None
         for motion_id in motion_ids:
             frames = frame_idxs[motion_id]
             joint_pose_traj = np.empty([len(frames), num_joints, 3])
@@ -335,8 +336,10 @@ class HumanoidAMP(HumanoidAMPBase):
             # Joint with parent -1 is the root
             if motion_id == 0:
                 parent_idx = curr_motion.skeleton_tree.parent_indices.tolist().index(-1)
+                parent_joint_name = curr_motion.skeleton_tree.node_names[parent_idx]
+                print(curr_motion.skeleton_tree.node_names)
 
-        return joint_pose_trajectories, parent_idx
+        return joint_pose_trajectories, [parent_idx, parent_joint_name]
 
 
 

@@ -74,6 +74,9 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             self._energynet_input_norm.eval()
         
+        # Fetch demo trajectories for computing eval metrics
+        self._fetch_demo_dataset()
+        self.sim_asset_root_body_id = None 
         print("Diffusion Motion Priors Initialised!")
 
 
@@ -690,4 +693,20 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         trajectories = [traj] where traj = [x0, x1, ..] where xi = [root_pos, joint_pos] 
         """
-        self.demo_trajectories, parent_idx = self.vec_env.env.fetch_demo_dataset()
+        self.demo_trajectories, self.demo_data_parent_info = self.vec_env.env.fetch_demo_dataset()
+
+    def _fetch_sim_asset_poses(self):
+        """Fetch the cartesian pose of all joints of the simulation asset in every environment at the current timestep
+        """
+        # Shape [num_envs, num_bodies, 3]
+
+        # The root body id of the simulation asset
+        if self.sim_asset_root_body_id is None: 
+            self.sim_asset_root_body_id = self.vec_env.env.body_ids_dict[self.demo_data_parent_info[1]]
+        
+        return self.vec_env.env._rigid_body_pos
+
+    def _to_relative_pose(self, root_idx):
+        """Transform a vector of body poses to be relative to the root joint
+        """
+        
