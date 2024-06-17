@@ -683,3 +683,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
         total_time = update_time_end - play_time_start
 
         return batch_dict['step_time'], play_time, update_time, total_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul
+
+
+    def _fetch_demo_dataset(self):
+        """Fetch trajectories of demonstration data where each frame in a trajectory is a vector of cartesian poses of the expert's joints
+
+        trajectories = [traj] where traj = [x0, x1, ..] where xi = [root_pos, joint_pos] 
+        """
+        self.demo_trajectories, parent_idx = self.vec_env.env.fetch_demo_dataset()

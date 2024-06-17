@@ -301,6 +301,45 @@ class HumanoidAMP(HumanoidAMPBase):
         return
 
 
+    ## New Addition ##
+    ## Does not affect AMP ##
+    def fetch_demo_dataset(self):
+        """Fetch all motions as trajectories of joints
+        """
+
+        # Arrays of motion features
+        dt = self.dt
+        motion_ids = np.array(range(self._motion_lib.num_motions()))
+        motion_lengths = self._motion_lib._motion_lengths[motion_ids]
+        num_frames = self._motion_lib._motion_num_frames[motion_ids]
+        num_joints = self._motion_lib._get_num_bodies()
+
+        # List of arrays of frame indices from the motion dataset such that the frames are approximately separated by a time gap of dt
+        frame_idxs = []
+        for i in range(len(motion_lengths)):
+            phase = np.arange(0, motion_lengths[i], dt) / motion_lengths[i]
+            phase = np.clip(phase, 0.0, 1.0)
+            frame_idx = (phase * (num_frames[i] - 1)).astype(int)
+            frame_idxs.append(frame_idx)
+
+        # Sample joint poses at the selected frames for each motion
+        joint_pose_trajectories = []
+        parent_idx = None
+        for motion_id in motion_ids:
+            frames = frame_idxs[motion_id]
+            joint_pose_traj = np.empty([len(frames), num_joints, 3])
+            curr_motion = self._motion_lib._motions[motion_id]
+            joint_pose_traj = curr_motion.global_translation[frames]
+            joint_pose_trajectories.append(joint_pose_traj)
+
+            # Joint with parent -1 is the root
+            if motion_id == 0:
+                parent_idx = curr_motion.skeleton_tree.parent_indices.tolist().index(-1)
+
+        return joint_pose_trajectories, parent_idx
+
+
+
 #####################################################################
 ###=========================jit functions=========================###
 #####################################################################

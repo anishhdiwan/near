@@ -128,8 +128,8 @@ class HumanoidMotionDataset():
         body_ids = to_torch(body_ids, device=self.device, dtype=torch.long)
 
         print("Obtained motion details. Destroying sim")
-        time.sleep(1.)
         self.gym.destroy_sim(sim)
+        time.sleep(1.)
 
         return num_dof, body_ids
 
