@@ -454,6 +454,53 @@ class DMPAgent(a2c_continuous.A2CAgent):
         return batch_dict
 
 
+    def run_policy(self):
+        """With network updates paused, rollout the current policy until the end of the episode to obtain a trajectory of body poses. 
+        
+        Used to compute eval metrics.
+
+        ISSUE!!: Need deterministic action sampling!!
+        """
+        is_deterministic = True
+        max_steps = self._max_episode_length
+        pose_trajectory = []
+
+        self.run_obses = self.env_reset()
+
+        pose_trajectory.append(self._fetch_sim_asset_poses()[0])
+
+        for n in range(max_steps):
+
+            # Append temporal feature to observations if needed
+            if self._encode_temporal_feature:
+                # progress0 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                progress0 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
+                self.run_obses['obs'] = torch.cat((progress0, self.run_obses['obs']), -1)
+
+            if self.use_action_masks:
+                masks = self.vec_env.get_action_masks()
+                res_dict = self.get_masked_action_values(self.run_obses, masks)
+            else:
+                res_dict = self.get_action_values(self.run_obses)
+
+            self.run_obses, rewards, dones, infos = self.env_step(res_dict['actions'])
+            pose_trajectory.append(self._fetch_sim_asset_poses()[0])
+
+            # Append temporal feature to observations if needed
+            if self._encode_temporal_feature:
+                # progress1 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+                progress1 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
+                self.run_obses['obs'] = torch.cat((progress1, self.run_obses['obs']), -1)
+
+            all_done_indices = self.dones.nonzero(as_tuple=False)
+            env_done_indices = all_done_indices[::self.num_agents]
+            done_count = len(env_done_indices)
+
+        pose_trajectory = torch.Tensor(pose_trajectory)
+        return pose_trajectory
+
+
+
     def _print_debug_stats(self, infos):
         """Print training stats for debugging. Usually called at the end of every training epoch
 
@@ -693,20 +740,42 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         trajectories = [traj] where traj = [x0, x1, ..] where xi = [root_pos, joint_pos] 
         """
-        self.demo_trajectories, self.demo_data_parent_info = self.vec_env.env.fetch_demo_dataset()
+        demo_trajectories, [self.demo_data_root_body_id, self.demo_data_root_body_name] = self.vec_env.env.fetch_demo_dataset()
+        
+        # Transform demo_traj to have body poses relative to the individual root pose of the body
+        root_relative_demo_trajectories = []
+        for demo_traj in demo_trajectories:
+            root_relative_demo_trajectories.append(self._to_relative_pose(demo_traj, self.demo_data_root_body_id))
+        
+        self.demo_trajectories = root_relative_demo_trajectories
+
 
     def _fetch_sim_asset_poses(self):
         """Fetch the cartesian pose of all joints of the simulation asset in every environment at the current timestep
         """
-        # Shape [num_envs, num_bodies, 3]
 
         # The root body id of the simulation asset
         if self.sim_asset_root_body_id is None: 
-            self.sim_asset_root_body_id = self.vec_env.env.body_ids_dict[self.demo_data_parent_info[1]]
+            self.sim_asset_root_body_id = self.vec_env.env.body_ids_dict[self.demo_data_root_body_name]
         
+        # Shape [num_envs, num_bodies, 3]
         return self.vec_env.env._rigid_body_pos
 
-    def _to_relative_pose(self, root_idx):
-        """Transform a vector of body poses to be relative to the root joint
+
+    def _to_relative_pose(self, pose_traj, root_idx):
+        """Transform a vector of body poses to be relative to the root joint and return the flattened vectors
+
+        Args:
+            pose_traj (torch.Tensor): Tensor of a body pose trajectory. Required shape: [num_frames, num_joints, 3]
+            root_idx (int): index of the root joint. Must be in [0,num_joints)
         """
+        assert len(pose_traj.shape) == 3, "Required trajectory shape: [num_frames, num_joints, 3]"
+        assert 0 <= root_idx < pose_traj.shape[1], "Root joint index must be in [0, num_joints)"
+
+        # Subtract the root body cartesian pose from the other joints
+        return (pose_traj - pose_traj[:, idx, :].unsqueeze(1)).flatten(start_dim=1, end_dim=-1)
+
+
+
+        
         
