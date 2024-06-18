@@ -8,3 +8,4 @@ matplotlib==3.5.3
 seaborn==0.12.2
 tqdm==4.66.4
 scikit-learn==1.0.2
+tslearn==0.5.2

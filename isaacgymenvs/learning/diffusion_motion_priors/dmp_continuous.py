@@ -23,7 +23,7 @@ from tslearn.metrics import dtw as ts_dtw
 
 from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
-from utils.ncsn_utils import dict2namespace, LastKMovingAvg
+from utils.ncsn_utils import dict2namespace, LastKMovingAvg, get_series_derivative
 
 # tslearn throws numpy deprecation warnings because of version mismatch. Silencing for now
 import warnings
@@ -508,9 +508,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         pose_trajectory = torch.stack(pose_trajectory)
         # Transform to be relative to root body
+        root_trajectory = pose_trajectory[:, self.sim_asset_root_body_id, :]
         pose_trajectory = self._to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
         
-        return pose_trajectory
+        return pose_trajectory, root_trajectory
 
 
 
@@ -628,16 +629,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
                     # Compute performance metrics
                     if self.perf_metrics_freq > 0:
                         if (self.epoch_num > 0) and (frame % (self.perf_metrics_freq * self.curr_frames) == 0):
-                            self.set_eval()
-                            agent_pose_trajectory = self.run_policy()
-                            dtw_pose_error = 0
-                            num_joints = agent_pose_trajectory.shape[-1]/3
-                            for demo_traj in self.demo_trajectories:
-                                dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
-                            dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
-                            self.writer.add_scalar('mean_dtw_pose_error/step', dtw_pose_error, frame)
-                            print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {dtw_pose_error}")
-                            self.set_train()
+                            self.compute_performance_metrics(frame)
 
                     if self.save_freq > 0:
                         #  and (mean_combined_reward <= self.last_mean_rewards)
@@ -767,11 +759,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
         demo_trajectories, [self.demo_data_root_body_id, self.demo_data_root_body_name] = self.vec_env.env.fetch_demo_dataset()
         
         # Transform demo_traj to have body poses relative to the individual root pose of the body
+        root_trajectories = []
         root_relative_demo_trajectories = []
         for demo_traj in demo_trajectories:
+            root_trajectories.append(demo_traj[:,self.demo_data_root_body_id, :])
             root_relative_demo_trajectories.append(self._to_relative_pose(demo_traj, self.demo_data_root_body_id))
         
         self.demo_trajectories = root_relative_demo_trajectories
+        self.demo_root_trajectories = root_trajectories
 
 
     def _fetch_sim_asset_poses(self):
@@ -798,6 +793,45 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         # Subtract the root body cartesian pose from the other joints
         return (pose_traj - pose_traj[:, root_idx, :].unsqueeze(1)).flatten(start_dim=1, end_dim=-1)
+
+    def compute_performance_metrics(self, frame):
+        """Compute performance metrics
+        """
+        self.set_eval()
+        agent_pose_trajectory, agent_root_trajectory = self.run_policy()
+        num_joints = agent_pose_trajectory.shape[-1]/3
+        dt = self.vec_env.env.dt
+
+        print(agent_pose_trajectory.shape)
+        print(agent_root_trajectory.shape)
+        print(agent_root_trajectory)
+        
+        # Compute pose error
+        dtw_pose_error = 0
+        for demo_traj in self.demo_trajectories:
+            dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
+        dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
+        self.writer.add_scalar('mean_dtw_pose_error/step', dtw_pose_error, frame)
+        print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {dtw_pose_error}")
+        
+        
+        # Compute root body statistics
+        agent_root_velocity = get_series_derivative(agent_root_trajectory, dt)
+        agent_root_acceleration = get_series_derivative(agent_root_velocity, dt)
+        agent_root_jerk = get_series_derivative(agent_root_acceleration, dt)
+
+        print(agent_root_velocity)
+        print(agent_root_acceleration)
+
+        mean_vel_norm = torch.mean(torch.linalg.norm(agent_root_velocity, dim=1))
+        mean_acc_norm = torch.mean(torch.linalg.norm(agent_root_acceleration, dim=1))
+        mean_jerk_norm = torch.mean(torch.linalg.norm(agent_root_jerk, dim=1))
+        self.writer.add_scalar('root_body_velocity/step', mean_vel_norm, frame)
+        self.writer.add_scalar('root_body_acceleration/step', mean_acc_norm, frame)
+        self.writer.add_scalar('root_body_jerk/step', mean_jerk_norm, frame)
+
+        self.set_train()
+
 
 
 

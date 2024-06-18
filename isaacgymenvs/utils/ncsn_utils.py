@@ -1,6 +1,26 @@
 import argparse
 from collections import deque
 import torch
+import copy
+
+def get_series_derivative(series, dt):
+    """Compute the derivative of a time series diven a time step length dt
+
+    Args:
+        series (torch.Tensor): time series of shape [d, dim]
+        dt (float): time step
+    """
+    if series.shape[0] < 2:
+        return torch.zeros((1, series.shape[-1]))
+
+    else:
+        series_shift = copy.deepcopy(series)
+        series_shift[:-1,:] = series_shift[1:,:]
+        series_shift = series_shift[:-1]
+        series = series[:-1]
+        derivative = (series_shift - series)/dt
+
+        return derivative
 
 def dict2namespace(config):
     """Convert a disctionary (typically containing config params) to a namespace structure (https://tedboy.github.io/python_stdlib/generated/generated/argparse.Namespace.html#argparse.Namespace)
