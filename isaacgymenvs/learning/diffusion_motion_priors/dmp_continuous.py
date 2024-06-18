@@ -90,6 +90,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         self._task_reward_w = config['dmp_config']['inference']['task_reward_w']
         self._energy_reward_w = config['dmp_config']['inference']['energy_reward_w']
 
+        self.perf_metrics_freq = config['dmp_config']['inference'].get('perf_metrics_freq', 0)
         self._paired_observation_space = self.env_info['paired_observation_space']
         self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
         self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
@@ -457,16 +458,15 @@ class DMPAgent(a2c_continuous.A2CAgent):
     def run_policy(self):
         """With network updates paused, rollout the current policy until the end of the episode to obtain a trajectory of body poses. 
         
-        Used to compute eval metrics.
-
-        ISSUE!!: Need deterministic action sampling!!
+        Used to compute performance metrics.
         """
+        print("Evaluating current policy's performance")
+        self.set_eval()
         is_deterministic = True
         max_steps = self._max_episode_length
         pose_trajectory = []
 
         self.run_obses = self.env_reset()
-
         pose_trajectory.append(self._fetch_sim_asset_poses()[0])
 
         for n in range(max_steps):
@@ -483,7 +483,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
             else:
                 res_dict = self.get_action_values(self.run_obses)
 
-            self.run_obses, rewards, dones, infos = self.env_step(res_dict['actions'])
+            if is_deterministic:
+                self.run_obses, rewards, dones, infos = self.env_step(res_dict['mus'])
+            else:
+                self.run_obses, rewards, dones, infos = self.env_step(res_dict['actions'])
+                
             pose_trajectory.append(self._fetch_sim_asset_poses()[0])
 
             # Append temporal feature to observations if needed
@@ -496,7 +500,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
             env_done_indices = all_done_indices[::self.num_agents]
             done_count = len(env_done_indices)
 
-        pose_trajectory = torch.Tensor(pose_trajectory)
+            if done_count > 0:
+                self.obs = self.env_reset()
+                break
+
+        pose_trajectory = torch.stack(pose_trajectory)
+        # Transform to be relative to root body
+        pose_trajectory = self._to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
+        
         return pose_trajectory
 
 
@@ -579,7 +590,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
                     self.writer.add_scalar('losses/aug_loss', np.mean(aug_losses), frame)
 
                 ## New Addition ##
-                # self._log_train_info(dmp_infos, frame)
                 if self.mean_combined_rewards.current_size > 0:
                     mean_combined_reward = self.mean_combined_rewards.get_mean()
                     mean_shaped_task_reward = self.mean_shaped_task_rewards.get_mean()
@@ -591,8 +601,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
                     self.writer.add_scalar('minibatch_energy_reward/step', mean_energy_reward, frame)
                     self.writer.add_scalar('minibatch_energy/step', mean_energy, frame)
                     self.writer.add_scalar('ncsn_perturbation_level/step', self._c, frame)
-                    
-
                 
                 if self.game_rewards.current_size > 0:
                     mean_rewards = self.game_rewards.get_mean()
@@ -614,6 +622,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
                     # checkpoint_name = self.config['name'] + '_ep_' + str(epoch_num) + '_combined_rew_' + str(mean_combined_reward)
                     checkpoint_name = f"{self.config['name']}_combined_rew_{str(mean_combined_reward)}_{'{date:%d-%H-%M-%S}'.format(date=datetime.now())}_{str(frame)}"
+
+                    # Compute performance metrics
+                    if self.perf_metrics_freq > 0:
+                        if (self.epoch_num > 0) and (frame % (self.perf_metrics_freq * self.curr_frames) == 0):
+                            agent_pose_trajectory = self.run_policy()
 
                     if self.save_freq > 0:
                         #  and (mean_combined_reward <= self.last_mean_rewards)
@@ -773,7 +786,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         assert 0 <= root_idx < pose_traj.shape[1], "Root joint index must be in [0, num_joints)"
 
         # Subtract the root body cartesian pose from the other joints
-        return (pose_traj - pose_traj[:, idx, :].unsqueeze(1)).flatten(start_dim=1, end_dim=-1)
+        return (pose_traj - pose_traj[:, root_idx, :].unsqueeze(1)).flatten(start_dim=1, end_dim=-1)
 
 
 

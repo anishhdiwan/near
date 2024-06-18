@@ -337,7 +337,6 @@ class HumanoidAMP(HumanoidAMPBase):
             if motion_id == 0:
                 parent_idx = curr_motion.skeleton_tree.parent_indices.tolist().index(-1)
                 parent_joint_name = curr_motion.skeleton_tree.node_names[parent_idx]
-                print(curr_motion.skeleton_tree.node_names)
 
         return joint_pose_trajectories, [parent_idx, parent_joint_name]
 
