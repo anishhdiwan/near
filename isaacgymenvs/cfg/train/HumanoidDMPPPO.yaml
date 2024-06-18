@@ -147,7 +147,7 @@ params:
         sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
         # Frequency at which to evaluate the model's performance. Comment out or set to 0 to skip this 
-        perf_metrics_freq: 3
+        perf_metrics_freq: 30
         eb_model_checkpoint: "ncsn_runs/Humanoid_SM_temporal_states_walk/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
         running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_temporal_states_walk/nn/running_mean_std.pth"

@@ -18,12 +18,16 @@ from rl_games.common import vecenv
 
 import torch
 from torch import optim
-
+from tslearn.metrics import dtw as ts_dtw
 # from . import amp_datasets as amp_datasets
 
 from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
 from utils.ncsn_utils import dict2namespace, LastKMovingAvg
+
+# tslearn throws numpy deprecation warnings because of version mismatch. Silencing for now
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 class DMPAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
@@ -460,8 +464,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
         
         Used to compute performance metrics.
         """
-        print("Evaluating current policy's performance")
-        self.set_eval()
         is_deterministic = True
         max_steps = self._max_episode_length
         pose_trajectory = []
@@ -626,7 +628,16 @@ class DMPAgent(a2c_continuous.A2CAgent):
                     # Compute performance metrics
                     if self.perf_metrics_freq > 0:
                         if (self.epoch_num > 0) and (frame % (self.perf_metrics_freq * self.curr_frames) == 0):
+                            self.set_eval()
                             agent_pose_trajectory = self.run_policy()
+                            dtw_pose_error = 0
+                            num_joints = agent_pose_trajectory.shape[-1]/3
+                            for demo_traj in self.demo_trajectories:
+                                dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
+                            dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
+                            self.writer.add_scalar('mean_dtw_pose_error/step', dtw_pose_error, frame)
+                            print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {dtw_pose_error}")
+                            self.set_train()
 
                     if self.save_freq > 0:
                         #  and (mean_combined_reward <= self.last_mean_rewards)
