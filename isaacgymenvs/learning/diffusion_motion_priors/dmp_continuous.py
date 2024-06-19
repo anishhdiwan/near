@@ -202,6 +202,16 @@ class DMPAgent(a2c_continuous.A2CAgent):
         obs, done_env_ids = self.vec_env.reset_done()
         return self.obs_to_tensors(obs), done_env_ids
 
+    
+    def _env_reset_all(self):
+        """Reset all environments regardless of the done state
+        
+        Wrapper around the vec_env reset_all() method
+        """
+
+        obs = self.vec_env.env.reset_all()
+        return self.obs_to_tensors(obs)
+
 
     def _calc_rewards(self, paired_obs):
         """Calculate DMP rewards given a sest of observation pairs
@@ -470,7 +480,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         pose_trajectory = []
         self.run_pi_dones = None
 
-        self.run_obses = self.vec_env.env.reset_all()
+        self.run_obses = self._env_reset_all()
         pose_trajectory.append(self._fetch_sim_asset_poses())
 
         for n in range(max_steps):
@@ -504,7 +514,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
             if done_count == self.num_actors:
                 # Reset the env to start training again
-                self.obs = self.vec_env.env.reset_all()
+                self.obs = self._env_reset_all()
                 break
 
         # Select a random env out of those envs that were done last

@@ -15,7 +15,7 @@ def get_series_derivative(series, dt):
 
     else:
         series_shift = copy.deepcopy(series)
-        series_shift[:-1,:] = series_shift[1:,:]
+        series_shift[:-1,:] = series_shift.clone()[1:,:]
         series_shift = series_shift[:-1]
         series = series[:-1]
         derivative = (series_shift - series)/dt
