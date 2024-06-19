@@ -816,10 +816,6 @@ class DMPAgent(a2c_continuous.A2CAgent):
         num_joints = agent_pose_trajectory.shape[-1]/3
         dt = self.vec_env.env.dt
 
-        print(agent_pose_trajectory.shape)
-        print(agent_root_trajectory.shape)
-        print(agent_root_trajectory)
-        
         # Compute pose error
         dtw_pose_error = 0
         for demo_traj in self.demo_trajectories:
@@ -827,15 +823,11 @@ class DMPAgent(a2c_continuous.A2CAgent):
         dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
         self.writer.add_scalar('mean_dtw_pose_error/step', dtw_pose_error, frame)
         print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {dtw_pose_error}")
-        
-        
+                
         # Compute root body statistics
         agent_root_velocity = get_series_derivative(agent_root_trajectory, dt)
         agent_root_acceleration = get_series_derivative(agent_root_velocity, dt)
         agent_root_jerk = get_series_derivative(agent_root_acceleration, dt)
-
-        print(agent_root_velocity)
-        print(agent_root_acceleration)
 
         mean_vel_norm = torch.mean(torch.linalg.norm(agent_root_velocity, dim=1))
         mean_acc_norm = torch.mean(torch.linalg.norm(agent_root_acceleration, dim=1))
