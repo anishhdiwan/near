@@ -5,6 +5,7 @@ import numpy as np
 import os
 import time
 import yaml
+import random
 from math import floor
 
 from rl_games.algos_torch import a2c_continuous
@@ -467,9 +468,10 @@ class DMPAgent(a2c_continuous.A2CAgent):
         is_deterministic = True
         max_steps = self._max_episode_length
         pose_trajectory = []
+        self.run_pi_dones = None
 
         self.run_obses = self.vec_env.env.reset_all()
-        pose_trajectory.append(self._fetch_sim_asset_poses()[0])
+        pose_trajectory.append(self._fetch_sim_asset_poses())
 
         for n in range(max_steps):
 
@@ -489,29 +491,30 @@ class DMPAgent(a2c_continuous.A2CAgent):
             else:
                 self.run_obses, rewards, dones, infos = self.env_step(res_dict['actions'])
                 
-            pose_trajectory.append(self._fetch_sim_asset_poses()[0])
-
-            # # Append temporal feature to observations if needed
-            # if self._encode_temporal_feature:
-            #     print(f" progress buf {self.vec_env.env.progress_buf}")
-            #     # progress1 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
-            #     progress1 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
-            #     self.run_obses['obs'] = torch.cat((progress1, self.run_obses['obs']), -1)
+            pose_trajectory.append(self._fetch_sim_asset_poses())
 
             all_done_indices = dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
             done_count = len(env_done_indices)
+            
+            # Find the envs that were done the last
+            if self.run_pi_dones != None:
+                new_dones = (dones - self.run_pi_dones).nonzero(as_tuple=False)
+            self.run_pi_dones = dones.clone()
 
-            if done_count > 0:
+            if done_count == self.num_actors:
                 # Reset the env to start training again
                 self.obs = self.vec_env.env.reset_all()
                 break
 
+        # Select a random env out of those envs that were done last
+        env_idx = random.choice(new_dones.squeeze(-1).tolist())
         pose_trajectory = torch.stack(pose_trajectory)
+        pose_trajectory = pose_trajectory[:, env_idx, :, : ]
         # Transform to be relative to root body
         root_trajectory = pose_trajectory[:, self.sim_asset_root_body_id, :]
         pose_trajectory = self._to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
-        
+
         return pose_trajectory, root_trajectory
 
 
