@@ -468,14 +468,13 @@ class DMPAgent(a2c_continuous.A2CAgent):
         max_steps = self._max_episode_length
         pose_trajectory = []
 
-        self.run_obses = self.env_reset()
+        self.run_obses = self.vec_env.env.reset_all()
         pose_trajectory.append(self._fetch_sim_asset_poses()[0])
 
         for n in range(max_steps):
 
             # Append temporal feature to observations if needed
             if self._encode_temporal_feature:
-                # progress0 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
                 progress0 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
                 self.run_obses['obs'] = torch.cat((progress0, self.run_obses['obs']), -1)
 
@@ -492,18 +491,20 @@ class DMPAgent(a2c_continuous.A2CAgent):
                 
             pose_trajectory.append(self._fetch_sim_asset_poses()[0])
 
-            # Append temporal feature to observations if needed
-            if self._encode_temporal_feature:
-                # progress1 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
-                progress1 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
-                self.run_obses['obs'] = torch.cat((progress1, self.run_obses['obs']), -1)
+            # # Append temporal feature to observations if needed
+            # if self._encode_temporal_feature:
+            #     print(f" progress buf {self.vec_env.env.progress_buf}")
+            #     # progress1 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
+            #     progress1 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
+            #     self.run_obses['obs'] = torch.cat((progress1, self.run_obses['obs']), -1)
 
-            all_done_indices = self.dones.nonzero(as_tuple=False)
+            all_done_indices = dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
             done_count = len(env_done_indices)
 
             if done_count > 0:
-                self.obs = self.env_reset()
+                # Reset the env to start training again
+                self.obs = self.vec_env.env.reset_all()
                 break
 
         pose_trajectory = torch.stack(pose_trajectory)
@@ -778,7 +779,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
             self.sim_asset_root_body_id = self.vec_env.env.body_ids_dict[self.demo_data_root_body_name]
         
         # Shape [num_envs, num_bodies, 3]
-        return self.vec_env.env._rigid_body_pos
+        return self.vec_env.env._rigid_body_pos.clone()
 
 
     def _to_relative_pose(self, pose_traj, root_idx):

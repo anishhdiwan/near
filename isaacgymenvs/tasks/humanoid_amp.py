@@ -341,6 +341,22 @@ class HumanoidAMP(HumanoidAMPBase):
         return joint_pose_trajectories, [parent_idx, parent_joint_name]
 
 
+    def reset_all(self):
+        """Reset all envs
+        Returns:
+            Observation dictionary, indices of environments being reset
+        """
+        env_ids = torch.arange(self.num_envs, device=self.reset_buf.device, dtype=self.reset_buf.dtype)
+        self.reset_idx(env_ids)
+
+        self.obs_dict["obs"] = torch.clamp(self.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
+
+        # asymmetric actor-critic
+        if self.num_states > 0:
+            self.obs_dict["states"] = self.get_state()
+
+        return self.obs_dict
+
 
 #####################################################################
 ###=========================jit functions=========================###
