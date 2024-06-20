@@ -3,6 +3,19 @@ from collections import deque
 import torch
 import copy
 
+def to_relative_pose(pose_traj, root_idx):
+    """Transform a vector of body poses to be relative to the root joint and return the flattened vectors
+
+    Args:
+        pose_traj (torch.Tensor): Tensor of a body pose trajectory. Required shape: [num_frames, num_joints, 3]
+        root_idx (int): index of the root joint. Must be in [0,num_joints)
+    """
+    assert len(pose_traj.shape) == 3, "Required trajectory shape: [num_frames, num_joints, 3]"
+    assert 0 <= root_idx < pose_traj.shape[1], "Root joint index must be in [0, num_joints)"
+
+    # Subtract the root body cartesian pose from the other joints
+    return (pose_traj - pose_traj[:, root_idx, :].unsqueeze(1)).flatten(start_dim=1, end_dim=-1)
+
 def get_series_derivative(series, dt):
     """Compute the derivative of a time series diven a time step length dt
 

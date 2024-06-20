@@ -180,6 +180,11 @@ class CommonAgent(a2c_continuous.A2CAgent):
                     if self.has_self_play_config:
                         self.self_play_manager.update(self)
 
+                # Compute performance metrics
+                if self.perf_metrics_freq > 0:
+                    if (self.epoch_num > 0) and (frame % (self.perf_metrics_freq * self.curr_frames) == 0):
+                        self.compute_performance_metrics(frame)
+                
                 if self.save_freq > 0:
                     if (frame % (self.save_freq * self.curr_frames) == 0):
                         self.save(self.model_output_file + "_" + str(frame))
@@ -475,6 +480,15 @@ class CommonAgent(a2c_continuous.A2CAgent):
     def _env_reset_done(self):
         obs, done_env_ids = self.vec_env.reset_done()
         return self.obs_to_tensors(obs), done_env_ids
+
+    def _env_reset_all(self):
+        """Reset all environments regardless of the done state
+        
+        Wrapper around the vec_env reset_all() method
+        """
+
+        obs = self.vec_env.env.reset_all()
+        return self.obs_to_tensors(obs)
 
     def _eval_critic(self, obs_dict):
         self.model.eval()

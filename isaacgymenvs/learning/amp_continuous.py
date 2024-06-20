@@ -41,9 +41,12 @@ import numpy as np
 from torch import optim
 import torch 
 from torch import nn
+import random
 
 import isaacgymenvs.learning.replay_buffer as replay_buffer
 import isaacgymenvs.learning.common_agent as common_agent 
+from utils.ncsn_utils import get_series_derivative, to_relative_pose
+from tslearn.metrics import dtw as ts_dtw
 
 from tensorboardX import SummaryWriter
 
@@ -57,6 +60,10 @@ class AMPAgent(common_agent.CommonAgent):
             self.value_mean_std = self.central_value_net.model.value_mean_std if self.has_central_value else self.model.value_mean_std
         if self._normalize_amp_input:
             self._amp_input_mean_std = RunningMeanStd(self._amp_observation_space.shape).to(self.ppo_device)
+
+        # Fetch demo trajectories for computing eval metrics
+        self._fetch_demo_dataset()
+        self.sim_asset_root_body_id = None 
 
         return
 
@@ -190,6 +197,60 @@ class AMPAgent(common_agent.CommonAgent):
         self.mean_shaped_task_rewards.update(shaped_env_rewards.sum(dim=0))
 
         return batch_dict
+
+
+    def run_policy(self):
+        """With network updates paused, rollout the current policy until the end of the episode to obtain a trajectory of body poses. 
+        
+        Used to compute performance metrics.
+        """
+        is_deterministic = True
+        max_steps = self._max_episode_length
+        pose_trajectory = []
+        self.run_pi_dones = None
+
+        self.run_obses = self._env_reset_all()
+        pose_trajectory.append(self._fetch_sim_asset_poses())
+
+        for n in range(max_steps):
+
+            if self.use_action_masks:
+                masks = self.vec_env.get_action_masks()
+                res_dict = self.get_masked_action_values(self.run_obses, masks)
+            else:
+                res_dict = self.get_action_values(self.run_obses)
+
+            if is_deterministic:
+                self.run_obses, rewards, dones, infos = self.env_step(res_dict['mus'])
+            else:
+                self.run_obses, rewards, dones, infos = self.env_step(res_dict['actions'])
+                
+            pose_trajectory.append(self._fetch_sim_asset_poses())
+
+            all_done_indices = dones.nonzero(as_tuple=False)
+            env_done_indices = all_done_indices[::self.num_agents]
+            done_count = len(env_done_indices)
+            
+            # Find the envs that were done the last
+            if self.run_pi_dones != None:
+                new_dones = (dones - self.run_pi_dones).nonzero(as_tuple=False)
+            self.run_pi_dones = dones.clone()
+
+            if done_count == self.num_actors:
+                # Reset the env to start training again
+                self.obs = self._env_reset_all()
+                break
+
+        # Select a random env out of those envs that were done last
+        env_idx = random.choice(new_dones.squeeze(-1).tolist())
+        pose_trajectory = torch.stack(pose_trajectory)
+        pose_trajectory = pose_trajectory[:, env_idx, :, : ]
+        # Transform to be relative to root body
+        root_trajectory = pose_trajectory[:, self.sim_asset_root_body_id, :]
+        pose_trajectory = to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
+
+        return pose_trajectory, root_trajectory
+
 
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
@@ -424,6 +485,11 @@ class AMPAgent(common_agent.CommonAgent):
         self._disc_weight_decay = config['disc_weight_decay']
         self._disc_reward_scale = config['disc_reward_scale']
         self._normalize_amp_input = config.get('normalize_amp_input', True)
+        self.perf_metrics_freq = config.get('perf_metrics_freq', 0)
+        try:
+            self._max_episode_length = self.vec_env.env.max_episode_length
+        except AttributeError as e:
+            self._max_episode_length = None
         return
 
     def _build_net_config(self):
@@ -627,3 +693,65 @@ class AMPAgent(common_agent.CommonAgent):
             disc_reward = disc_reward.cpu().numpy()[0, 0]
             print("disc_pred: ", disc_pred, disc_reward)
         return
+
+    ## New Addition ##
+    # Evaluate Performance #
+    def compute_performance_metrics(self, frame):
+        """Compute performance metrics
+        """
+        self.set_eval()
+        agent_pose_trajectory, agent_root_trajectory = self.run_policy()
+        num_joints = agent_pose_trajectory.shape[-1]/3
+        dt = self.vec_env.env.dt
+
+        # Compute pose error
+        dtw_pose_error = 0
+        for demo_traj in self.demo_trajectories:
+            dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
+        dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
+        self.writer.add_scalar('mean_dtw_pose_error/step', dtw_pose_error, frame)
+        print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {dtw_pose_error}")
+                
+        # Compute root body statistics
+        agent_root_velocity = get_series_derivative(agent_root_trajectory, dt)
+        agent_root_acceleration = get_series_derivative(agent_root_velocity, dt)
+        agent_root_jerk = get_series_derivative(agent_root_acceleration, dt)
+
+        mean_vel_norm = torch.mean(torch.linalg.norm(agent_root_velocity, dim=1))
+        mean_acc_norm = torch.mean(torch.linalg.norm(agent_root_acceleration, dim=1))
+        mean_jerk_norm = torch.mean(torch.linalg.norm(agent_root_jerk, dim=1))
+        self.writer.add_scalar('root_body_velocity/step', mean_vel_norm, frame)
+        self.writer.add_scalar('root_body_acceleration/step', mean_acc_norm, frame)
+        self.writer.add_scalar('root_body_jerk/step', mean_jerk_norm, frame)
+
+        self.set_train()
+
+
+    def _fetch_demo_dataset(self):
+        """Fetch trajectories of demonstration data where each frame in a trajectory is a vector of cartesian poses of the expert's joints
+
+        trajectories = [traj] where traj = [x0, x1, ..] where xi = [root_pos, joint_pos] 
+        """
+        demo_trajectories, [self.demo_data_root_body_id, self.demo_data_root_body_name] = self.vec_env.env.fetch_demo_dataset()
+        
+        # Transform demo_traj to have body poses relative to the individual root pose of the body
+        root_trajectories = []
+        root_relative_demo_trajectories = []
+        for demo_traj in demo_trajectories:
+            root_trajectories.append(demo_traj[:,self.demo_data_root_body_id, :])
+            root_relative_demo_trajectories.append(to_relative_pose(demo_traj, self.demo_data_root_body_id))
+        
+        self.demo_trajectories = root_relative_demo_trajectories
+        self.demo_root_trajectories = root_trajectories
+
+
+    def _fetch_sim_asset_poses(self):
+        """Fetch the cartesian pose of all joints of the simulation asset in every environment at the current timestep
+        """
+
+        # The root body id of the simulation asset
+        if self.sim_asset_root_body_id is None: 
+            self.sim_asset_root_body_id = self.vec_env.env.body_ids_dict[self.demo_data_root_body_name]
+        
+        # Shape [num_envs, num_bodies, 3]
+        return self.vec_env.env._rigid_body_pos.clone()

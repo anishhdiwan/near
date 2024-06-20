@@ -24,7 +24,7 @@ from tslearn.metrics import dtw as ts_dtw
 
 from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
-from utils.ncsn_utils import dict2namespace, LastKMovingAvg, get_series_derivative
+from utils.ncsn_utils import dict2namespace, LastKMovingAvg, get_series_derivative, to_relative_pose
 
 # tslearn throws numpy deprecation warnings because of version mismatch. Silencing for now
 import warnings
@@ -523,7 +523,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         pose_trajectory = pose_trajectory[:, env_idx, :, : ]
         # Transform to be relative to root body
         root_trajectory = pose_trajectory[:, self.sim_asset_root_body_id, :]
-        pose_trajectory = self._to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
+        pose_trajectory = to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
 
         return pose_trajectory, root_trajectory
 
@@ -777,7 +777,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         root_relative_demo_trajectories = []
         for demo_traj in demo_trajectories:
             root_trajectories.append(demo_traj[:,self.demo_data_root_body_id, :])
-            root_relative_demo_trajectories.append(self._to_relative_pose(demo_traj, self.demo_data_root_body_id))
+            root_relative_demo_trajectories.append(to_relative_pose(demo_traj, self.demo_data_root_body_id))
         
         self.demo_trajectories = root_relative_demo_trajectories
         self.demo_root_trajectories = root_trajectories
@@ -795,18 +795,18 @@ class DMPAgent(a2c_continuous.A2CAgent):
         return self.vec_env.env._rigid_body_pos.clone()
 
 
-    def _to_relative_pose(self, pose_traj, root_idx):
-        """Transform a vector of body poses to be relative to the root joint and return the flattened vectors
+    # def to_relative_pose(self, pose_traj, root_idx):
+    #     """Transform a vector of body poses to be relative to the root joint and return the flattened vectors
 
-        Args:
-            pose_traj (torch.Tensor): Tensor of a body pose trajectory. Required shape: [num_frames, num_joints, 3]
-            root_idx (int): index of the root joint. Must be in [0,num_joints)
-        """
-        assert len(pose_traj.shape) == 3, "Required trajectory shape: [num_frames, num_joints, 3]"
-        assert 0 <= root_idx < pose_traj.shape[1], "Root joint index must be in [0, num_joints)"
+    #     Args:
+    #         pose_traj (torch.Tensor): Tensor of a body pose trajectory. Required shape: [num_frames, num_joints, 3]
+    #         root_idx (int): index of the root joint. Must be in [0,num_joints)
+    #     """
+    #     assert len(pose_traj.shape) == 3, "Required trajectory shape: [num_frames, num_joints, 3]"
+    #     assert 0 <= root_idx < pose_traj.shape[1], "Root joint index must be in [0, num_joints)"
 
-        # Subtract the root body cartesian pose from the other joints
-        return (pose_traj - pose_traj[:, root_idx, :].unsqueeze(1)).flatten(start_dim=1, end_dim=-1)
+    #     # Subtract the root body cartesian pose from the other joints
+    #     return (pose_traj - pose_traj[:, root_idx, :].unsqueeze(1)).flatten(start_dim=1, end_dim=-1)
 
     def compute_performance_metrics(self, frame):
         """Compute performance metrics
