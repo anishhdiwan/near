@@ -36,7 +36,7 @@ from gym import spaces
 from isaacgym import gymapi
 from isaacgym import gymtorch
 
-from isaacgymenvs.tasks.amp.humanoid_amp_base import HumanoidAMPBase, dof_to_obs
+from isaacgymenvs.tasks.amp.humanoid_amp_base import HumanoidAMPBase, dof_to_obs, compute_humanoid_reward
 from isaacgymenvs.tasks.amp.utils_amp import gym_util
 from isaacgymenvs.tasks.amp.utils_amp.motion_lib import MotionLib
 
@@ -80,6 +80,9 @@ class HumanoidAMP(HumanoidAMPBase):
 
         # motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets/amp/motions/" + motion_file)
         self._load_motion(motion_file_path)
+
+        # Infer the type of task reward based on the motion file
+        self._infer_task_reward_type(motion_file)
 
         self.num_amp_obs = self._num_amp_obs_steps * NUM_AMP_OBS_PER_STEP
 
@@ -357,6 +360,61 @@ class HumanoidAMP(HumanoidAMPBase):
 
         return self.obs_dict
 
+    
+    def _compute_reward(self, actions):
+        """Inherit to add reward types
+        """
+        reward_buffers = []
+
+        for reward_type in self.reward_types:
+            if reward_type == "time":
+                reward_buffers.append(compute_humanoid_reward(self.obs_buf))
+            
+            if reward_type == "dist":
+                try:
+                    reward_buffers.append(compute_humanoid_dist_reward(self._rigid_body_pos, self._prev_dist_rew_body_pos, self.body_ids_dict['pelvis']))
+                except AttributeError:
+                    # Small positive reward for first timestep to avoid nan errors
+                    reward_buffers.append(torch.full_like(self.obs_buf[:, 0], 0.001))
+
+                self._prev_dist_rew_body_pos = self._rigid_body_pos.clone()
+
+            if reward_type == "height":
+                reward_buffers.append(compute_humanoid_height_reward(self._rigid_body_pos, self.body_ids_dict['pelvis']))
+
+        # Add all types of rewards proportionally
+        if len(reward_buffers) > 1:
+            reward_buffers = [reward_buffer/len(reward_buffers) for reward_buffer in reward_buffers]
+            self.rew_buf[:] = torch.add(*reward_buffers)
+        else:
+            self.rew_buf[:] = reward_buffers[0]
+
+
+        print(reward_buffers)
+        print(self.rew_buf[:])
+        return
+
+    def _infer_task_reward_type(self, motion_file):
+        """Infer the type of task reward given the motion file
+        """
+
+        task_reward_dict = {
+            "amp_humanoid_walk": ["time", "dist"],
+            "amp_humanoid_run": ["time", "dist"],
+            "amp_humanoid_crane_pose": ["time"],
+            "amp_humanoid_cartwheel": ["time", "dist"],
+            "amp_humanoid_jump_in_place": ["time", "height"],
+            "amp_humanoid_martial_arts_bassai": ["time"]
+        }
+
+        motion_file = os.path.splitext(motion_file)[0]
+
+        try:
+            self.reward_types = task_reward_dict[motion_file]
+        except KeyError:
+            self.reward_types = ["time"]
+
+
 
 #####################################################################
 ###=========================jit functions=========================###
@@ -397,3 +455,39 @@ def build_amp_observations(root_states, dof_pos, dof_vel, key_body_pos, local_ro
 
     obs = torch.cat((root_h, root_rot_obs, local_root_vel, local_root_ang_vel, dof_obs, dof_vel, flat_local_key_pos), dim=-1)
     return obs
+
+@torch.jit.script
+def compute_humanoid_dist_reward(rigid_body_pos, prev_rigid_body_pose, root_body_id):
+    # type: (Tensor, Tensor, int) -> Tensor
+
+    # Cap the displacement in timestep dt to something reasonable
+    max_disp = 0.5
+    root_body_x_pos = rigid_body_pos.clone()[:, root_body_id, 0]
+    # No need to clone as its already cloned
+    prev_root_body_x_pos = prev_rigid_body_pose[:, root_body_id, 0]
+    disp = root_body_x_pos - prev_root_body_x_pos
+    disp = torch.clamp(disp, min=0.0, max=max_disp)
+
+    # Scale to [0,1]
+    reward = disp/max_disp
+
+    return reward
+
+
+@torch.jit.script
+def compute_humanoid_height_reward(rigid_body_pos, root_body_id):
+    # type: (Tensor, int) -> Tensor
+
+    # Reward up to 2.5m of vertical root position
+    max_disp = 2.5
+    root_body_z_pos = rigid_body_pos.clone()[:, root_body_id, 2]
+    root_body_z_pos = torch.clamp(root_body_z_pos, min=0.0, max=max_disp)
+
+    # Scale to [0,1]
+    reward = root_body_z_pos/max_disp
+
+    return reward
+
+
+
+
