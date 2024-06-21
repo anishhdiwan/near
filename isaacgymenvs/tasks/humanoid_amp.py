@@ -389,9 +389,6 @@ class HumanoidAMP(HumanoidAMPBase):
         else:
             self.rew_buf[:] = reward_buffers[0]
 
-
-        print(reward_buffers)
-        print(self.rew_buf[:])
         return
 
     def _infer_task_reward_type(self, motion_file):

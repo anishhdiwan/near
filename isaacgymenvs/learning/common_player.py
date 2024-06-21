@@ -54,6 +54,11 @@ class CommonPlayer(players.PpoPlayerContinuous):
             self.visualise_disc = self.config['player'].get('visualise_disc', False)
         except KeyError as e:
             self.visualise_disc = False
+
+        try:
+            self.visualise_disc_landscape = self.config['player'].get('visualise_disc_landscape', False)
+        except KeyError as e:
+            self.visualise_disc_landscape = False
         
         return
 
@@ -62,6 +67,11 @@ class CommonPlayer(players.PpoPlayerContinuous):
         if self.visualise_disc:
             print(f"Visualising discriminator at checkpoint")
             self.visualise_2d_disc()
+            quit()
+
+        elif self.visualise_disc_landscape:
+            print(f"Visualising discriminator landscape")
+            self.visualise_discriminator_landscape()
             quit()
 
         n_games = self.games_num

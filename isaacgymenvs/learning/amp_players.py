@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import torch 
+import numpy as np
 
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
@@ -34,6 +35,8 @@ from rl_games.common.player import BasePlayer
 import matplotlib.pyplot as plt
 
 import isaacgymenvs.learning.common_player as common_player
+
+import copy
 
 
 class AMPPlayerContinuous(common_player.CommonPlayer):
@@ -120,14 +123,62 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         return disc_r
 
 
-    def visualise_2d_disc(self):
-        """Visualise the energy function for 2D maze environment
+    def visualise_discriminator_landscape(self):
+        """Visualise the discriminator values vs distance from the data manifold 
 
-        An observation in the maze env is a 2D vector. The energy net is trained using s-s' pairs so the input is 4D. To visualise this in a 2D plane:
-        - First a meshgrid of the same size as the env is created
-        - For every point in the meshgrid, a window of the agent's reachable set is computed
-        - s-s' pairs are the ncomputed by pairing every meshgrid point with another point in the window (reachable set)
-        - The energy function is then computed in using this 4D input and the average energy is assigned to that meshgrid point
+        """
+        device = self.device
+        num_batches_to_sample = 15
+        batch_size = 128
+        demo_observations = self.env.fetch_amp_obs_demo(int(num_batches_to_sample*batch_size))
+
+        self.plot_disc_curve(demo_observations)
+        
+
+
+    def plot_disc_curve(self, samples):
+        """Plot a curve with the average disc value of a set of samples on the y-axis and the distance of the samples from the demo dataset on the x-axis
+        """
+        # Absolute values of the range [-r, r] of a uniform distribution from which demo data is perturbed
+        demo_sample_max_distances = np.linspace(0, 10, 100)
+
+        avg_disc_val = np.zeros_like(demo_sample_max_distances)
+        avg_amp_rew = np.zeros_like(demo_sample_max_distances)
+
+        for idx, max_dist in enumerate(demo_sample_max_distances):
+            if max_dist == 0.0:
+                perturbed_samples = copy.deepcopy(samples)
+            else:
+                perturbed_samples = copy.deepcopy(samples) + (max_dist -2*max_dist*torch.rand(samples.shape, device=samples.device))
+
+            disc_pred = self._eval_disc(perturbed_samples.to(self.device))
+            amp_rewards = self._calc_amp_rewards(perturbed_samples.to(self.device))['disc_rewards']
+
+            avg_disc_val[idx] = disc_pred.squeeze().mean()
+            avg_amp_rew[idx] = amp_rewards.squeeze().mean()
+
+        
+        plt.figure(figsize=(8, 6))
+        plt.plot(demo_sample_max_distances, avg_disc_val, label="disc value")
+        # plt.legend()
+        plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
+        plt.ylabel("avg disc(sample)")
+        plt.title(f"Avg disc value vs distance from demo data")
+        plt.show()
+        
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(demo_sample_max_distances, avg_amp_rew, label="amp reward")
+        # plt.legend()
+        plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
+        plt.ylabel("avg amp rew")
+        plt.title(f"Avg amp reward vs distance from demo data")
+        plt.show()
+
+
+    def visualise_2d_disc(self):
+        """Visualise the discriminator function for 2D maze environment
+
         """
         device = self.device
         viz_min = 0
