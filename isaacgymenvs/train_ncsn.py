@@ -44,6 +44,13 @@ def launch_hydra(cfg: DictConfig):
     # dump config dict
     if not visualise:
 
+        # Handle for experiment name being passed
+        experiment = cfg.get('experiment', None)
+        if experiment:
+            pass
+        else:
+            cfg.train.params.config['full_experiment_name'] = cfg.get('full_experiment_name')
+
         # Printing the config
         dmp_cfg_dict = omegaconf_to_dict(dmp_cfg)
         print("TRAIN CFG")

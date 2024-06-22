@@ -65,12 +65,16 @@ class CommonPlayer(players.PpoPlayerContinuous):
     def run(self):
 
         if self.visualise_disc:
-            print(f"Visualising discriminator at checkpoint")
+            print("""Visualising discriminator at checkpoint
+            NOTE: Set visualise_disc = False in the train script to visualise the policy
+            """)
             self.visualise_2d_disc()
             quit()
 
         elif self.visualise_disc_landscape:
-            print(f"Visualising discriminator landscape")
+            print("""Visualising discriminator landscape
+            NOTE: Set visualise_disc_landscape = False in the train script to visualise the policy
+            """)
             self.visualise_discriminator_landscape()
             quit()
 

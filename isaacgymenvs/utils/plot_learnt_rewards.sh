@@ -6,13 +6,16 @@
 
 ALGO="DMP"
 CHECKPOINTS="-1"
-TRIALS="Humanoid_SM_temporal_states_walk"
+TRIALS="plottest1 plottest2"
 
 play_cmd=$(python ./utils/plot_learnt_rewards.py --algo ${ALGO} --trials ${TRIALS} --checkpoints ${CHECKPOINTS})
 
 while [ "${play_cmd}" != "done" ]
 do 
-#   echo ${play_cmd}
+  echo "---------"
+  echo ${play_cmd}
+  echo "---------"
+  sleep 0.5
   python ${play_cmd}
   sleep 1.0
 
