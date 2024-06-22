@@ -1,5 +1,4 @@
-from tbparse import SummaryReader
-import seaborn as sns
+# from tbparse import SummaryReader
 import matplotlib.pyplot as plt
 import numpy as np
 import os, sys
@@ -46,33 +45,36 @@ def get_scalars_from_dfs(scalar, trial_dfs):
 
     return trial_scalars, trial_steps
 
-# Get all events in this dir
-event_file = "./ncsn_runs/temp_runs/"
-reader = SummaryReader(event_file, pivot=True, extra_columns={'dir_name'})
-df = reader.scalars
+
+if __name__ == "__main__":
+
+    # Get all events in this dir
+    event_file = "./ncsn_runs/temp_runs/"
+    reader = SummaryReader(event_file, pivot=True, extra_columns={'dir_name'})
+    df = reader.scalars
 
 
-trial_names = ["Humanoid_SM_run0/summaries/_", "Humanoid_SM_run1/summaries/_", "Humanoid_SM_run2/summaries/_"]
-scalars = ["loss", "demo_data_energy/sigma_level_9"]
+    trial_names = ["Humanoid_SM_run0/summaries/_", "Humanoid_SM_run1/summaries/_", "Humanoid_SM_run2/summaries/_"]
+    scalars = ["loss", "demo_data_energy/sigma_level_9"]
 
-exp_dfs = []
-for trial in trial_names:
-    exp_dfs.append(df[df['dir_name'] == trial])
+    exp_dfs = []
+    for trial in trial_names:
+        exp_dfs.append(df[df['dir_name'] == trial])
 
 
-for idx, scalar in enumerate(scalars):
-    exp_scalars, exp_steps = get_scalars_from_dfs(scalar, exp_dfs)
-    exp_scalars = np.stack(exp_scalars, axis=1)
-    mean_scalar = np.mean(exp_scalars, axis=1)
-    std_scalar = np.std(exp_scalars, axis=1)
-    std_interval = 1.0
-    min_interval = mean_scalar - std_interval*std_scalar
-    max_interval = mean_scalar + std_interval*std_scalar
+    for idx, scalar in enumerate(scalars):
+        exp_scalars, exp_steps = get_scalars_from_dfs(scalar, exp_dfs)
+        exp_scalars = np.stack(exp_scalars, axis=1)
+        mean_scalar = np.mean(exp_scalars, axis=1)
+        std_scalar = np.std(exp_scalars, axis=1)
+        std_interval = 1.0
+        min_interval = mean_scalar - std_interval*std_scalar
+        max_interval = mean_scalar + std_interval*std_scalar
 
-    plt.plot(exp_steps, mean_scalar, color=Colours[idx], linewidth=1)
-    plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[idx])
+        plt.plot(exp_steps, mean_scalar, color=Colours[idx], linewidth=1)
+        plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[idx])
 
-    plt.xlabel('steps')
-    plt.ylabel(scalar)
-    plt.show()
+        plt.xlabel('steps')
+        plt.ylabel(scalar)
+        plt.show()
 
