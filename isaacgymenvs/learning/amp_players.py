@@ -35,8 +35,9 @@ from rl_games.common.player import BasePlayer
 import matplotlib.pyplot as plt
 
 import isaacgymenvs.learning.common_player as common_player
-
+import os
 import copy
+import pickle
 
 
 class AMPPlayerContinuous(common_player.CommonPlayer):
@@ -52,6 +53,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         return
 
     def restore(self, fn):
+        self.last_checkpoint = fn
         super().restore(fn)
         if self._normalize_amp_input:
             checkpoint = torch_ext.load_checkpoint(fn)
@@ -174,6 +176,15 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.ylabel("avg amp rew")
         plt.title(f"Avg amp reward vs distance from demo data")
         plt.show()
+
+        # save data
+        learnt_function_path = os.path.splitext(self.last_checkpoint)[0] + '_learnt_fn.pkl'
+        data = {'disc_val': avg_disc_val, 'amp_rew': avg_amp_rew, 'max_sample_perturbation': demo_sample_max_distances}
+
+        with open(learnt_function_path, 'wb') as handle:
+            pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        print("saved learnt function data")
 
 
     def visualise_2d_disc(self):
