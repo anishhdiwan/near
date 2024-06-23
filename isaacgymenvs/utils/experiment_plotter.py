@@ -7,30 +7,37 @@ PARENT_DIR_PATH = os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(PARENT_DIR_PATH)
 
 # https://sashamaps.net/docs/tools/20-colors/
+# Colours = [
+#     '#000000',
+#     '#e6194B', 
+#     '#3cb44b', 
+#     # '#ffe119', 
+#     '#4363d8', 
+#     '#f58231', 
+#     '#911eb4', 
+#     '#42d4f4', 
+#     '#f032e6', 
+#     # '#bfef45', 
+#     # '#fabed4', 
+#     '#469990', 
+#     # '#dcbeff', 
+#     '#9A6324', 
+#     # '#fffac8', 
+#     '#800000', 
+#     # '#aaffc3', 
+#     '#808000', 
+#     # '#ffd8b1', 
+#     '#000075', 
+#     # '#a9a9a9', 
+#     # '#ffffff', 
+# ]
+
 Colours = [
-	'#800000',  # Maroon (99.99%)
-	'#4363d8',  # Blue (99.99%)
-	'#ffe119',  # Yellow (99.99%)
-	'#e6beff',  # Lavender (99.99%)
-	'#f58231',  # Orange (99.99%)
-	'#3cb44b',  # Green (99%)
-	'#000075',  # Navy (99.99%)
-	'#e6194b',  # Red (99%)
-	'#46f0f0',  # Cyan (99%)
-	'#f032e6',  # Magenta (99%)
-	'#9a6324',  # Brown (99%)
-	'#008080',  # Teal (99%)
-	'#911eb4',  # Purple (95%*)
-	'#aaffc3',  # Mint (99%)
-	'#ffd8b1',  # Apiroct (95%)
-	'#bcf60c',  # Lime (95%)
-	'#fabed4',  # Pink (99%)
-	'#808000',  # Olive (95%)
-	'#fffac8',  # Beige (99%)
-	#'#a9a9a9',
-	#'#ffffff',
-	#'#000000'
+    '#000000', '#42d4f4', '#e6194B', '#4363d8', '#f58231', '#000075',
+    '#3cb44b', '#911eb4', '#469990', '#f032e6', '#9A6324', '#808000',
+    '#800000'
 ]
+
 
 def get_scalars_from_dfs(scalar, trial_dfs):
     # Returns a list of np  arrays, of the scalar from each trial and a np array of steps

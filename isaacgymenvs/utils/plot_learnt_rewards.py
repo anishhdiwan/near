@@ -151,8 +151,8 @@ def plot_checkpoint_data(aggregated_data):
             max_interval = mean_scalar + std_interval*std_scalar
 
             plt.figure(figsize=(8, 6))
-            plt.plot(data_x, mean_scalar, color=Colours[idx], linewidth=1)
-            plt.fill_between(data_x, min_interval, max_interval, alpha=0.2, color=Colours[idx])
+            plt.plot(data_x, mean_scalar, color=Colours[idx], linewidth=1.5)
+            plt.fill_between(data_x, min_interval, max_interval, alpha=0.1, color=Colours[idx])
 
             plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
             plt.ylabel(data_key)
@@ -168,8 +168,15 @@ def plot_checkpoint_data(aggregated_data):
                 min_interval = mean_scalar - std_interval*std_scalar
                 max_interval = mean_scalar + std_interval*std_scalar
 
-                plt.plot(data_x, np.flip(mean_scalar, axis=0), color=Colours[ind], linewidth=1, label=f"{k}")
-                plt.fill_between(data_x, np.flip(min_interval, axis=0), np.flip(max_interval, axis=0), alpha=0.2, color=Colours[idx])
+                if ind%2 == 0:
+                    linestyle = 'solid'
+                    hatch = None
+                else:
+                    linestyle = 'dotted'
+                    hatch = None
+
+                plt.plot(data_x, np.flip(mean_scalar, axis=0), color=Colours[ind], linewidth=1.5, label=f"{data_key}_{k}")
+                plt.fill_between(data_x, np.flip(min_interval, axis=0), np.flip(max_interval, axis=0), alpha=0.1, color=Colours[ind], hatch=hatch, edgecolor=Colours[ind])
 
             plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
             plt.ylabel(data_key)

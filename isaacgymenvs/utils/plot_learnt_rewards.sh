@@ -6,7 +6,7 @@
 
 ALGO="DMP"
 CHECKPOINTS="-1"
-TRIALS="plottest1 plottest2"
+TRIALS="plottest_1 plottest_20"
 
 play_cmd=$(python ./utils/plot_learnt_rewards.py --algo ${ALGO} --trials ${TRIALS} --checkpoints ${CHECKPOINTS})
 
