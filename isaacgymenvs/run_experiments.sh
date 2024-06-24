@@ -17,7 +17,7 @@ fi
 
 rl_cfg=$(python ./cfg/experiment_generator.py --model=rl)
 
-# Run rl (either AMP or DMP) if not done
+# Run rl (either AMP or NEAR) if not done
 if [ "${rl_cfg}" = "done" ]; then
   echo "cmds done!"
   echo "------------"

@@ -1,13 +1,13 @@
 # used to create the object
-name: HumanoidDMP
+name: HumanoidNEAR
 
 physics_engine: ${..physics_engine}
 
 
 headless: ${resolve_default:False,${..headless}}
 # TODO: this gets passed on the the env. Demo data is fetched if this equals "AMP". Not the nicest idea to pass algo details into the env
-# TODO: change amp specific vecenv configs also for DMP
-training_algo: DMP 
+# TODO: change amp specific vecenv configs also for NEAR
+training_algo: NEAR 
 env: 
   numEnvs: ${resolve_default:1024,${...num_envs}}
   numObsSteps: 2
@@ -25,7 +25,7 @@ env:
   numAMPObsSteps: ${.numObsSteps}
 
   localRootObs: False
-  contactBodies: ["right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot", "right_hand", "left_hand"]
   terminationHeight: 0.5
   enableEarlyTermination: True
 

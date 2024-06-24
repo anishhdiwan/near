@@ -1,9 +1,9 @@
 # used to create the object
-name: particleDMP
+name: mazeNEAR
 headless: ${resolve_default:False,${..headless}}
 # TODO: this gets passed on the the env. Demo data is fetched if this equals "AMP". Not the nicest idea to pass algo details into the env
-# TODO: change amp specific vecenv configs also for DMP
-training_algo: DMP 
+# TODO: change amp specific vecenv configs also for NEAR
+training_algo: NEAR 
 env: 
   numEnvs: ${resolve_default:16,${...num_envs}}
-  numObsSteps: 1
+  numObsSteps: 2

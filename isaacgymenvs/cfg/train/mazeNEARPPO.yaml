@@ -2,7 +2,7 @@ params:
   seed: ${...seed}
   
   algo:
-    name: dmp_continuous
+    name: near_continuous
 
   model:
     name: continuous_a2c_logstd
@@ -34,7 +34,7 @@ params:
 
 
   config:
-    name: ${resolve_default:mazeDMP,${....experiment}}
+    name: ${resolve_default:mazeNEAR,${....experiment}}
     full_experiment_name: ${.name}
     max_epochs: ${resolve_default:500,${....max_iterations}}
     env_name:  gym_env
@@ -70,8 +70,8 @@ params:
     mixed_precision: False
     print_stats: True
     
-    # DMP Params
-    dmp_config:
+    # NEAR Params
+    near_config:
       
       training:
         batch_size: 128
@@ -120,9 +120,9 @@ params:
         energy_reward_w: 0.0
         sigma_level: 7 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/mazeDMP_NCSN_30-15-42-04/nn/checkpoint.pth"
+        eb_model_checkpoint: ""
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/mazeDMP_NCSN_30-15-42-04/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: ""
 
 
     player:

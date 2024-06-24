@@ -104,7 +104,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning import amp_network_builder
     import isaacgymenvs
 
-    from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous, dmp_players
+    from isaacgymenvs.learning.noise_conditioned_energy_based_annealed_rewards import near_continuous, near_players
     from isaacgymenvs.learning.cem import cem_continuous
 
 
@@ -135,11 +135,11 @@ def launch_rlg_hydra(cfg: DictConfig):
     from custom_envs.customenv_utils import CustomRayVecEnv, PushTAlgoObserver
 
     def create_env(**kwargs):
-        if cfg_dict["task_name"] in ["pushT", "pushTAMP", "pushTDMP"]:
+        if cfg_dict["task_name"] in ["pushT", "pushTAMP", "pushTNEAR"]:
             env = PushTEnv(cfg=cfg_dict["task"]) # cfg is obtained from the config file. This is passed in within the algo init step as a kwarg
-        elif cfg_dict["task_name"] in ["particle", "particleDMP"]:
+        elif cfg_dict["task_name"] in ["particle", "particleNEAR"]:
             env = ParticleEnv(cfg=cfg_dict["task"])
-        elif cfg_dict["task_name"] in ["maze", "mazeDMP", "mazeAMP", "mazeCEM"]:
+        elif cfg_dict["task_name"] in ["maze", "mazeNEAR", "mazeAMP", "mazeCEM"]:
             env = MazeEnv(cfg=cfg_dict["task"])
         
         return env
@@ -166,9 +166,9 @@ def launch_rlg_hydra(cfg: DictConfig):
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
 
 
-        ## Registering Diffusion Motion Priors ##
-        runner.algo_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_continuous.DMPAgent(**kwargs))
-        runner.player_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_players.DMPPlayerContinuous(**kwargs))
+        ## Registering Noise-conditioned Energy-based Annealed Rewards ##
+        runner.algo_factory.register_builder('near_continuous', lambda **kwargs : near_continuous.NEARAgent(**kwargs))
+        runner.player_factory.register_builder('near_continuous', lambda **kwargs : near_players.NEARPlayerContinuous(**kwargs))
 
         ## Registering Cross Entropy Method ##
         runner.algo_factory.register_builder('cem_continuous', lambda **kwargs : cem_continuous.CEMAgent(**kwargs))

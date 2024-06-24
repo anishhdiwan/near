@@ -24,12 +24,12 @@ def launch_hydra(cfg: DictConfig):
     #     cfg.checkpoint = to_absolute_path(cfg.checkpoint)
 
     visualise = cfg.test
-    dmp_cfg = cfg.train.params.config.dmp_config
+    near_cfg = cfg.train.params.config.near_config
 
     # add device
-    device = dmp_cfg.get('device', 'cuda:0')
-    with open_dict(dmp_cfg):
-        dmp_cfg.device = device
+    device = near_cfg.get('device', 'cuda:0')
+    with open_dict(near_cfg):
+        near_cfg.device = device
 
 
     # set numpy formatting for printing only
@@ -37,8 +37,8 @@ def launch_hydra(cfg: DictConfig):
     # global rank of the GPU
     global_rank = int(os.getenv("RANK", "0"))
     # sets seed. if seed is -1 will pick a random one
-    with open_dict(dmp_cfg):
-        dmp_cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=global_rank)
+    with open_dict(near_cfg):
+        near_cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=global_rank)
 
 
     # dump config dict
@@ -52,9 +52,9 @@ def launch_hydra(cfg: DictConfig):
             cfg.train.params.config['full_experiment_name'] = cfg.get('full_experiment_name')
 
         # Printing the config
-        dmp_cfg_dict = omegaconf_to_dict(dmp_cfg)
+        near_cfg_dict = omegaconf_to_dict(near_cfg)
         print("TRAIN CFG")
-        print_dict(dmp_cfg_dict)
+        print_dict(near_cfg_dict)
         print("-----")
 
         full_experiment_name = cfg.train.params.config.get('full_experiment_name', None)
@@ -68,7 +68,7 @@ def launch_hydra(cfg: DictConfig):
 
         os.makedirs(experiment_dir, exist_ok=True)
         with open(os.path.join(experiment_dir, 'ncsn_config.yaml'), 'w') as f:
-            f.write(OmegaConf.to_yaml(dmp_cfg))
+            f.write(OmegaConf.to_yaml(near_cfg))
 
         # AnnealRunner generally takes in command line arguments for training log paths and other options. Setting up an artifical args object here to feed in the options
         args = argparse.Namespace()
@@ -78,13 +78,13 @@ def launch_hydra(cfg: DictConfig):
         args.doc = '_'
 
 
-        runner = AnnealRunner(args, dmp_cfg)
+        runner = AnnealRunner(args, near_cfg)
         runner.train()
     
     else:
         # Empty args
         args = argparse.Namespace()
-        runner = AnnealRunner(args, dmp_cfg)
+        runner = AnnealRunner(args, near_cfg)
         runner.visualise_energy()
 
 

@@ -108,7 +108,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning import amp_network_builder
     import isaacgymenvs
 
-    from isaacgymenvs.learning.diffusion_motion_priors import dmp_continuous, dmp_players
+    from isaacgymenvs.learning.noise_conditioned_energy_based_annealed_rewards import near_continuous, near_players
     from isaacgymenvs.learning.cem import cem_continuous
 
     time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -132,8 +132,8 @@ def launch_rlg_hydra(cfg: DictConfig):
     cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=global_rank)
 
     def create_isaacgym_env(**kwargs):
-        if cfg_dict["task_name"][-3:] == "DMP":
-            print("INFO: setting up the environment for DMP. Motions will still be loaded as part of env instantiation but they will not be used")
+        if cfg_dict["task_name"][-3:] == "NEAR":
+            print("INFO: setting up the environment for NEAR. Motions will still be loaded as part of env instantiation but they will not be used")
         envs = isaacgymenvs.make(
             cfg.seed, 
             cfg.task_name, 
@@ -205,9 +205,9 @@ def launch_rlg_hydra(cfg: DictConfig):
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
 
 
-        ## Registering Diffusion Motion Priors ##
-        runner.algo_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_continuous.DMPAgent(**kwargs))
-        runner.player_factory.register_builder('dmp_continuous', lambda **kwargs : dmp_players.DMPPlayerContinuous(**kwargs))
+        ## Registering Noise-conditioned Energy-based Annealed Rewards ##
+        runner.algo_factory.register_builder('near_continuous', lambda **kwargs : near_continuous.NEARAgent(**kwargs))
+        runner.player_factory.register_builder('near_continuous', lambda **kwargs : near_players.NEARPlayerContinuous(**kwargs))
 
         ## Registering Cross Entropy Method ##
         runner.algo_factory.register_builder('cem_continuous', lambda **kwargs : cem_continuous.CEMAgent(**kwargs))

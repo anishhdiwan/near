@@ -11,7 +11,7 @@ from experiment_generator import generate_seeds
 FILE_PATH = os.path.dirname(__file__)
 sys.path.append(FILE_PATH)
 
-algos = ["HumanoidDMP"]
+algos = ["HumanoidNEAR"]
 
 motions = [
     "amp_humanoid_walk.yaml", # standard 
@@ -53,10 +53,10 @@ def generate_train_commands():
                         w_task = 1.0 - w_style
                         cmd = [
 f"task={algo} ++task.env.motion_file={motion} seed={seed} \
-++train.params.config.dmp_config.inference.sigma_level={annealing} \
-++train.params.config.dmp_config.model.encode_temporal_feature={temporal_feature} \
-++train.params.config.dmp_config.inference.task_reward_w={w_task} \
-++train.params.config.dmp_config.inference.energy_reward_w={w_style}", 
+++train.params.config.near_config.inference.sigma_level={annealing} \
+++train.params.config.near_config.model.encode_temporal_feature={temporal_feature} \
+++train.params.config.near_config.inference.task_reward_w={w_task} \
+++train.params.config.near_config.inference.energy_reward_w={w_style}", 
 
 f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{annealing}_{temporal_feature}_w_style_{str(w_style).replace('.', '')}_{seed}"]
                         pending_cmds.append(cmd)
@@ -116,8 +116,8 @@ if __name__ == "__main__":
         ncsn_dir = next_cmd[1]
         eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
         running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
-        command_to_pass = next_cmd[0] + f" ++train.params.config.dmp_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
-        + f" ++train.params.config.dmp_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={next_cmd[1]}"
+        command_to_pass = next_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
+        + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={next_cmd[1]}"
         
         cmds[0]['completed_cmds'][-1].append(command_to_pass)
 

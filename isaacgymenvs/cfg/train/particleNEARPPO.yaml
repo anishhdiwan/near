@@ -2,7 +2,7 @@ params:
   seed: ${...seed}
    
   algo:
-    name: dmp_continuous
+    name: near_continuous
 
   model:
     name: continuous_a2c_logstd
@@ -32,7 +32,7 @@ params:
   load_path: ${...checkpoint} # path to the checkpoint to load
 
   config:
-    name: ${resolve_default:particleDMP,${....experiment}}
+    name: ${resolve_default:particleNEAR,${....experiment}}
     full_experiment_name: ${.name}
     max_epochs: ${resolve_default:500,${....max_iterations}}
     env_name:  gym_env
@@ -66,8 +66,8 @@ params:
     bounds_loss_coef: 0
     
     
-    # DMP Params
-    dmp_config:
+    # NEAR Params
+    near_config:
       
       training:
         batch_size: 128
@@ -116,9 +116,9 @@ params:
         energy_reward_w: 1.0
         sigma_level: 1 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: "ncsn_runs/particleDMP_NCSN_02-11-24-10/nn/checkpoint.pth"
+        eb_model_checkpoint: ""
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: "ncsn_runs/particleDMP_NCSN_02-11-24-10/nn/running_mean_std.pth"
+        running_mean_std_checkpoint: ""
 
 
     player:

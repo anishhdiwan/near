@@ -2,7 +2,7 @@ params:
   seed: ${...seed}
   
   algo:
-    name: dmp_continuous
+    name: near_continuous
 
   model:
     name: continuous_a2c_logstd
@@ -38,7 +38,7 @@ params:
 
 
   config:
-    name: ${resolve_default:HumanoidDMP,${....experiment}}
+    name: ${resolve_default:HumanoidNEAR,${....experiment}}
     full_experiment_name: ${.name}
     env_name: rlgpu
     # ppo: True
@@ -75,8 +75,8 @@ params:
     
     
     
-    # DMP Params
-    dmp_config:
+    # NEAR Params
+    near_config:
       
       training:
         batch_size: 128

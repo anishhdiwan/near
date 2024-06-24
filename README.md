@@ -50,9 +50,9 @@ pip install -r requirements.txt
 **Training is a two-step procedure. First we train the energy-based model and subsequently use the trained model to learn a policy.**
 
 **Note:** 
-- Set params in the `dsm_config` part of the `train/<task-name>DMPPPO.yml` file. 
+- Set params in the `near_cfg` part of the `train/<task-name>DMPPPO.yml` file. 
 - The task data for CPU environments (mazeDMP, pushTDMP) is loaded automatically. The task data for the Humanoid environment is passed in the `motion_file` param of the `task/HumanoidDMP.yaml` file. This data is either in the `custom_envs/data/humanoid` directory or in the `assets` directory. Passing a .yaml file loads several motions while passing a single .npy file does single-clip training.
-- Before training the policy, add the path to the trained energy-based model checkpoint in the `dsm_config` part of the `train/<task-name>DMP.yml` file.
+- Before training the policy, add the path to the trained energy-based model checkpoint in the `near_cfg` part of the `train/<task-name>NEAR.yml` file.
 - With IsaacGym, by default we show a preview window, which will usually slow down training. You can use the `v` key while running to disable viewer updates and allow training to proceed faster. Hit the `v` key again to resume viewing. Use the `esc` key or close the viewer window to stop training early. Alternatively, you can train headlessly by adding the headless:True argument. 
 
 ### Step 1: Training the energy-based model
