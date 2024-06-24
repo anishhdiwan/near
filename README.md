@@ -22,7 +22,7 @@ This installation proceeds in three main steps. First, we install Isaac Gym, the
 
 ```bash
 conda install -c anaconda git
-git clone --recurse-submodules -b <branch> https://github.com/anishhdiwan/diffusion_motion_priors.git
+git clone --recurse-submodules -b <branch> https://github.com/anishhdiwan/near.git
 cd <dir-name>
 pip install -e .
 ```
@@ -50,14 +50,14 @@ pip install -r requirements.txt
 **Training is a two-step procedure. First we train the energy-based model and subsequently use the trained model to learn a policy.**
 
 **Note:** 
-- Set params in the `near_cfg` part of the `train/<task-name>DMPPPO.yml` file. 
-- The task data for CPU environments (mazeDMP, pushTDMP) is loaded automatically. The task data for the Humanoid environment is passed in the `motion_file` param of the `task/HumanoidDMP.yaml` file. This data is either in the `custom_envs/data/humanoid` directory or in the `assets` directory. Passing a .yaml file loads several motions while passing a single .npy file does single-clip training.
+- Set params in the `near_cfg` part of the `train/<task-name>NEARPPO.yml` file. 
+- The task data for CPU environments (mazeNEAR, pushTNEAR) is loaded automatically. The task data for the Humanoid environment is passed in the `motion_file` param of the `task/HumanoidNEAR.yaml` file. This data is either in the `custom_envs/data/humanoid` directory or in the `assets` directory. Passing a .yaml file loads several motions while passing a single .npy file does single-clip training.
 - Before training the policy, add the path to the trained energy-based model checkpoint in the `near_cfg` part of the `train/<task-name>NEAR.yml` file.
 - With IsaacGym, by default we show a preview window, which will usually slow down training. You can use the `v` key while running to disable viewer updates and allow training to proceed faster. Hit the `v` key again to resume viewing. Use the `esc` key or close the viewer window to stop training early. Alternatively, you can train headlessly by adding the headless:True argument. 
 
 ### Step 1: Training the energy-based model
 ```bash
-# tasks = [mazeDMP, pushTDMP, HumanoidDMP]
+# tasks = [mazeNEAR, pushTNEAR, HumanoidNEAR]
 python train_ncsn.py task=<task-name>
 ```
 
@@ -65,13 +65,13 @@ python train_ncsn.py task=<task-name>
 
 ```bash
 # For CPU-based environments
-# tasks = [mazeDMP, pushTDMP]
+# tasks = [mazeNEAR, pushTNEAR]
 python train_gym_envs.py task=<task-name> headless=<bool>  
 ```
 
 ```bash
 # For Isaac Gym environments
-# tasks = [HumanoidDMP]
+# tasks = [HumanoidNEAR]
 python train.py task=<task-name> headless=<bool>  
 ```
 
@@ -107,7 +107,7 @@ Trained policies can be visualised as follows
 
 ```bash
 # For CPU-based environments
-# tasks = [mazeAMP, pushTAMP, pushT, maze, mazeDMP, pushTDMP]
+# tasks = [mazeAMP, pushTAMP, pushT, maze, mazeNEAR, pushTNEAR]
 # If no algo is mentioned, then PPO is assumed by default
 # Make sure to set the visualise_disc argument of in tasks/mazeAMPPPO.yaml to False
 python train_gym_envs.py task=<task-name> test=True checkpoint=<path-to-saved-checkpoint>
@@ -115,7 +115,7 @@ python train_gym_envs.py task=<task-name> test=True checkpoint=<path-to-saved-ch
 
 ```bash
 # For Isaac Gym environments
-# tasks = [HumanoidAMP, Humanoid, HumanoidDMP]
+# tasks = [HumanoidAMP, Humanoid, HumanoidNEAR]
 # If no algo is mentioned, then PPO is assumed by default
 python train.py task=<task-name> test=True checkpoint=<path-to-saved-checkpoint> 
 ```
@@ -126,7 +126,7 @@ Since the maze environment is 2-dimensional, the energy-function or the adversar
 
 ```bash
 # Visualising the energy function
-python train_ncsn.py task=mazeDMP test=True
+python train_ncsn.py task=mazeNEAR test=True
 ```
 
 ```bash
