@@ -4,7 +4,7 @@
 # CHECKPOINTS="0 5000"
 # TRIALS="HumanoidAMP_walk_42 HumanoidAMP_walk_43"
 
-ALGO="DMP"
+ALGO="NEAR"
 CHECKPOINTS="-1"
 TRIALS="plottest_1 plottest_20"
 

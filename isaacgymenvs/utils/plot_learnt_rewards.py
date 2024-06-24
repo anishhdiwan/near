@@ -32,10 +32,10 @@ def generate_play_commands(algo, checkpoints, trials):
                         if re.search(pattern, filename):
                             pending_cmds.append(f"train.py task=Humanoid{algo} test=True checkpoint=runs/{trial}/nn/{filename}")
 
-                elif algo=="DMP":
+                elif algo=="NEAR":
                     pending_cmds.append(f"train_ncsn.py task=Humanoid{algo} test=True \
-++train.params.config.dmp_config.inference.eb_model_checkpoint=ncsn_runs/{trial}/nn/checkpoint.pth \
-++train.params.config.dmp_config.inference.running_mean_std_checkpoint=ncsn_runs/{trial}/nn/running_mean_std.pth")
+++train.params.config.near_config.inference.eb_model_checkpoint=ncsn_runs/{trial}/nn/checkpoint.pth \
+++train.params.config.near_config.inference.running_mean_std_checkpoint=ncsn_runs/{trial}/nn/running_mean_std.pth")
 
 
         cmds = [{"pending_cmds":pending_cmds}]
@@ -87,7 +87,7 @@ def plot_series(args):
                             checkpoint_data.append(pickle.load(handle))
         
 
-            elif algo=="DMP":
+            elif algo=="NEAR":
                 datafile = os.path.join(FILE_PATH, f"../ncsn_runs/{trial}/nn/checkpoint_learnt_fn.pkl")
 
                 with open(datafile, 'rb') as handle:
@@ -193,7 +193,7 @@ def plot_checkpoint_data(aggregated_data):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-a", "--algo", type=str, required=True, help="whether to plot AMP rewards or DMP rewards")
+    parser.add_argument("-a", "--algo", type=str, required=True, help="whether to plot AMP rewards or NEAR rewards")
     parser.add_argument('-t', '--trials', nargs='+', required=True, help='the experiment trials to plot')
     parser.add_argument('-c', '--checkpoints', nargs='+', required=True, help='the checkpoints to plot')
     args = parser.parse_args()

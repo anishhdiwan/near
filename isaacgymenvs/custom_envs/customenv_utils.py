@@ -242,8 +242,8 @@ class CustomRayVecEnv(IVecEnv):
         if self.training_algo in ["AMP"]:
             # Set up the motions library
             self._setup_motions(setup_motionlib=True)
-        # Only set up experience buffers for paired observations for DMP (saves unnecessary memory usage)
-        elif self.training_algo in ["DMP", "CEM"]:
+        # Only set up experience buffers for paired observations for NEAR (saves unnecessary memory usage)
+        elif self.training_algo in ["NEAR", "CEM"]:
             # Set up the motions library
             self._setup_motions(setup_motionlib=False)
 
@@ -296,7 +296,7 @@ class CustomRayVecEnv(IVecEnv):
         # if self.concat_infos:
         newinfos = dicts_to_dict_with_arrays(newinfos, False)
 
-        if self.training_algo in ["AMP", "DMP", "CEM"]:
+        if self.training_algo in ["AMP", "NEAR", "CEM"]:
             # Augmenting the infos dict
             self.post_step_procedures(ret_obs, indices=indices)
             newinfos = self.augment_infos(newinfos, newdones, indices=indices)
@@ -350,7 +350,7 @@ class CustomRayVecEnv(IVecEnv):
         # if self.concat_infos:
         newinfos = dicts_to_dict_with_arrays(newinfos, False)
 
-        if self.training_algo in ["AMP", "DMP", "CEM"]:
+        if self.training_algo in ["AMP", "NEAR", "CEM"]:
             # Augmenting the infos dict
             self.post_step_procedures(ret_obs)
             newinfos = self.augment_infos(newinfos, newdones)

@@ -299,7 +299,7 @@ class GymMotionLib():
     def get_traj_agnostic_dataloader(self, batch_size, shuffle=False):
         """Returns a dataloader that can be used to sample a batch of observation pairs regardless of the episode endings. 
 
-        Primarily used to train trajectory-agnostic methods like diffusion.
+        Primarily used to train trajectory-agnostic methods like NCSN.
         """
         assert self.episodic == False, "Please set the episodic argument of MotionLib to false"
         if not self.test_split:
