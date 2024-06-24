@@ -10,7 +10,7 @@ from learning.motion_ncsn.models.motion_scorenet import SimpleNet
 import time
 
 
-class DMPPlayerContinuous(players.PpoPlayerContinuous):
+class NEARPlayerContinuous(players.PpoPlayerContinuous):
     def __init__(self, params):
         """
         Initialise a player to run trained policies. Inherits from the PPO player and makes minor modifications to attach energy functions
@@ -19,21 +19,21 @@ class DMPPlayerContinuous(players.PpoPlayerContinuous):
             params (:obj `dict`): Algorithm parameters (self.config is obtained from params in the parent class __init__() method)
         """
         super().__init__(params)
-        self._task_reward_w = self.config['dmp_config']['inference']['task_reward_w']
-        self._energy_reward_w = self.config['dmp_config']['inference']['energy_reward_w']
-        self._eb_model_checkpoint = self.config['dmp_config']['inference']['eb_model_checkpoint']
-        self._c = self.config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1]
-        self._L = self.config['dmp_config']['model']['L']
-        self._normalize_energynet_input = self.config['dmp_config']['training'].get('normalize_energynet_input', True)
-        self._energynet_input_norm_checkpoint = self.config['dmp_config']['inference']['running_mean_std_checkpoint']
+        self._task_reward_w = self.config['near_config']['inference']['task_reward_w']
+        self._energy_reward_w = self.config['near_config']['inference']['energy_reward_w']
+        self._eb_model_checkpoint = self.config['near_config']['inference']['eb_model_checkpoint']
+        self._c = self.config['near_config']['inference']['sigma_level'] # c ranges from [0,L-1]
+        self._L = self.config['near_config']['model']['L']
+        self._normalize_energynet_input = self.config['near_config']['training'].get('normalize_energynet_input', True)
+        self._energynet_input_norm_checkpoint = self.config['near_config']['inference']['running_mean_std_checkpoint']
 
-        self._init_network(self.config['dmp_config'])
+        self._init_network(self.config['near_config'])
 
 
         # Standardization
         # if self._normalize_energynet_input:
             ## TESTING ONLY: Swiss-Roll ##
-            # self._energynet_input_norm = RunningMeanStd(torch.ones(self.config['dmp_config']['model']['in_dim']).shape).to(self.device)
+            # self._energynet_input_norm = RunningMeanStd(torch.ones(self.config['near_config']['model']['in_dim']).shape).to(self.device)
             ## TESTING ONLY ##
 
             # self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.device)

@@ -30,9 +30,9 @@ from utils.ncsn_utils import dict2namespace, LastKMovingAvg, get_series_derivati
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-class DMPAgent(a2c_continuous.A2CAgent):
+class NEARAgent(a2c_continuous.A2CAgent):
     def __init__(self, base_name, params):
-        """Initialise DMP algorithm with passed params. Inherit from the rl_games PPO implementation.
+        """Initialise NEAR algorithm with passed params. Inherit from the rl_games PPO implementation.
 
         Args:
             base_name (:obj:`str`): Name passed on to the observer and used for checkpoints etc.
@@ -42,12 +42,12 @@ class DMPAgent(a2c_continuous.A2CAgent):
         config = params['config']
 
         # If using temporal feature in the state vector, create the environment first and then augment the env_info to account for extra dims
-        if config['dmp_config']['model']['encode_temporal_feature']:
+        if config['near_config']['model']['encode_temporal_feature']:
             print("Using Temporal Features")
             env_config = config.get('env_config', {})
             num_actors = config['num_actors']
             env_name = config['env_name']
-            temporal_emb_dim = config['dmp_config']['model'].get('temporal_emb_dim', None)
+            temporal_emb_dim = config['near_config']['model'].get('temporal_emb_dim', None)
             assert temporal_emb_dim != None, "A temporal embedding dim must be provided if encoding temporal features"
 
             vec_env = vecenv.create_vec_env(env_name, num_actors, **env_config)
@@ -57,17 +57,17 @@ class DMPAgent(a2c_continuous.A2CAgent):
         super().__init__(base_name, params)
 
         # Set the self.vec_env attribute
-        if config['dmp_config']['model']['encode_temporal_feature']:
+        if config['near_config']['model']['encode_temporal_feature']:
             self.vec_env = vec_env
 
 
         self._load_config_params(config)
-        self._init_network(config['dmp_config'])
+        self._init_network(config['near_config'])
 
         # Standardization
         if self._normalize_energynet_input:
             ## TESTING ONLY: Swiss-Roll ##
-            # self._energynet_input_norm = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.ppo_device)
+            # self._energynet_input_norm = RunningMeanStd(torch.ones(config['near_config']['model']['in_dim']).shape).to(self.ppo_device)
             ## TESTING ONLY ##
 
             self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
@@ -82,7 +82,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         # Fetch demo trajectories for computing eval metrics
         self._fetch_demo_dataset()
         self.sim_asset_root_body_id = None 
-        print("Diffusion Motion Priors Initialised!")
+        print("Noise-conditioned Energy-based Annealed Rewards Initialised!")
 
 
     def _load_config_params(self, config):
@@ -92,13 +92,13 @@ class DMPAgent(a2c_continuous.A2CAgent):
             config (dict): Configuration params
         """
         
-        self._task_reward_w = config['dmp_config']['inference']['task_reward_w']
-        self._energy_reward_w = config['dmp_config']['inference']['energy_reward_w']
+        self._task_reward_w = config['near_config']['inference']['task_reward_w']
+        self._energy_reward_w = config['near_config']['inference']['energy_reward_w']
 
-        self.perf_metrics_freq = config['dmp_config']['inference'].get('perf_metrics_freq', 0)
+        self.perf_metrics_freq = config['near_config']['inference'].get('perf_metrics_freq', 0)
         self._paired_observation_space = self.env_info['paired_observation_space']
-        self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
-        self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
+        self._eb_model_checkpoint = config['near_config']['inference']['eb_model_checkpoint']
+        self._c = config['near_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
         if self._c == -1:
             # When c=-1, noise level annealing is used.
             print("Using Annealed Rewards!")
@@ -126,14 +126,14 @@ class DMPAgent(a2c_continuous.A2CAgent):
             # Initialise a replay memory style class to return the average reward encounter by the last k policies
             self._transformed_rewards_buffer = LastKMovingAvg()
 
-        self._sigma_begin = config['dmp_config']['model']['sigma_begin']
-        self._sigma_end = config['dmp_config']['model']['sigma_end']
-        self._L = config['dmp_config']['model']['L']
-        self._normalize_energynet_input = config['dmp_config']['training'].get('normalize_energynet_input', True)
-        self._energynet_input_norm_checkpoint = config['dmp_config']['inference']['running_mean_std_checkpoint']
+        self._sigma_begin = config['near_config']['model']['sigma_begin']
+        self._sigma_end = config['near_config']['model']['sigma_end']
+        self._L = config['near_config']['model']['L']
+        self._normalize_energynet_input = config['near_config']['training'].get('normalize_energynet_input', True)
+        self._energynet_input_norm_checkpoint = config['near_config']['inference']['running_mean_std_checkpoint']
         
         # If temporal features are encoded in the paired observations then a new space for the temporal states is made. The energy net and normalization use this space
-        self._encode_temporal_feature = config['dmp_config']['model']['encode_temporal_feature']
+        self._encode_temporal_feature = config['near_config']['model']['encode_temporal_feature']
 
         try:
             self._max_episode_length = self.vec_env.env.max_episode_length
@@ -144,7 +144,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
             assert self._max_episode_length != None, "A max episode length must be known when using temporal state features"
 
             # Positional embedding for temporal information
-            self.emb_dim = config['dmp_config']['model']['temporal_emb_dim']
+            self.emb_dim = config['near_config']['model']['temporal_emb_dim']
             self.embed = SinusoidalPosEmb(dim=self.emb_dim, steps=512)
             self.embed.eval()
 
@@ -214,7 +214,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
 
     def _calc_rewards(self, paired_obs):
-        """Calculate DMP rewards given a sest of observation pairs
+        """Calculate NEAR rewards given a sest of observation pairs
 
         Args:
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
@@ -286,15 +286,15 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         return energy_rew
 
-    def _combine_rewards(self, task_rewards, dmp_rewards):
+    def _combine_rewards(self, task_rewards, near_rewards):
         """Combine task and style (energy) rewards using the weights assigned in the config file
 
         Args:
             task_rewards (torch.Tensor): rewards received from the environment
-            dmp_rewards (torch.Tensor): rewards obtained as energies computed using an energy-based model
+            near_rewards (torch.Tensor): rewards obtained as energies computed using an energy-based model
         """
 
-        energy_rew = dmp_rewards['energy_reward']
+        energy_rew = near_rewards['energy_reward']
         combined_rewards = (self._task_reward_w * task_rewards) + (self._energy_reward_w * energy_rew)
         return combined_rewards
 
@@ -449,8 +449,8 @@ class DMPAgent(a2c_continuous.A2CAgent):
 
         ## New Addition ##
         self._anneal_noise_level(paired_obs=mb_paired_obs)
-        dmp_rewards = self._calc_rewards(mb_paired_obs)
-        mb_rewards = self._combine_rewards(mb_rewards, dmp_rewards)
+        near_rewards = self._calc_rewards(mb_paired_obs)
+        mb_rewards = self._combine_rewards(mb_rewards, near_rewards)
 
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
         mb_returns = mb_advs + mb_values
@@ -461,7 +461,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         batch_dict['step_time'] = step_time
 
         temp_combined_rewards = copy.deepcopy(mb_rewards).squeeze()
-        temp_energy_rewards = copy.deepcopy(dmp_rewards['energy_reward']).squeeze()
+        temp_energy_rewards = copy.deepcopy(near_rewards['energy_reward']).squeeze()
         self.mean_combined_rewards.update(temp_combined_rewards.sum(dim=0))
         self.mean_energy_rewards.update(temp_energy_rewards.sum(dim=0))
         self.mean_shaped_task_rewards.update(shaped_env_rewards.sum(dim=0))
@@ -549,7 +549,7 @@ class DMPAgent(a2c_continuous.A2CAgent):
         print(f"Minibatch Stats - E(s_penultimate, s_last).mean(all envs): {energy_rew.mean()}")
 
     def _log_train_info(self, infos, frame):
-        """Log dmp specific training information
+        """Log near specific training information
 
         Args:
             infos (dict): dictionary of training logs

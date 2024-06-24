@@ -158,7 +158,7 @@ class CEMAgent(BaseAlgorithm):
 
         # Initialising the energy network
         self._load_config_params(config)
-        self._init_network(config['dmp_config'])
+        self._init_network(config['near_config'])
 
 
     @property
@@ -173,17 +173,17 @@ class CEMAgent(BaseAlgorithm):
             config (dict): Configuration params
         """
         
-        self._task_reward_w = config['dmp_config']['inference']['task_reward_w']
-        self._energy_reward_w = config['dmp_config']['inference']['energy_reward_w']
+        self._task_reward_w = config['near_config']['inference']['task_reward_w']
+        self._energy_reward_w = config['near_config']['inference']['energy_reward_w']
 
         self._paired_observation_space = self.env_info['paired_observation_space']
-        self._eb_model_checkpoint = config['dmp_config']['inference']['eb_model_checkpoint']
-        self._c = config['dmp_config']['inference']['sigma_level'] # c ranges from [0,L-1]
-        self._sigma_begin = config['dmp_config']['model']['sigma_begin']
-        self._sigma_end = config['dmp_config']['model']['sigma_end']
-        self._L = config['dmp_config']['model']['L']
-        self._normalize_energynet_input = config['dmp_config']['training'].get('normalize_energynet_input', True)
-        self._energynet_input_norm_checkpoint = config['dmp_config']['inference']['running_mean_std_checkpoint']
+        self._eb_model_checkpoint = config['near_config']['inference']['eb_model_checkpoint']
+        self._c = config['near_config']['inference']['sigma_level'] # c ranges from [0,L-1]
+        self._sigma_begin = config['near_config']['model']['sigma_begin']
+        self._sigma_end = config['near_config']['model']['sigma_end']
+        self._L = config['near_config']['model']['L']
+        self._normalize_energynet_input = config['near_config']['training'].get('normalize_energynet_input', True)
+        self._energynet_input_norm_checkpoint = config['near_config']['inference']['running_mean_std_checkpoint']
 
         self.mean_game_rewards = torch_ext.AverageMeter(1, self.games_to_track).to(self.algo_device)
         self.mean_shaped_task_rewards = torch_ext.AverageMeter(1, self.games_to_track).to(self.algo_device)
@@ -201,7 +201,7 @@ class CEMAgent(BaseAlgorithm):
         # Standardization
         if self._normalize_energynet_input:
             ## TESTING ONLY: Swiss-Roll ##
-            # self._energynet_input_norm = RunningMeanStd(torch.ones(config['dmp_config']['model']['in_dim']).shape).to(self.algo_device)
+            # self._energynet_input_norm = RunningMeanStd(torch.ones(config['near_config']['model']['in_dim']).shape).to(self.algo_device)
             ## TESTING ONLY ##
 
             self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.algo_device)
@@ -227,7 +227,7 @@ class CEMAgent(BaseAlgorithm):
 
 
     def _calc_rewards(self, paired_obs):
-        """Calculate DMP rewards given a sest of observation pairs
+        """Calculate NEAR rewards given a sest of observation pairs
 
         Args:
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
