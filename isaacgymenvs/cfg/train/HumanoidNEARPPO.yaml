@@ -133,6 +133,10 @@ params:
         beta1: 0.9
         # Whether to use AMSGrad
         amsgrad: false
+        # Whether to use gradient clipping and the max norm of grads. Set to 0.0 for no clipping
+        grad_clip_norm: 1.0
+        # Weight initialisation : set to "default" for uniform
+        param_init: xavier_uniform
       
       # Used to visualise learnt energies. Not relevant for high dimensional datasets  
       visualise:

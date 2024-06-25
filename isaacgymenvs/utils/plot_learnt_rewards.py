@@ -11,6 +11,15 @@ import pickle
 FILE_PATH = os.path.join(os.path.dirname(__file__))
 sys.path.append(FILE_PATH)
 
+motions = {
+    "walk": "amp_humanoid_walk.yaml",
+    "run": "amp_humanoid_run.yaml",
+    "crane_pose": "amp_humanoid_crane_pose.yaml",
+    "cartwheel": "amp_humanoid_cartwheel.yaml",
+    "jump_in_place": "amp_humanoid_jump_in_place.yaml",
+    "bassai": "amp_humanoid_martial_arts_bassai.yaml"
+}
+
 
 def generate_play_commands(algo, checkpoints, trials):
     play_cmds = Path(os.path.join(FILE_PATH, f"{algo}_play_cmds.yaml"))
@@ -22,6 +31,13 @@ def generate_play_commands(algo, checkpoints, trials):
         pending_cmds = []
         for checkpoint in checkpoints:
             for trial in trials:
+
+                trial_motion = trial.replace("HumanoidNEAR_", "")
+                trial_motion = trial_motion.replace("HumanoidAMP_", "")
+                for motion in list(motions.keys()):
+                    if motion in trial_motion:
+                        trial_motion_file = motions[motion]
+
                 if algo == "AMP":
                     checkpoints_pth = os.path.join(FILE_PATH, f"../runs/{trial}/nn")
                     trial_checkpoints = [f for f in os.listdir(checkpoints_pth) if os.path.isfile(os.path.join(checkpoints_pth, f))]
@@ -30,12 +46,13 @@ def generate_play_commands(algo, checkpoints, trials):
                     pattern = rf'_{checkpoint}\.pth$'
                     for filename in trial_checkpoints:
                         if re.search(pattern, filename):
-                            pending_cmds.append(f"train.py task=Humanoid{algo} test=True checkpoint=runs/{trial}/nn/{filename}")
+                            pending_cmds.append(f"train.py task=Humanoid{algo} test=True checkpoint=runs/{trial}/nn/{filename} ++task.env.motion_file={trial_motion_file}")
 
                 elif algo=="NEAR":
                     pending_cmds.append(f"train_ncsn.py task=Humanoid{algo} test=True \
 ++train.params.config.near_config.inference.eb_model_checkpoint=ncsn_runs/{trial}/nn/checkpoint.pth \
-++train.params.config.near_config.inference.running_mean_std_checkpoint=ncsn_runs/{trial}/nn/running_mean_std.pth")
+++train.params.config.near_config.inference.running_mean_std_checkpoint=ncsn_runs/{trial}/nn/running_mean_std.pth \
+++task.env.motion_file={trial_motion_file}")
 
 
         cmds = [{"pending_cmds":pending_cmds}]

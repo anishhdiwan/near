@@ -6,7 +6,7 @@
 
 ALGO="NEAR"
 CHECKPOINTS="-1"
-TRIALS="plottest_1 plottest_20"
+TRIALS="HumanoidNEAR_crane_pose_6351_xavunif_l2"
 
 play_cmd=$(python ./utils/plot_learnt_rewards.py --algo ${ALGO} --trials ${TRIALS} --checkpoints ${CHECKPOINTS})
 
