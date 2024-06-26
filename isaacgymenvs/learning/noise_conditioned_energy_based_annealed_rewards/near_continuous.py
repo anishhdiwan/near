@@ -476,9 +476,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
         Used to compute performance metrics.
         """
         is_deterministic = True
+        return_traj_type = "most_rewarding" # "longest" or "most_rewarding"
         max_steps = self._max_episode_length
         pose_trajectory = []
         self.run_pi_dones = None
+        self.total_env_learnt_rewards = None
 
         self.run_obses = self._env_reset_all()
         pose_trajectory.append(self._fetch_sim_asset_poses())
@@ -507,18 +509,53 @@ class NEARAgent(a2c_continuous.A2CAgent):
             env_done_indices = all_done_indices[::self.num_agents]
             done_count = len(env_done_indices)
             
-            # Find the envs that were done the last
-            if self.run_pi_dones != None:
-                new_dones = (dones - self.run_pi_dones).nonzero(as_tuple=False)
-            self.run_pi_dones = dones.clone()
+            if return_traj_type == "longest":
+                # Find the envs that were done the last
+                if self.run_pi_dones != None:
+                    new_dones = (dones - self.run_pi_dones).nonzero(as_tuple=False)
+                self.run_pi_dones = dones.clone()
 
-            if done_count == self.num_actors:
-                # Reset the env to start training again
-                self.obs = self._env_reset_all()
-                break
+                if done_count == self.num_actors:
+                    # Select a random env out of those envs that were done last
+                    env_idx = random.choice(new_dones.squeeze(-1).tolist())
+                    # Reset the env to start training again
+                    self.obs = self._env_reset_all()
+                    break
 
-        # Select a random env out of those envs that were done last
-        env_idx = random.choice(new_dones.squeeze(-1).tolist())
+            elif return_traj_type == "most_rewarding":
+                # Append temporal feature to observations if needed
+                if self._encode_temporal_feature:
+                    progress1 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
+                    
+                    try:
+                        obs1, obs0 = torch.chunk(infos['paired_obs'], chunks=2, dim=-1)
+                        obs1 = torch.cat((progress1, obs1), -1)
+                        obs0 = torch.cat((progress0, obs0), -1)
+                        infos['paired_obs'] = torch.cat((obs1, obs0), -1)
+                    except KeyError:
+                        obs1, obs0 = torch.chunk(infos['amp_obs'], chunks=2, dim=-1)
+                        obs1 = torch.cat((progress1,obs1), -1)
+                        obs0 = torch.cat((progress0,obs0), -1)
+                        infos['amp_obs'] = torch.cat((obs1, obs0), -1)
+            
+                try:
+                    env_learnt_rewards = self._calc_energy(infos['paired_obs'])
+                except KeyError:
+                    env_learnt_rewards = self._calc_energy(infos['amp_obs'])
+
+                if self.total_env_learnt_rewards != None:
+                    self.total_env_learnt_rewards += env_learnt_rewards.clone()
+                else:
+                    self.total_env_learnt_rewards = env_learnt_rewards.clone() 
+
+                if done_count == self.num_actors:
+                    # Select a random env out of those envs that were done last
+                    env_idx = torch.argmax(self.total_env_learnt_rewards, dim=0).item()
+                    # Reset the env to start training again
+                    self.obs = self._env_reset_all()
+                    break
+                    
+
         pose_trajectory = torch.stack(pose_trajectory)
         pose_trajectory = pose_trajectory[:, env_idx, :, : ]
         # Transform to be relative to root body

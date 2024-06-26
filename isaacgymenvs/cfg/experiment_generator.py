@@ -30,7 +30,7 @@ task_specific_cfg = {
 
 manual_seeds = []
 
-def generate_seeds(start=0, end=int(1e4), k=5, manual_seeds=[]):
+def generate_seeds(start=0, end=int(1e4), k=3, manual_seeds=[]):
 
     if manual_seeds != []:
         seeds = manual_seeds
