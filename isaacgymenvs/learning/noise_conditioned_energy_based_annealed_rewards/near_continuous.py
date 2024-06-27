@@ -107,13 +107,14 @@ class NEARAgent(a2c_continuous.A2CAgent):
             # Index of the current noise level used to compute energies
             self._c_idx = 0
             # Value to add to reward to ensure that the annealed rewards are non-decreasing
-            self._curr_reward_offset = 0.0
+            self._reward_offsets = [0.0]
             # Sigma levels to use to compute energies
             self._anneal_levels = [3,4,5,6,7,8,9]
             # Noise level being used right now
             self._c = self._anneal_levels[self._c_idx]
             # Minimum energy value after which noise level is changed
-            self._anneal_threshold = 100.0 - self._c * 10
+            # self._anneal_threshold = 100.0 - self._c * 10
+            self._anneal_thresholds = [100.0 - c*10 for c in self._anneal_levels[:-1]]
             # Initialise a replay memory style class to return the average energy of the last k policies (for both noise levels)
             self._nextlv_energy_buffer = LastKMovingAvg()
             self._thislv_energy_buffer = LastKMovingAvg()
@@ -122,7 +123,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         else:
             self.ncsn_annealing = False
-            self._curr_reward_offset = 0.0
+            self._reward_offsets = [0.0]
             # Initialise a replay memory style class to return the average reward encounter by the last k policies
             self._transformed_rewards_buffer = LastKMovingAvg()
 
@@ -238,7 +239,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         # rewards = (0.0001/(1 + rewards**2)) + (torch.exp(-torch.abs(rewards)))
         # rewards = -torch.log(1/(1 + torch.exp(rewards)))
 
-        rewards = rewards + self._curr_reward_offset
+        rewards = rewards + sum(self._reward_offsets)
 
         # Keep track of the energy as learning progresses
         self.mean_energy.update(rewards.sum(dim=0))
@@ -313,7 +314,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
     def _anneal_noise_level(self, **kwargs):
         """If NCSN annealing is used, change the currently used noise level self._c
         """
-        ANNEAL_STRATEGY = "non-decreasing-linear" # options are "linear" or "non-decreasing-linear"
+        ANNEAL_STRATEGY = "adaptive" # options are "linear" or "non-decreasing" or "adaptive"
         
         if self.ncsn_annealing == True:
             if ANNEAL_STRATEGY == "linear":
@@ -321,7 +322,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
                     num_levels = self._L
                     self._c = floor((self.frame * num_levels)/max_level_iters)
 
-            elif ANNEAL_STRATEGY == "non-decreasing-linear":
+            elif ANNEAL_STRATEGY == "non-decreasing":
                 # Make sure that an observation pair is passed in 
                 assert "paired_obs" in list(kwargs.keys())
                 paired_obs = kwargs["paired_obs"]
@@ -330,7 +331,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
                 if not self._c_idx == len(self._anneal_levels) - 1:
 
                     # If the next noise level's average energy is lower than some threshold then keep using the current noise level
-                    if self._nextlv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx+1])) < self._anneal_threshold:
+                    if self._nextlv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx+1])) < self._anneal_thresholds[self._c_idx]:
                         self._c = self._anneal_levels[self._c_idx]
 
                         # Computing energies for current level twice (once again during play loop). A bit redundant but done for readability and reusability
@@ -338,13 +339,81 @@ class NEARAgent(a2c_continuous.A2CAgent):
                     # If the next noise level's average energy is higher than some threshold then change the noise level and 
                     # add the average energy of the current noise level to the reward offset. This ensures that rewards are non-decreasing
                     else:
-                        self._curr_reward_offset += self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]))
+                        self._reward_offsets.append(self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx])))
                         self._c_idx += 1
                         self._c = self._anneal_levels[self._c_idx]
-                        self._anneal_threshold = 100.0 - self._c * 10
+                        # self._anneal_threshold = 100.0 - self._c * 10
 
                         self._thislv_energy_buffer.reset()
                         self._nextlv_energy_buffer.reset()
+
+            elif ANNEAL_STRATEGY == "adaptive":
+                # If already at the max noise level, then noise level can not increase
+                if self._c_idx == len(self._anneal_levels) - 1:
+
+                    # If the current noise level's energy higher than its threshold, do nothing
+                    if self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx])) >= self._anneal_thresholds[self._c_idx-1]:
+                        self._c = self._anneal_levels[self._c_idx]
+
+                    else:
+                        # Remove the last added offset
+                        self._reward_offsets.pop(-1)
+                        self._c_idx -= 1
+                        self._c = self._anneal_levels[self._c_idx]
+
+                        self._thislv_energy_buffer.reset()
+                        self._nextlv_energy_buffer.reset()
+
+
+                # If at the first noise level, then the noise level can not decreasee
+                elif self._c_idx == 0:
+
+                    # If the next noise level's average energy is lower than some threshold do nothing
+                    if self._nextlv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx+1])) < self._anneal_thresholds[self._c_idx]:
+
+                        self._c = self._anneal_levels[self._c_idx]
+                        self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]), return_avg=False)
+                    
+                    # If the next noise level's average energy is higher than some threshold then change the noise level and 
+                    # add the average energy of the current noise level to the reward offset
+                    else:
+                        self._reward_offsets.append(self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx])))
+                        self._c_idx += 1
+                        self._c = self._anneal_levels[self._c_idx]
+
+                        self._thislv_energy_buffer.reset()
+                        self._nextlv_energy_buffer.reset()
+
+
+                else:
+                    # If the next noise level's average energy is lower than some threshold then check the energy of the current level
+                    if self._nextlv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx+1])) < self._anneal_thresholds[self._c_idx]:
+
+                        # If the current noise level's energy higher than its threshold, do nothing
+                        if self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx])) >= self._anneal_thresholds[self._c_idx-1]:
+                            self._c = self._anneal_levels[self._c_idx]
+
+                        else:
+                            # Remove the last added offset
+                            self._reward_offsets.pop(-1)
+                            self._c_idx -= 1
+                            self._c = self._anneal_levels[self._c_idx]
+
+                            self._thislv_energy_buffer.reset()
+                            self._nextlv_energy_buffer.reset()
+
+                    # If the next noise level's average energy is higher than some threshold then change the noise level and 
+                    # add the average energy of the current noise level to the reward offset
+                    else:
+                        self._reward_offsets.append(self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx])))
+                        self._c_idx += 1
+                        self._c = self._anneal_levels[self._c_idx]
+
+                        self._thislv_energy_buffer.reset()
+                        self._nextlv_energy_buffer.reset()
+                    
+
+
 
 
     def play_steps(self):
