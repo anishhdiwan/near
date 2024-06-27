@@ -114,7 +114,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
             self._c = self._anneal_levels[self._c_idx]
             # Minimum energy value after which noise level is changed
             # self._anneal_threshold = 100.0 - self._c * 10
-            self._anneal_thresholds = [100.0 - c*10 for c in self._anneal_levels[:-1]]
+            self._anneal_thresholds = [150.0 - c*10 for c in self._anneal_levels[1:]]
             # Initialise a replay memory style class to return the average energy of the last k policies (for both noise levels)
             self._nextlv_energy_buffer = LastKMovingAvg()
             self._thislv_energy_buffer = LastKMovingAvg()
@@ -348,6 +348,10 @@ class NEARAgent(a2c_continuous.A2CAgent):
                         self._nextlv_energy_buffer.reset()
 
             elif ANNEAL_STRATEGY == "adaptive":
+                # Make sure that an observation pair is passed in 
+                assert "paired_obs" in list(kwargs.keys())
+                paired_obs = kwargs["paired_obs"]
+
                 # If already at the max noise level, then noise level can not increase
                 if self._c_idx == len(self._anneal_levels) - 1:
 
