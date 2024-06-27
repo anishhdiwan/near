@@ -5,9 +5,59 @@ from rl_games.algos_torch import players
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.common.player import BasePlayer
+import gym
+# from rl_games.common import env_configurations
 from utils.ncsn_utils import dict2namespace
-from learning.motion_ncsn.models.motion_scorenet import SimpleNet
+from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
 import time
+
+def get_augmented_env_info(env, **kwargs):
+    if "temporal_feature" in list(kwargs.keys()):
+        if kwargs["temporal_feature"] == True:
+            assert "temporal_emb_dim" in list(kwargs.keys()), "A temporal embedding dim must be provided if encoding temporal features"
+            temporal_emb_dim = kwargs["temporal_emb_dim"]
+
+            result_shapes = {}
+            result_shapes['action_space'] = env.action_space
+            result_shapes['observation_space'] = gym.spaces.Box(np.ones(env.num_obs + temporal_emb_dim) * -np.Inf, np.ones(env.num_obs + temporal_emb_dim) * np.Inf)
+
+            result_shapes['agents'] = 1
+            result_shapes['value_size'] = 1
+            if hasattr(env, "get_number_of_agents"):
+                result_shapes['agents'] = env.get_number_of_agents()
+            '''
+            if isinstance(result_shapes['observation_space'], gym.spaces.dict.Dict):
+                result_shapes['observation_space'] = observation_space['observations']
+            
+            if isinstance(result_shapes['observation_space'], dict):
+                result_shapes['observation_space'] = observation_space['observations']
+                result_shapes['state_space'] = observation_space['states']
+            '''
+            if hasattr(env, "value_size"):    
+                result_shapes['value_size'] = env.value_size
+            print(result_shapes)
+            return result_shapes
+
+    else:
+        result_shapes = {}
+        result_shapes['observation_space'] = env.observation_space
+        result_shapes['action_space'] = env.action_space
+        result_shapes['agents'] = 1
+        result_shapes['value_size'] = 1
+        if hasattr(env, "get_number_of_agents"):
+            result_shapes['agents'] = env.get_number_of_agents()
+        '''
+        if isinstance(result_shapes['observation_space'], gym.spaces.dict.Dict):
+            result_shapes['observation_space'] = observation_space['observations']
+        
+        if isinstance(result_shapes['observation_space'], dict):
+            result_shapes['observation_space'] = observation_space['observations']
+            result_shapes['state_space'] = observation_space['states']
+        '''
+        if hasattr(env, "value_size"):    
+            result_shapes['value_size'] = env.value_size
+        print(result_shapes)
+        return result_shapes
 
 
 class NEARPlayerContinuous(players.PpoPlayerContinuous):
@@ -18,7 +68,26 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         Args:
             params (:obj `dict`): Algorithm parameters (self.config is obtained from params in the parent class __init__() method)
         """
+
+        config = params['config']
+
+        # If using temporal feature in the state vector, create the environment first and then augment the env_info to account for extra dims
+        if config['near_config']['model']['encode_temporal_feature']:
+            print("Using Temporal Features")
+            temporal_emb_dim = config['near_config']['model'].get('temporal_emb_dim', None)
+            assert temporal_emb_dim != None, "A temporal embedding dim must be provided if encoding temporal features"
+            self.env_name = config['env_name']
+            self.env_config = config.get('env_config', {})
+            env = self.create_env()
+            self.env_info = get_augmented_env_info(env, temporal_feature=True, temporal_emb_dim=temporal_emb_dim)
+            params['config']['env_info'] = self.env_info
+
         super().__init__(params)
+
+        # Set the self.env attribute
+        if config['near_config']['model']['encode_temporal_feature']:
+            self.env = env
+
         self._task_reward_w = self.config['near_config']['inference']['task_reward_w']
         self._energy_reward_w = self.config['near_config']['inference']['energy_reward_w']
         self._eb_model_checkpoint = self.config['near_config']['inference']['eb_model_checkpoint']
@@ -27,24 +96,24 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         self._normalize_energynet_input = self.config['near_config']['training'].get('normalize_energynet_input', True)
         self._energynet_input_norm_checkpoint = self.config['near_config']['inference']['running_mean_std_checkpoint']
 
-        self._init_network(self.config['near_config'])
+        # If temporal features are encoded in the paired observations then a new space for the temporal states is made. The energy net and normalization use this space
+        self._encode_temporal_feature = self.config['near_config']['model']['encode_temporal_feature']
+
+        try:
+            self._max_episode_length = self.env.max_episode_length
+        except AttributeError as e:
+            self._max_episode_length = None
+        
+        if self._encode_temporal_feature:
+            assert self._max_episode_length != None, "A max episode length must be known when using temporal state features"
+
+            # Positional embedding for temporal information
+            self.emb_dim = config['near_config']['model']['temporal_emb_dim']
+            self.embed = SinusoidalPosEmb(dim=self.emb_dim, steps=512)
+            self.embed.eval()
 
 
-        # Standardization
-        # if self._normalize_energynet_input:
-            ## TESTING ONLY: Swiss-Roll ##
-            # self._energynet_input_norm = RunningMeanStd(torch.ones(self.config['near_config']['model']['in_dim']).shape).to(self.device)
-            ## TESTING ONLY ##
-
-            # self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.device)
-
-            # self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.device)
-            # Since the running mean and std are pre-computed on the demo data, only eval is needed here
-
-            # energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.device)
-            # self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
-
-            # self._energynet_input_norm.eval()
+        # self._init_network(self.config['near_config'])
 
 
     def _init_network(self, energynet_config):
@@ -204,6 +273,12 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
                 # TODO! reset_done() is a custom_vec_env method. It resets all done envs. The player class directly instantiates a single gym env
                 # Hence reset_done() simply resets the env.
                 # obses, done_env_ids = self._env_reset_done()
+
+                # Append temporal feature to observations if needed
+                if self._encode_temporal_feature:
+                    progress0 = self.embed(self.env.progress_buf/self._max_episode_length)
+                    obses = torch.cat((progress0, obses), -1)
+                
                 if has_masks:
                     masks = self.env.get_action_mask()
                     action = self.get_masked_action(
