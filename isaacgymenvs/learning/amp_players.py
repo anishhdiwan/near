@@ -145,6 +145,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         demo_sample_max_distances = np.linspace(0, 10, 100)
 
         avg_disc_val = np.zeros_like(demo_sample_max_distances)
+        disc_std = np.zeros_like(demo_sample_max_distances)
         avg_amp_rew = np.zeros_like(demo_sample_max_distances)
 
         for idx, max_dist in enumerate(demo_sample_max_distances):
@@ -157,6 +158,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
             amp_rewards = self._calc_amp_rewards(perturbed_samples.to(self.device))['disc_rewards']
 
             avg_disc_val[idx] = disc_pred.squeeze().mean()
+            disc_std[idx] = disc_pred.squeeze().std()
             avg_amp_rew[idx] = amp_rewards.squeeze().mean()
 
         
@@ -166,6 +168,14 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
         plt.ylabel("avg disc(sample)")
         plt.title(f"Avg disc value vs distance from demo data")
+        plt.show()
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(demo_sample_max_distances, disc_std, label="disc stdev")
+        # plt.legend()
+        plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
+        plt.ylabel("stdev disc(sample)")
+        plt.title(f"Std disc value vs distance from demo data")
         plt.show()
         
 
@@ -179,7 +189,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
 
         # save data
         learnt_function_path = os.path.splitext(self.last_checkpoint)[0] + '_learnt_fn.pkl'
-        data = {'disc_val': avg_disc_val, 'amp_rew': avg_amp_rew, 'max_sample_perturbation': demo_sample_max_distances}
+        data = {'disc_val': avg_disc_val, 'amp_rew': avg_amp_rew, 'disc_std': disc_std, 'max_sample_perturbation': demo_sample_max_distances}
 
         with open(learnt_function_path, 'wb') as handle:
             pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
