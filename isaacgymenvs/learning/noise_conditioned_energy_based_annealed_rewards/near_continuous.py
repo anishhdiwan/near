@@ -24,6 +24,7 @@ from tslearn.metrics import dtw as ts_dtw
 
 from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
+from learning.motion_ncsn.models.ema import EMAHelper
 from utils.ncsn_utils import dict2namespace, LastKMovingAvg, get_series_derivative, to_relative_pose
 
 # tslearn throws numpy deprecation warnings because of version mismatch. Silencing for now
@@ -109,12 +110,12 @@ class NEARAgent(a2c_continuous.A2CAgent):
             # Value to add to reward to ensure that the annealed rewards are non-decreasing
             self._reward_offsets = [0.0]
             # Sigma levels to use to compute energies
-            self._anneal_levels = [3,4,5,6,7,8,9]
+            self._anneal_levels = [0,1,2,3,4,5,6,7,8,9]
             # Noise level being used right now
             self._c = self._anneal_levels[self._c_idx]
             # Minimum energy value after which noise level is changed
             # self._anneal_threshold = 100.0 - self._c * 10
-            self._anneal_thresholds = [150.0 - c*10 for c in self._anneal_levels[1:]]
+            self._anneal_thresholds = [20.0 - c*2 for c in self._anneal_levels[1:]]
             # Initialise a replay memory style class to return the average energy of the last k policies (for both noise levels)
             self._nextlv_energy_buffer = LastKMovingAvg()
             self._thislv_energy_buffer = LastKMovingAvg()
@@ -149,6 +150,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
             self.embed = SinusoidalPosEmb(dim=self.emb_dim, steps=512)
             self.embed.eval()
 
+        # Whether to use exponentially moving average of model weights for inference (ncsn-v2)
+        self._use_ema = config['near_config']['model'].get('ema', 0)
+        self._ema_rate = config['near_config']['model'].get('ema_rate', 0.999)
+
+
         
 
 
@@ -178,6 +184,13 @@ class NEARAgent(a2c_continuous.A2CAgent):
         energynet = SimpleNet(energynet_config, in_dim=self._paired_observation_space.shape[0]).to(self.ppo_device)
         energynet = torch.nn.DataParallel(energynet)
         energynet.load_state_dict(eb_model_states[0])
+
+        if self._use_ema:
+            print("Using EMA model weights")
+            ema_helper = EMAHelper(mu=self._ema_rate)
+            ema_helper.register(energynet)
+            ema_helper.load_state_dict(eb_model_states[-1])
+            ema_helper.ema(energynet)
 
         self._energynet = energynet
         self._energynet.eval()
