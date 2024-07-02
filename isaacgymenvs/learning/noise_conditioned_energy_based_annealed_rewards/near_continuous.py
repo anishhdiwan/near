@@ -20,6 +20,7 @@ from rl_games.common import vecenv
 import torch
 from torch import optim
 from tslearn.metrics import dtw as ts_dtw
+from omegaconf import OmegaConf
 # from . import amp_datasets as amp_datasets
 
 from tensorboardX import SummaryWriter
@@ -179,7 +180,8 @@ class NEARAgent(a2c_continuous.A2CAgent):
         """
 
         # Convert to Namespace() 
-        energynet_config = dict2namespace(energynet_config)
+        # energynet_config = dict2namespace(energynet_config)
+        energynet_config = OmegaConf.create(energynet_config)
 
         eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
         energynet = SimpleNet(energynet_config, in_dim=self._paired_observation_space.shape[0]).to(self.ppo_device)
