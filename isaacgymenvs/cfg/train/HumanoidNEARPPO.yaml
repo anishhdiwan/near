@@ -82,11 +82,11 @@ params:
         batch_size: 128
         buffer_size: 10000
         # An epoch of training contains several iters. An iter is one minibatch of training.
-        n_epochs: 250000
+        n_epochs: 150000
         # Use n_iters as a stop criteria with n_epochs set to some upper bound.
         n_iters: 50000
         ngpu: 1
-        snapshot_freq: 5000
+        snapshot_freq: 10000
         algo: 'dsm'
         anneal_power: 2.0
         normalize_energynet_input: True
@@ -109,9 +109,9 @@ params:
         sim_params: ${......task.sim}
       
       model:
-        sigma_begin: 1
+        sigma_begin: 20
         sigma_end: 0.01
-        L: 10
+        L: 50
         # number of features in an observation
         in_dim: 105
         # needed for standardization computation
@@ -126,7 +126,7 @@ params:
         temporal_emb_dim: 8
         # Whether to use exponentially moving average of network weights during inference (ncsn-v2)
         ema: True
-        ema_rate: 0.99
+        ema_rate: 0.999
         
       optim:
         weight_decay: 0.0
@@ -149,9 +149,9 @@ params:
 
       # Change these to use the learnt energies to train a policy
       inference:
-        task_reward_w: 0.5
-        energy_reward_w: 0.5
-        sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
+        task_reward_w: 0.0
+        energy_reward_w: 1.0
+        sigma_level: 5 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
         # Frequency at which to evaluate the model's performance. Comment out or set to 0 to skip this 
         perf_metrics_freq: 30

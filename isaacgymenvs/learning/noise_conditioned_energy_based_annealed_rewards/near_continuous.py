@@ -290,11 +290,16 @@ class NEARAgent(a2c_continuous.A2CAgent):
         original_shape = list(paired_obs.shape)
         paired_obs = paired_obs.reshape(-1, original_shape[-1])
 
+
+        sigmas = torch.tensor(
+        np.exp(np.linspace(np.log(20.0), np.log(0.01),
+                            50))).float().to(self.device)
         # Tensor of noise level to condition the energynet
-        labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * c # c ranges from [0,L-1]
-        
+        labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
+        used_sigmas = sigmas[labels].view(paired_obs.shape[0], *([1] * len(paired_obs.shape[1:])))
+
         with torch.no_grad():
-            energy_rew = self._energynet(paired_obs, labels)
+            energy_rew = self._energynet(paired_obs, used_sigmas)
             original_shape[-1] = energy_rew.shape[-1]
             energy_rew = energy_rew.reshape(original_shape)
 

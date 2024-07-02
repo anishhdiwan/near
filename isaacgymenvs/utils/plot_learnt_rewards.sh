@@ -6,7 +6,7 @@
 
 ALGO="NEAR"
 CHECKPOINTS="-1"
-TRIALS="HumanoidNEAR_walk_700_reg_unif_ema_notemp HumanoidNEAR_walk_8759_reg_unif_ema_notemp"
+TRIALS="HumanoidNEAR_walk_700_ncsnv2"
 
 play_cmd=$(python ./utils/plot_learnt_rewards.py --algo ${ALGO} --trials ${TRIALS} --checkpoints ${CHECKPOINTS})
 
