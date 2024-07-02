@@ -131,6 +131,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         self._sigma_begin = config['near_config']['model']['sigma_begin']
         self._sigma_end = config['near_config']['model']['sigma_end']
         self._L = config['near_config']['model']['L']
+        self._ncsnv2 = config['near_config']['model'].get('ncsnv2', False)
         self._normalize_energynet_input = config['near_config']['training'].get('normalize_energynet_input', True)
         self._energynet_input_norm_checkpoint = config['near_config']['inference']['running_mean_std_checkpoint']
         
@@ -290,16 +291,17 @@ class NEARAgent(a2c_continuous.A2CAgent):
         original_shape = list(paired_obs.shape)
         paired_obs = paired_obs.reshape(-1, original_shape[-1])
 
-
-        sigmas = torch.tensor(
-        np.exp(np.linspace(np.log(20.0), np.log(0.01),
-                            50))).float().to(self.device)
+        sigmas = self._get_ncsn_sigmas()
         # Tensor of noise level to condition the energynet
-        labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
+        if self._ncsnv2:
+            labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
+        else:
+            labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * c # c ranges from [0,L-1]
         used_sigmas = sigmas[labels].view(paired_obs.shape[0], *([1] * len(paired_obs.shape[1:])))
+        perturbation_levels = {'labels':labels, 'used_sigmas':used_sigmas}
 
         with torch.no_grad():
-            energy_rew = self._energynet(paired_obs, used_sigmas)
+            energy_rew = self._energynet(paired_obs, perturbation_levels)
             original_shape[-1] = energy_rew.shape[-1]
             energy_rew = energy_rew.reshape(original_shape)
 
@@ -953,7 +955,21 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         self.set_train()
 
+    def _get_ncsn_sigmas(self):
+        """Return the noise scales depending on the ncsn version
+        """
+        if self._ncsnv2:
+            # Geometric Schedule
+            sigmas = torch.tensor(
+                np.exp(np.linspace(np.log(self._sigma_begin), np.log(self._sigma_end),
+                                self._L))).float().to(self.device)
+        else:
+            # Uniform Schedule
+            sigmas = torch.tensor(
+                    np.linspace(self._sigma_begin, self._sigma_end, self._L)
+                    ).float().to(self.device)
 
+        return sigmas
 
 
         

@@ -82,9 +82,9 @@ params:
         batch_size: 128
         buffer_size: 10000
         # An epoch of training contains several iters. An iter is one minibatch of training.
-        n_epochs: 150000
+        n_epochs: 50000
         # Use n_iters as a stop criteria with n_epochs set to some upper bound.
-        n_iters: 50000
+        n_iters: 180000
         ngpu: 1
         snapshot_freq: 10000
         algo: 'dsm'
@@ -127,6 +127,8 @@ params:
         # Whether to use exponentially moving average of network weights during inference (ncsn-v2)
         ema: True
         ema_rate: 0.999
+        # Whether to use the modifications proposed in ncsnv2
+        ncsnv2: True
         
       optim:
         weight_decay: 0.0
