@@ -84,7 +84,7 @@ params:
         # An epoch of training contains several iters. An iter is one minibatch of training.
         n_epochs: 50000
         # Use n_iters as a stop criteria with n_epochs set to some upper bound.
-        n_iters: 180000
+        n_iters: 100000
         ngpu: 1
         snapshot_freq: 10000
         algo: 'dsm'
@@ -153,7 +153,7 @@ params:
       inference:
         task_reward_w: 0.0
         energy_reward_w: 1.0
-        sigma_level: 5 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
+        sigma_level: -1 # Must be in range(0,L). If sigma_level = -1 then annealing is used.
         # Relative to the train.py file
         # Frequency at which to evaluate the model's performance. Comment out or set to 0 to skip this 
         perf_metrics_freq: 30

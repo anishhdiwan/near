@@ -10,6 +10,7 @@ import gym
 from utils.ncsn_utils import dict2namespace
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
 import time
+from isaacgymenvs.tasks.humanoid_amp import HumanoidAMP 
 
 def get_augmented_env_info(env, **kwargs):
     if "temporal_feature" in list(kwargs.keys()):
@@ -230,7 +231,8 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         n_games = self.games_num
         render = self.render_env
         n_game_life = self.n_game_life
-        is_deterministic = self.is_deterministic
+        # is_deterministic = self.is_deterministic
+        is_deterministic = False
         sum_rewards = 0
         sum_steps = 0
         sum_game_res = 0
@@ -255,6 +257,8 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
                 break
 
             obses = self.env_reset(self.env)
+            self.env._state_init = HumanoidAMP.StateInit.Random
+            obses = self.env.reset_all()['obs']
             batch_size = 1
             # batch_size = self.get_batch_size(obses['obs'], batch_size)
             batch_size = self.get_batch_size(obses, batch_size)

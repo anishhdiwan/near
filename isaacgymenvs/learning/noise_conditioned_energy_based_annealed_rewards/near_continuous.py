@@ -336,11 +336,14 @@ class NEARAgent(a2c_continuous.A2CAgent):
     def _anneal_noise_level(self, **kwargs):
         """If NCSN annealing is used, change the currently used noise level self._c
         """
-        ANNEAL_STRATEGY = "adaptive" # options are "linear" or "non-decreasing" or "adaptive"
+        if self._ncsnv2:
+            ANNEAL_STRATEGY = "linear" # options are "linear" or "non-decreasing" or "adaptive"
+        else:
+            ANNEAL_STRATEGY = "adaptive" # options are "linear" or "non-decreasing" or "adaptive"
         
         if self.ncsn_annealing == True:
             if ANNEAL_STRATEGY == "linear":
-                    max_level_iters = 1e6
+                    max_level_iters = self.max_frames
                     num_levels = self._L
                     self._c = floor((self.frame * num_levels)/max_level_iters)
 
@@ -782,7 +785,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
                         if (frame % (self.save_freq * self.curr_frames) == 0):
                             self.save(os.path.join(self.nn_dir, checkpoint_name))
 
-                    if mean_combined_reward > self.last_mean_rewards and epoch_num >= self.save_best_after:
+                    if mean_combined_reward >= self.last_mean_rewards and epoch_num >= self.save_best_after:
                         print('saving next best rewards: ', mean_combined_reward)
                         self.last_mean_rewards = mean_combined_reward
                         self.save(os.path.join(self.nn_dir, self.config['name']))
