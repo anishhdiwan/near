@@ -401,7 +401,13 @@ class HumanoidAMP(HumanoidAMPBase):
             "amp_humanoid_crane_pose": ["time"],
             "amp_humanoid_cartwheel": ["time", "dist"],
             "amp_humanoid_jump_in_place": ["time", "height"],
-            "amp_humanoid_martial_arts_bassai": ["time"]
+            "amp_humanoid_martial_arts_bassai": ["time"],
+            "amp_humanoid_boxing": ["time"],
+            "amp_humanoid_right_punch": ["time"],
+            "amp_humanoid_left_punch": ["time"],
+            "amp_humanoid_indian_dance_bharatnatyam1": ["time"],
+            "amp_humanoid_indian_dance_bharatnatyam2": ["time"],
+            "amp_humanoid_indian_dance_kuchipudi": ["time"]
         }
 
         motion_file = os.path.splitext(motion_file)[0]
