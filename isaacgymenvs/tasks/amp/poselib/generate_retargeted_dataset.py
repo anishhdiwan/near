@@ -251,6 +251,8 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
             
         if (frame_end == -1):
             frame_end = target_motion.local_rotation.shape[0]
+        else:
+            frame_end = target_motion.local_rotation.shape[0] - frame_end
             
         local_rotation = target_motion.local_rotation
         root_translation = target_motion.root_translation

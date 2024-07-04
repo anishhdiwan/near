@@ -1,0 +1,5 @@
+motions:
+- file: amp_cmu_right_punch_sequence_task/amp_cmu_144_20.npy
+  weight: 1.0
+- file: amp_cmu_right_punch_sequence_task/amp_cmu_144_21.npy
+  weight: 1.0

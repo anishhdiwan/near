@@ -1,0 +1,3 @@
+motions:
+- file: amp_cmu_indian_dance_bharatnatyam2_task/amp_cmu_94_07.npy
+  weight: 1.0

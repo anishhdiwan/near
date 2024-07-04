@@ -1,0 +1,15 @@
+motions:
+- file: amp_cmu_boxing_task/amp_cmu_17_10.npy
+  weight: 1.0
+- file: amp_cmu_boxing_task/amp_cmu_15_13.npy
+  weight: 1.0
+- file: amp_cmu_boxing_task/amp_cmu_14_01.npy
+  weight: 1.0
+- file: amp_cmu_boxing_task/amp_cmu_13_17.npy
+  weight: 1.0
+- file: amp_cmu_boxing_task/amp_cmu_13_18.npy
+  weight: 1.0
+- file: amp_cmu_boxing_task/amp_cmu_14_02.npy
+  weight: 1.0
+- file: amp_cmu_boxing_task/amp_cmu_14_03.npy
+  weight: 1.0
