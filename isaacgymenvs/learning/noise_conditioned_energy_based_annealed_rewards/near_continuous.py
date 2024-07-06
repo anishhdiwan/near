@@ -123,6 +123,12 @@ class NEARAgent(a2c_continuous.A2CAgent):
             # Initialise a replay memory style class to return the average reward encounter by the last k policies
             self._transformed_rewards_buffer = LastKMovingAvg()
 
+            # Set a variable to track the inital energy value upon switching noise levels (used in ncsnv2)
+            self._thislv_init_energy = None
+            self._ncsnv2_progress_thresh = 0.2 # 1/(1+config['near_config']['model']['L'])
+            if config['near_config']['model'].get('ncsnv2', False):
+                self._anneal_levels = list(range(config['near_config']['model']['L']))
+
         else:
             self.ncsn_annealing = False
             self._reward_offsets = [0.0]
@@ -337,12 +343,74 @@ class NEARAgent(a2c_continuous.A2CAgent):
         """If NCSN annealing is used, change the currently used noise level self._c
         """
         if self._ncsnv2:
-            ANNEAL_STRATEGY = "linear" # options are "linear" or "non-decreasing" or "adaptive"
+            ANNEAL_STRATEGY = "ncsnv2-adaptive" # options are "linear" or "non-decreasing" or "adaptive" or "ncsnv2-adaptive"
         else:
             ANNEAL_STRATEGY = "adaptive" # options are "linear" or "non-decreasing" or "adaptive"
         
         if self.ncsn_annealing == True:
-            if ANNEAL_STRATEGY == "linear":
+            
+            if ANNEAL_STRATEGY == "ncsnv2-adaptive":
+                # Make sure that the right ncsn implementation is being used
+                assert self._ncsnv2 == True, "Can not use ncsnv2-adaptive annealing for standard ncsn"
+
+                # Make sure that an observation pair is passed in 
+                assert "paired_obs" in list(kwargs.keys())
+                paired_obs = kwargs["paired_obs"]
+
+                # If already at the max noise level, then noise level can not increase
+                if self._c_idx == len(self._anneal_levels) - 1:
+                    # Record the starting energy value for the current sigma level
+                    thislv_energy = self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]))
+                    if self._thislv_init_energy == None:
+                        self._thislv_init_energy = thislv_energy
+
+                    # If the energy level has decreased by a certain threshold percentage then switch noise level
+                    if thislv_energy < self._thislv_init_energy * (1 - self._ncsnv2_progress_thresh):
+                        self._c_idx -= 1
+                        self._c = self._anneal_levels[self._c_idx]
+
+                        self._thislv_energy_buffer.reset()
+                        self._thislv_init_energy = None
+
+
+                # If at the first noise level, then the noise level can not decreasee
+                elif self._c_idx == 0:
+                    # Record the starting energy value for the current sigma level
+                    thislv_energy = self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]))
+                    if self._thislv_init_energy == None:
+                        self._thislv_init_energy = thislv_energy
+
+                    # If the energy level has increased by a certain threshold percentage then switch noise level
+                    if thislv_energy >= self._thislv_init_energy * (1 + self._ncsnv2_progress_thresh):
+                        self._c_idx += 1
+                        self._c = self._anneal_levels[self._c_idx]
+
+                        self._thislv_energy_buffer.reset()
+                        self._thislv_init_energy = None
+
+                else:
+                    # Record the starting energy value for the current sigma level
+                    thislv_energy = self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]))
+                    if self._thislv_init_energy == None:
+                        self._thislv_init_energy = thislv_energy
+                    
+                    # If the energy level has increased or decreased by a certain threshold percentage then switch noise level
+                    if thislv_energy >= self._thislv_init_energy * (1 + self._ncsnv2_progress_thresh):
+                        self._c_idx += 1
+                        self._c = self._anneal_levels[self._c_idx]
+
+                        self._thislv_energy_buffer.reset()
+                        self._thislv_init_energy = None
+                    
+                    elif thislv_energy < self._thislv_init_energy * (1 - self._ncsnv2_progress_thresh):
+                        self._c_idx -= 1
+                        self._c = self._anneal_levels[self._c_idx]
+
+                        self._thislv_energy_buffer.reset()
+                        self._thislv_init_energy = None
+
+
+            elif ANNEAL_STRATEGY == "linear":
                     max_level_iters = self.max_frames
                     num_levels = self._L
                     self._c = floor((self.frame * num_levels)/max_level_iters)
