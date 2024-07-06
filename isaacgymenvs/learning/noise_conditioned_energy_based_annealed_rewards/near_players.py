@@ -306,9 +306,9 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
                 all_done_indices = done.nonzero(as_tuple=False)
                 done_indices = all_done_indices[::self.num_agents]
                 done_count = len(done_indices)
-                games_played += done_count
 
-                if done_count > 0:
+                if done_count == 512:
+                    games_played += 1
                     if self.is_rnn:
                         for s in self.states:
                             s[:, all_done_indices, :] = s[:,
