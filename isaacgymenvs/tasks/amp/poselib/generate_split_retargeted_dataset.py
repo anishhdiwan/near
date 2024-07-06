@@ -306,7 +306,7 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
 
             # visualize retargeted motion
             if VISUALIZE:
-                print("Viewing the target motion")
+                print(f"Viewing the target motion amp_{ind}_{source_file_name}")
                 plot_skeleton_motion_interactive(target_motion)
         
             print("----------")
