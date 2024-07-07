@@ -132,7 +132,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=global_rank)
 
     def create_isaacgym_env(**kwargs):
-        if cfg_dict["task_name"][-3:] == "NEAR":
+        if cfg_dict["task_name"][-4:] == "NEAR":
             print("INFO: setting up the environment for NEAR. Motions will still be loaded as part of env instantiation but they will not be used")
         envs = isaacgymenvs.make(
             cfg.seed, 
