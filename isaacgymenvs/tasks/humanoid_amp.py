@@ -49,10 +49,16 @@ NUM_AMP_OBS_PER_STEP = 13 + 52 + 28 + 12 # [root_h, root_rot, root_vel, root_ang
 class HumanoidAMP(HumanoidAMPBase):
 
     class StateInit(Enum):
+        # Initialise at the default pose of the humanoid body
         Default = 0
+        # Initialise at the start pose of the motion
         Start = 1
+        # Initialise at a random pose in the motion
         Random = 2
+        # Hybrid between Default and Random
         Hybrid = 3
+        # Initialise environments at a uniform linspace in the motions
+        Uniform = 4
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
         self.cfg = cfg
@@ -93,6 +99,7 @@ class HumanoidAMP(HumanoidAMPBase):
         self._hist_amp_obs_buf = self._amp_obs_buf[:, 1:]
         
         self._amp_obs_demo_buf = None
+        self._reset_uniform_motion_ids = None
 
         return
 
@@ -168,6 +175,8 @@ class HumanoidAMP(HumanoidAMPBase):
             self._reset_ref_state_init(env_ids)
         elif (self._state_init == HumanoidAMP.StateInit.Hybrid):
             self._reset_hybrid_state_init(env_ids)
+        elif (self._state_init == HumanoidAMP.StateInit.Uniform):
+            self._reset_uniform_state_init(env_ids)
         else:
             assert(False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
 
@@ -189,6 +198,53 @@ class HumanoidAMP(HumanoidAMPBase):
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
         self._reset_default_env_ids = env_ids
+        return
+
+    def _reset_uniform_state_init(self, env_ids):
+        """Create a repeatable uniformly random init state for testing
+
+        Samples chunks of motions ids [1,3,5,6 | 1,3,5,6 |...]
+        Then samples chunks of init times [0. 0. 0. 0. | 0.1 0.1 0.1 0.1 | ...]
+
+        Then resets the envs as per those phases in those motions
+        """
+        print("Resetting with uniform state initialisation")
+        if self._reset_uniform_motion_ids is None:
+            num_envs = env_ids.shape[0]
+            num_motions = self._motion_lib.num_motions()
+            num_init_states = 8
+            chunk_size = int(num_envs/num_init_states)
+
+            motion_id_elements = np.arange(num_motions)
+            repetitions = int(chunk_size // len(motion_id_elements)) + 1
+            repeated_motion_id_elements = np.tile(motion_id_elements, repetitions)
+            np.random.shuffle(repeated_motion_id_elements)
+            motion_ids = repeated_motion_id_elements[:chunk_size]
+            motion_ids = np.tile(motion_ids, num_init_states)        
+            
+            phase_vals = np.linspace(start=0.1, stop=0.5, num=num_init_states)
+            phase = np.repeat(phase_vals, chunk_size)
+
+            motion_len = self._motion_lib._motion_lengths[motion_ids]
+            motion_times = phase * motion_len
+
+            self._reset_uniform_motion_ids = motion_ids
+            self._reset_uniform_motion_times = motion_times
+
+        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
+               = self._motion_lib.get_motion_state(self._reset_uniform_motion_ids, self._reset_uniform_motion_times)
+
+        self._set_env_state(env_ids=env_ids, 
+                            root_pos=root_pos, 
+                            root_rot=root_rot, 
+                            dof_pos=dof_pos, 
+                            root_vel=root_vel, 
+                            root_ang_vel=root_ang_vel, 
+                            dof_vel=dof_vel)
+
+        self._reset_ref_env_ids = env_ids
+        self._reset_ref_motion_ids = self._reset_uniform_motion_ids.copy()
+        self._reset_ref_motion_times = self._reset_uniform_motion_times.copy()
         return
 
     def _reset_ref_state_init(self, env_ids):
