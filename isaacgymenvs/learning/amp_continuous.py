@@ -206,11 +206,13 @@ class AMPAgent(common_agent.CommonAgent):
         """
         is_deterministic = True
         return_traj_type = "most_rewarding" # "longest" or "most_rewarding"
+        most_rewarding_k = 25
         max_steps = self._max_episode_length
         pose_trajectory = []
         self.run_pi_dones = None
         self.total_env_learnt_rewards = None
-
+        # cfg_initialization = self.vec_env.env._state_init
+        # self.vec_env.env._state_init = self.vec_env.env.StateInit.Uniform
         self.run_obses = self._env_reset_all()
         pose_trajectory.append(self._fetch_sim_asset_poses())
 
@@ -243,6 +245,7 @@ class AMPAgent(common_agent.CommonAgent):
                     # Select a random env out of those envs that were done last
                     env_idx = random.choice(new_dones.squeeze(-1).tolist())
                     # Reset the env to start training again
+                    # self.vec_env.env._state_init = cfg_initialization
                     self.obs = self._env_reset_all()
                     break
 
@@ -257,19 +260,37 @@ class AMPAgent(common_agent.CommonAgent):
 
                 if done_count == self.num_actors:
                     # Select a random env out of those envs that were done last
-                    env_idx = torch.argmax(self.total_env_learnt_rewards, dim=0).item()
+                    # env_idx = torch.argmax(self.total_env_learnt_rewards, dim=0).item()
+                    _, env_idx = torch.topk(self.total_env_learnt_rewards, k=most_rewarding_k, dim=0)
+                    env_idx = env_idx.squeeze().tolist()
                     # Reset the env to start training again
+                    # self.vec_env.env._state_init = cfg_initialization
                     self.obs = self._env_reset_all()
                     break
 
 
-        pose_trajectory = torch.stack(pose_trajectory)
-        pose_trajectory = pose_trajectory[:, env_idx, :, : ]
-        # Transform to be relative to root body
-        root_trajectory = pose_trajectory[:, self.sim_asset_root_body_id, :]
-        pose_trajectory = to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
+        if isinstance(env_idx, list):
+            pose_trajectory = torch.stack(pose_trajectory)
+            idx_trajectories = []
+            idx_root_trajectories = []
+            for i in env_idx:
+                idx_pose_trajectory = pose_trajectory.clone()[:, i, :, : ]
+                # Transform to be relative to root body
+                idx_root_trajectory = idx_pose_trajectory[:, self.sim_asset_root_body_id, :]
+                idx_pose_trajectory = to_relative_pose(idx_pose_trajectory, self.sim_asset_root_body_id)
+                idx_trajectories.append(idx_pose_trajectory)
+                idx_root_trajectories.append(idx_root_trajectory)
 
-        return pose_trajectory, root_trajectory
+            return idx_trajectories, idx_root_trajectories
+
+        else:
+            pose_trajectory = torch.stack(pose_trajectory)
+            pose_trajectory = pose_trajectory[:, env_idx, :, : ]
+            # Transform to be relative to root body
+            root_trajectory = pose_trajectory[:, self.sim_asset_root_body_id, :]
+            pose_trajectory = to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
+
+            return pose_trajectory, root_trajectory
 
 
     def prepare_dataset(self, batch_dict):
@@ -720,29 +741,56 @@ class AMPAgent(common_agent.CommonAgent):
         """Compute performance metrics
         """
         self.set_eval()
-        agent_pose_trajectory, agent_root_trajectory = self.run_policy()
+        agent_pose_trajectories, agent_root_trajectories = self.run_policy()
+        if not isinstance(agent_pose_trajectories, list):
+            agent_pose_trajectories = [agent_pose_trajectories]
+            agent_root_trajectories = [agent_root_trajectories]
+
         num_joints = agent_pose_trajectory.shape[-1]/3
         dt = self.vec_env.env.dt
-
+ 
         # Compute pose error
-        dtw_pose_error = 0
-        for demo_traj in self.demo_trajectories:
-            dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
-        dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
-        self.writer.add_scalar('mean_dtw_pose_error/step', dtw_pose_error, frame)
-        print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {dtw_pose_error}")
-                
-        # Compute root body statistics
-        agent_root_velocity = get_series_derivative(agent_root_trajectory, dt)
-        agent_root_acceleration = get_series_derivative(agent_root_velocity, dt)
-        agent_root_jerk = get_series_derivative(agent_root_acceleration, dt)
+        avg_dtw_pose_error = 0
+        dtw_start_time = time.time()
+        for agent_pose_trajectory in agent_pose_trajectories:
+            dtw_pose_error = 0
+            for demo_traj in self.demo_trajectories:
+                dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
+            dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
+            avg_dtw_pose_error += dtw_pose_error
+        
+        dtw_end_time = time.time()
+        dtw_computation_performance = dtw_end_time - dtw_start_time
+        avg_dtw_pose_error = avg_dtw_pose_error/len(agent_pose_trajectories)
+        self.writer.add_scalar('mean_dtw_pose_error/step', avg_dtw_pose_error, frame)
+        self.writer.add_scalar('dtw_computation_performance/step', dtw_computation_performance, frame)
+        print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {avg_dtw_pose_error}. Time taken {dtw_computation_performance}")
 
-        mean_vel_norm = torch.mean(torch.linalg.norm(agent_root_velocity, dim=1))
-        mean_acc_norm = torch.mean(torch.linalg.norm(agent_root_acceleration, dim=1))
-        mean_jerk_norm = torch.mean(torch.linalg.norm(agent_root_jerk, dim=1))
-        self.writer.add_scalar('root_body_velocity/step', mean_vel_norm, frame)
-        self.writer.add_scalar('root_body_acceleration/step', mean_acc_norm, frame)
-        self.writer.add_scalar('root_body_jerk/step', mean_jerk_norm, frame)
+        # Compute root body statistics
+        avg_vel_norm = 0
+        avg_acc_norm = 0
+        avg_jerk_norm = 0
+        for agent_root_trajectory in agent_root_trajectories:
+            agent_root_velocity = get_series_derivative(agent_root_trajectory, dt)
+            agent_root_acceleration = get_series_derivative(agent_root_velocity, dt)
+            agent_root_jerk = get_series_derivative(agent_root_acceleration, dt)
+
+            mean_vel_norm = torch.mean(torch.linalg.norm(agent_root_velocity, dim=1))
+            mean_acc_norm = torch.mean(torch.linalg.norm(agent_root_acceleration, dim=1))
+            mean_jerk_norm = torch.mean(torch.linalg.norm(agent_root_jerk, dim=1))
+
+            avg_vel_norm += mean_vel_norm
+            avg_acc_norm += mean_acc_norm
+            avg_jerk_norm += mean_jerk_norm
+        
+        avg_vel_norm = avg_vel_norm/len(agent_root_trajectories)
+        avg_acc_norm = avg_acc_norm/len(agent_root_trajectories)
+        avg_jerk_norm = avg_jerk_norm/len(agent_root_trajectories)
+
+        self.writer.add_scalar('root_body_velocity/step', avg_vel_norm, frame)
+        self.writer.add_scalar('root_body_acceleration/step', avg_acc_norm, frame)
+        self.writer.add_scalar('root_body_jerk/step', avg_jerk_norm, frame)
+
 
         self.set_train()
 
