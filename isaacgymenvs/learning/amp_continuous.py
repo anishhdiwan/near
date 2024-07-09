@@ -274,7 +274,7 @@ class AMPAgent(common_agent.CommonAgent):
             idx_trajectories = []
             idx_root_trajectories = []
             for i in env_idx:
-                idx_pose_trajectory = pose_trajectory.clone()[:, i, :, : ]
+                idx_pose_trajectory = pose_trajectory[:, i, :, : ]
                 # Transform to be relative to root body
                 idx_root_trajectory = idx_pose_trajectory[:, self.sim_asset_root_body_id, :]
                 idx_pose_trajectory = to_relative_pose(idx_pose_trajectory, self.sim_asset_root_body_id)
@@ -746,9 +746,9 @@ class AMPAgent(common_agent.CommonAgent):
             agent_pose_trajectories = [agent_pose_trajectories]
             agent_root_trajectories = [agent_root_trajectories]
 
-        num_joints = agent_pose_trajectory.shape[-1]/3
+        num_joints = agent_pose_trajectories[0].shape[-1]/3
         dt = self.vec_env.env.dt
- 
+
         # Compute pose error
         avg_dtw_pose_error = 0
         dtw_start_time = time.time()
@@ -765,7 +765,7 @@ class AMPAgent(common_agent.CommonAgent):
         self.writer.add_scalar('mean_dtw_pose_error/step', avg_dtw_pose_error, frame)
         self.writer.add_scalar('dtw_computation_performance/step', dtw_computation_performance, frame)
         print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {avg_dtw_pose_error}. Time taken {dtw_computation_performance}")
-
+                
         # Compute root body statistics
         avg_vel_norm = 0
         avg_acc_norm = 0
@@ -790,7 +790,6 @@ class AMPAgent(common_agent.CommonAgent):
         self.writer.add_scalar('root_body_velocity/step', avg_vel_norm, frame)
         self.writer.add_scalar('root_body_acceleration/step', avg_acc_norm, frame)
         self.writer.add_scalar('root_body_jerk/step', avg_jerk_norm, frame)
-
 
         self.set_train()
 

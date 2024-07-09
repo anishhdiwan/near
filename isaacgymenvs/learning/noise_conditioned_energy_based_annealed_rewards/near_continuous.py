@@ -732,7 +732,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
             idx_trajectories = []
             idx_root_trajectories = []
             for i in env_idx:
-                idx_pose_trajectory = pose_trajectory.clone()[:, i, :, : ]
+                idx_pose_trajectory = pose_trajectory[:, i, :, : ]
                 # Transform to be relative to root body
                 idx_root_trajectory = idx_pose_trajectory[:, self.sim_asset_root_body_id, :]
                 idx_pose_trajectory = to_relative_pose(idx_pose_trajectory, self.sim_asset_root_body_id)
