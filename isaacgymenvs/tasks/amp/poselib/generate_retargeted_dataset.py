@@ -253,11 +253,20 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
             frame_end = target_motion.local_rotation.shape[0]
         # else:
         #     frame_end = target_motion.local_rotation.shape[0] - frame_end
-            
+        
         local_rotation = target_motion.local_rotation
         root_translation = target_motion.root_translation
-        local_rotation = local_rotation[frame_beg:frame_end, ...]
-        root_translation = root_translation[frame_beg:frame_end, ...]
+
+        skip_frames = False
+        skip_gap = 4
+        if skip_frames:
+            unskipped_indices = [i for i in range(frame_end - frame_beg) if i%skip_gap==0]
+            unskipped_frames = np.arange(frame_beg, frame_end)[unskipped_indices]
+            local_rotation = local_rotation[unskipped_frames, ...]
+            root_translation = root_translation[unskipped_frames, ...]
+        else:
+            local_rotation = local_rotation[frame_beg:frame_end, ...]
+            root_translation = root_translation[frame_beg:frame_end, ...]
         
         new_sk_state = SkeletonState.from_rotation_and_root_translation(target_motion.skeleton_tree, local_rotation, root_translation, is_local=True)
         target_motion = SkeletonMotion.from_skeleton_state(new_sk_state, fps=target_motion.fps)

@@ -1,0 +1,28 @@
+{
+    "source_motion": "data/horizontal_cmu_02_01.npy",
+    "target_motion_path": "data/horizontal_cmu_02_01_amp.npy",
+    "source_tpose": "data/horizontal_cmu_tpose.npy",
+    "target_tpose": "data/amp_humanoid_tpose.npy",
+    "joint_mapping": {
+         "Hips": "pelvis",
+         "LeftUpLeg": "left_thigh",
+         "LeftLeg": "left_shin",
+         "LeftFoot": "left_foot",
+         "RightUpLeg": "right_thigh",
+         "RightLeg": "right_shin",
+         "RightFoot": "right_foot",
+         "Spine1": "torso",
+         "Head": "head",
+         "LeftArm": "left_upper_arm",
+         "LeftForeArm": "left_lower_arm",
+         "LeftHand": "left_hand",
+         "RightArm": "right_upper_arm",
+         "RightForeArm": "right_lower_arm",
+         "RightHand": "right_hand"
+    },
+    "rotation": [0.5, 0.5, 0.5, 0.5],
+    "scale": 0.056444,
+	"root_height_offset": -0.1,
+	"trim_frame_beg": 5800,
+	"trim_frame_end": 6865
+}
