@@ -22,7 +22,7 @@
     },
     "rotation": [0.5, 0.5, 0.5, 0.5],
     "scale": 0.056444,
-	"root_height_offset": -0.1,
+	"root_height_offset": 0.005,
 	"trim_frame_beg": 5800,
 	"trim_frame_end": 6865
 }

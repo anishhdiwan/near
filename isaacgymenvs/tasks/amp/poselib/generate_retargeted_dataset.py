@@ -258,7 +258,7 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
         root_translation = target_motion.root_translation
 
         skip_frames = False
-        skip_gap = 4
+        skip_gap = 2
         if skip_frames:
             unskipped_indices = [i for i in range(frame_end - frame_beg) if i%skip_gap==0]
             unskipped_frames = np.arange(frame_beg, frame_end)[unskipped_indices]

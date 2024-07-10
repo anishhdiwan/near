@@ -125,7 +125,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
             # Set a variable to track the inital energy value upon switching noise levels (used in ncsnv2)
             self._thislv_init_energy = None
-            self._ncsnv2_progress_thresh = 0.02 # 1/(1+config['near_config']['model']['L'])
+            self._ncsnv2_progress_thresh = 0.015 # 1/(1+config['near_config']['model']['L'])
             if config['near_config']['model'].get('ncsnv2', False):
                 self._anneal_levels = list(range(config['near_config']['model']['L']))
 
