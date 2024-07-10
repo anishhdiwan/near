@@ -125,7 +125,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
             # Set a variable to track the inital energy value upon switching noise levels (used in ncsnv2)
             self._thislv_init_energy = None
-            self._ncsnv2_progress_thresh = 0.015 # 1/(1+config['near_config']['model']['L'])
+            self._ncsnv2_progress_thresh = 0.02 # 1/(1+config['near_config']['model']['L'])
             if config['near_config']['model'].get('ncsnv2', False):
                 self._anneal_levels = list(range(config['near_config']['model']['L']))
 
@@ -344,6 +344,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         """
         if self._ncsnv2:
             ANNEAL_STRATEGY = "ncsnv2-adaptive" # options are "linear" or "non-decreasing" or "adaptive" or "ncsnv2-adaptive"
+            DECREASING = False
         else:
             ANNEAL_STRATEGY = "adaptive" # options are "linear" or "non-decreasing" or "adaptive"
         
@@ -359,21 +360,23 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
                 # If already at the max noise level, then noise level can not increase
                 if self._c_idx == len(self._anneal_levels) - 1:
+                    
                     # Record the starting energy value for the current sigma level
                     thislv_energy = self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]))
                     if self._thislv_init_energy == None:
                         self._thislv_init_energy = thislv_energy
-
+                    
                     # If the energy level has decreased by a certain threshold percentage then switch noise level
                     if thislv_energy < self._thislv_init_energy * (1 - self._ncsnv2_progress_thresh):
-                        self._c_idx -= 1
-                        self._c = self._anneal_levels[self._c_idx]
+                        if DECREASING:
+                            self._c_idx -= 1
+                            self._c = self._anneal_levels[self._c_idx]
 
-                        self._thislv_energy_buffer.reset()
-                        self._thislv_init_energy = None
+                            self._thislv_energy_buffer.reset()
+                            self._thislv_init_energy = None
 
 
-                # If at the first noise level, then the noise level can not decreasee
+                # If at the first noise level, then the noise level can not decrease
                 elif self._c_idx == 0:
                     # Record the starting energy value for the current sigma level
                     thislv_energy = self._thislv_energy_buffer.append(self._calc_energy(paired_obs, c=self._anneal_levels[self._c_idx]))
@@ -403,11 +406,12 @@ class NEARAgent(a2c_continuous.A2CAgent):
                         self._thislv_init_energy = None
                     
                     elif thislv_energy < self._thislv_init_energy * (1 - self._ncsnv2_progress_thresh):
-                        self._c_idx -= 1
-                        self._c = self._anneal_levels[self._c_idx]
+                        if DECREASING:
+                            self._c_idx -= 1
+                            self._c = self._anneal_levels[self._c_idx]
 
-                        self._thislv_energy_buffer.reset()
-                        self._thislv_init_energy = None
+                            self._thislv_energy_buffer.reset()
+                            self._thislv_init_energy = None
 
 
             elif ANNEAL_STRATEGY == "linear":
