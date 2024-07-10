@@ -4,29 +4,48 @@ import os, sys
 from datetime import datetime
 from pathlib import Path
 import argparse
+import re
 
 FILE_PATH = os.path.dirname(__file__)
 sys.path.append(FILE_PATH)
 
-algos = ["HumanoidNEAR", "HumanoidAMP"]
+algos = [
+    "HumanoidNEAR", 
+    "HumanoidAMP"
+]
 
 motions = [
     "amp_humanoid_walk.yaml",
     "amp_humanoid_run.yaml",
     "amp_humanoid_crane_pose.yaml",
-    "amp_humanoid_cartwheel.yaml",
-    "amp_humanoid_jump_in_place.yaml",
-    "amp_humanoid_martial_arts_bassai.yaml"
+    "amp_humanoid_single_left_punch.yaml",
+    # "amp_humanoid_tai_chi.yaml"
 ]
 
 task_specific_cfg = {
-    "amp_humanoid_walk.yaml":[],
-    "amp_humanoid_run.yaml":[],
-    "amp_humanoid_crane_pose.yaml":[],
-    "amp_humanoid_cartwheel.yaml":[],
-    "amp_humanoid_jump_in_place.yaml":[],
-    "amp_humanoid_martial_arts_bassai.yaml":[],
+    "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=32768",
+    "amp_humanoid_run.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=32768",
+    "amp_humanoid_crane_pose.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=32768",
+    "amp_humanoid_single_left_punch.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=32768",
+    "amp_humanoid_tai_chi.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=32768",
 }
+
+near_task_specific_cfg = {
+    "amp_humanoid_walk.yaml": "++train.params.config.near_config.training.n_iters=150000",
+    "amp_humanoid_run.yaml": "++train.params.config.near_config.training.n_iters=120000",
+    "amp_humanoid_crane_pose.yaml": "++train.params.config.near_config.training.n_iters=100000",
+    "amp_humanoid_single_left_punch.yaml": "++train.params.config.near_config.training.n_iters=120000",
+    "amp_humanoid_tai_chi.yaml": "++train.params.config.near_config.training.n_iters=150000"
+}
+
+amp_task_specific_cfg = {
+    "amp_humanoid_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_run.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_crane_pose.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_single_left_punch.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_tai_chi.yaml": "++train.params.config.amp_minibatch_size=4096"
+}
+
 
 manual_seeds = []
 
@@ -58,11 +77,11 @@ def generate_train_commands():
             for motion in motions:
                 for seed in seeds:
                     # cmd = {counter: {"cmd":f"task={algo} ++task.env.motion_file={motion} seed={seed}", "exp_name":f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"}}
-                    cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
+                    cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
                     pending_cmds.append(cmd)
                     counter += 1
         
-        cmds = [{"algos": algos, "motions":motions, "seeds":seeds, "pending_cmds":pending_cmds, "completed_cmds":[]}]
+        cmds = [{"algos": algos, "motions":motions, "seeds":seeds, "pending_cmds":pending_cmds, "completed_cmds":[], "num_runs": counter}]
         with open(os.path.join(FILE_PATH, "train_cmds.yaml"), 'w') as yaml_file:
             yaml.dump(cmds, yaml_file, default_flow_style=False)
 
@@ -96,7 +115,10 @@ if __name__ == "__main__":
 
         if 'HumanoidNEAR' in next_cmd[0]:
             # add experiment name to cmd and add it to the completed cmds
-            command_to_pass = next_cmd[0] + f" experiment={next_cmd[1]}"
+            pattern = r"\+\+task\.env\.motion_file=([^ ]+)"
+            rgx_match = re.search(pattern, next_cmd[0])
+            motion = rgx_match.group(1)
+            command_to_pass = next_cmd[0] + f" experiment={next_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
 
             cmds[0]['completed_cmds'].append([command_to_pass])
             # save the training commands yaml file
@@ -129,8 +151,11 @@ if __name__ == "__main__":
             cmds[0]['completed_cmds'][-1].append(command_to_pass)
 
         elif 'HumanoidAMP' in next_cmd[0]:
+            pattern = r"\+\+task\.env\.motion_file=([^ ]+)"
+            rgx_match = re.search(pattern, next_cmd[0])
+            motion = rgx_match.group(1)
             # add experiment name to cmd and add it to the completed cmds
-            command_to_pass = next_cmd[0] + f" experiment={next_cmd[1]}"
+            command_to_pass = next_cmd[0] + f" experiment={next_cmd[1]}" + f" {amp_task_specific_cfg[motion]}"
             cmds[0]['completed_cmds'].append([command_to_pass])
 
         # save the training commands yaml file

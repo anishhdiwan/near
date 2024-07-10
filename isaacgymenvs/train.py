@@ -234,7 +234,7 @@ def launch_rlg_hydra(cfg: DictConfig):
             '_{date:%d-%H-%M}'.format(date=datetime.now()))
 
         os.makedirs(experiment_dir, exist_ok=True)
-        with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
+        with open(os.path.join(experiment_dir, 'run_config.yaml'), 'w') as f:
             f.write(OmegaConf.to_yaml(cfg))
 
 

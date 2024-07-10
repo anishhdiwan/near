@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ncsn_cfg=$(python ./cfg/ablation_generator.py --model=ncsn)
+ncsn_cfg=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/cfg/ablation_generator.py --model=ncsn)
 
 # Run ncsn if the cfg is not empty or done
 if [ "${ncsn_cfg}" = "done" ]; then
@@ -11,8 +11,9 @@ else
   echo ${ncsn_cfg}
 fi
 
+sleep 1.0
 
-rl_cfg=$(python ./cfg/ablation_generator.py --model=rl)
+rl_cfg=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/cfg/ablation_generator.py --model=rl)
 
 # Run rl (either AMP or NEAR) if not done
 if [ "${rl_cfg}" = "done" ]; then

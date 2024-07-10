@@ -68,7 +68,7 @@ def launch_hydra(cfg: DictConfig):
 
         os.makedirs(experiment_dir, exist_ok=True)
         with open(os.path.join(experiment_dir, 'ncsn_config.yaml'), 'w') as f:
-            f.write(OmegaConf.to_yaml(near_cfg))
+            f.write(OmegaConf.to_yaml(cfg))
 
         # AnnealRunner generally takes in command line arguments for training log paths and other options. Setting up an artifical args object here to feed in the options
         args = argparse.Namespace()
