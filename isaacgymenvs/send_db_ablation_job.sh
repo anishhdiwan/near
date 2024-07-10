@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name="NEAR_experiments"
+#SBATCH --job-name="NEAR_ablations"
 #SBATCH --time=00:40:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -24,14 +24,11 @@ cd /scratch/adiwan
 
 #####
 
-ncsn_cfg=$(python ~/near/isaacgymenvs/cfg/experiment_generator.py --model=ncsn)
+ncsn_cfg=$(python ~/near/isaacgymenvs/cfg/ablation_generator.py --model=ncsn)
 
 # Run ncsn if the cfg is not empty or done
 if [ "${ncsn_cfg}" = "done" ]; then
   echo "cmds done!"
-  echo "------------"
-elif [ "${ncsn_cfg}" = "" ]; then
-  echo "NCSN Skipped"
   echo "------------"
 else
   echo ${ncsn_cfg}
@@ -40,7 +37,7 @@ fi
 
 sleep 1.0
 
-rl_cfg=$(python ~/near/isaacgymenvs/cfg/experiment_generator.py --model=rl)
+rl_cfg=$(python ~/near/isaacgymenvs/cfg/ablation_generator.py --model=rl)
 
 # Run rl (either AMP or NEAR) if not done
 if [ "${rl_cfg}" = "done" ]; then
@@ -49,6 +46,7 @@ if [ "${rl_cfg}" = "done" ]; then
 else
   echo ${rl_cfg}
   srun python ~/near/isaacgymenvs/train.py ${rl_cfg}
+  
 fi
 
 #####
