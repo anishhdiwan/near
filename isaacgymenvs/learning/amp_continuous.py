@@ -206,7 +206,7 @@ class AMPAgent(common_agent.CommonAgent):
         """
         is_deterministic = True
         return_traj_type = "most_rewarding" # "longest" or "most_rewarding"
-        most_rewarding_k = 50
+        most_rewarding_k = 20
         max_steps = self._max_episode_length
         pose_trajectory = []
         self.run_pi_dones = None
