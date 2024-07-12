@@ -20,7 +20,7 @@ env:
 
   localRootObs: False
   contactBodies: ["right_foot", "left_foot", "right_hand", "left_hand"]
-  terminationHeight: 0.5
+  terminationHeight: 0.3
   enableEarlyTermination: True
 
   # animation files to learn from
