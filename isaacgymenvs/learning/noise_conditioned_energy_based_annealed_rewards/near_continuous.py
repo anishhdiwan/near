@@ -648,6 +648,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         is_deterministic = True
         return_traj_type = "most_rewarding" # "longest" or "most_rewarding"
         most_rewarding_k = 20
+        done_envs = None
         max_steps = self._max_episode_length
         pose_trajectory = []
         self.run_pi_dones = None
@@ -680,10 +681,14 @@ class NEARAgent(a2c_continuous.A2CAgent):
             all_done_indices = dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
             done_count = len(env_done_indices)
-            
+            if done_envs is not None:
+                done_envs = np.union1d(done_envs, env_done_indices.clone().squeeze().cpu().numpy())
+            else:
+                done_envs = env_done_indices.clone().squeeze().cpu().numpy()
+
             if return_traj_type == "longest":
                 # Find the envs that were done the last
-                if self.run_pi_dones != None:
+                if self.run_pi_dones is not None:
                     new_dones = (dones - self.run_pi_dones).nonzero(as_tuple=False)
                 self.run_pi_dones = dones.clone()
 
@@ -716,7 +721,8 @@ class NEARAgent(a2c_continuous.A2CAgent):
                 except KeyError:
                     env_learnt_rewards = self._calc_energy(infos['amp_obs'])
 
-                if self.total_env_learnt_rewards != None:
+                env_learnt_rewards[done_envs] = 0.0
+                if self.total_env_learnt_rewards is not None:
                     self.total_env_learnt_rewards += env_learnt_rewards.clone()
                 else:
                     self.total_env_learnt_rewards = env_learnt_rewards.clone() 

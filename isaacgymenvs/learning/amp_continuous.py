@@ -207,6 +207,7 @@ class AMPAgent(common_agent.CommonAgent):
         is_deterministic = True
         return_traj_type = "most_rewarding" # "longest" or "most_rewarding"
         most_rewarding_k = 20
+        done_envs = None
         max_steps = self._max_episode_length
         pose_trajectory = []
         self.run_pi_dones = None
@@ -234,10 +235,14 @@ class AMPAgent(common_agent.CommonAgent):
             all_done_indices = dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
             done_count = len(env_done_indices)
+            if done_envs is not None:
+                done_envs = np.union1d(done_envs, env_done_indices.clone().squeeze().cpu().numpy())
+            else:
+                done_envs = env_done_indices.clone().squeeze().cpu().numpy()
             
             if return_traj_type == "longest":
                 # Find the envs that were done the last
-                if self.run_pi_dones != None:
+                if self.run_pi_dones is not None:
                     new_dones = (dones - self.run_pi_dones).nonzero(as_tuple=False)
                 self.run_pi_dones = dones.clone()
 
@@ -251,9 +256,11 @@ class AMPAgent(common_agent.CommonAgent):
 
             elif return_traj_type == "most_rewarding":            
 
+                # Compute energies and set done env energies to 0.0
                 env_learnt_rewards = self._calc_disc_rewards(infos['amp_obs'])
+                env_learnt_rewards[done_envs] = 0.0
 
-                if self.total_env_learnt_rewards != None:
+                if self.total_env_learnt_rewards is not None:
                     self.total_env_learnt_rewards += env_learnt_rewards.clone()
                 else:
                     self.total_env_learnt_rewards = env_learnt_rewards.clone() 
