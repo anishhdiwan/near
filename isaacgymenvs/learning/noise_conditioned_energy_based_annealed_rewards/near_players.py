@@ -232,7 +232,7 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         render = self.render_env
         n_game_life = self.n_game_life
         # is_deterministic = self.is_deterministic
-        is_deterministic = False
+        is_deterministic = True
         sum_rewards = 0
         sum_steps = 0
         sum_game_res = 0
