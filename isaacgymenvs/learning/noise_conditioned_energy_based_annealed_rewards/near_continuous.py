@@ -1054,10 +1054,20 @@ class NEARAgent(a2c_continuous.A2CAgent):
         avg_vel_norm = 0
         avg_acc_norm = 0
         avg_jerk_norm = 0
+        mean_avg_sparc = 0
         for agent_root_trajectory in agent_root_trajectories:
             agent_root_velocity = get_series_derivative(agent_root_trajectory, dt)
             agent_root_acceleration = get_series_derivative(agent_root_velocity, dt)
             agent_root_jerk = get_series_derivative(agent_root_acceleration, dt)
+
+            # Compute spectral arc length
+            agent_velocity_profile = agent_root_velocity.cpu().numpy()
+            mean_sparc = 0
+            for ax in range(agent_velocity_profile.shape[-1]):
+                ax_sparc_spectral_arc_len, _, _ = sparc(agent_velocity_profile[:,ax].squeeze(), 1/dt)
+                mean_sparc += ax_sparc_spectral_arc_len
+            mean_sparc = mean_sparc/agent_velocity_profile.shape[-1]
+            mean_avg_sparc += mean_sparc
 
             mean_vel_norm = torch.mean(torch.linalg.norm(agent_root_velocity, dim=1))
             mean_acc_norm = torch.mean(torch.linalg.norm(agent_root_acceleration, dim=1))
@@ -1070,10 +1080,12 @@ class NEARAgent(a2c_continuous.A2CAgent):
         avg_vel_norm = avg_vel_norm/len(agent_root_trajectories)
         avg_acc_norm = avg_acc_norm/len(agent_root_trajectories)
         avg_jerk_norm = avg_jerk_norm/len(agent_root_trajectories)
+        mean_avg_sparc = mean_avg_sparc/len(agent_root_trajectories)
 
         self.writer.add_scalar('root_body_velocity/step', avg_vel_norm, frame)
         self.writer.add_scalar('root_body_acceleration/step', avg_acc_norm, frame)
         self.writer.add_scalar('root_body_jerk/step', avg_jerk_norm, frame)
+        self.writer.add_scalar('spectral_arc_length/step', mean_avg_sparc, frame)
 
         # Compute demonstration data root body statistics
         if not hasattr(self, 'demo_root_body_stats'):
@@ -1081,10 +1093,20 @@ class NEARAgent(a2c_continuous.A2CAgent):
             avg_vel_norm_demo = 0
             avg_acc_norm_demo = 0
             avg_jerk_norm_demo = 0
+            mean_avg_sparc_demo = 0
             for demo_root_trajectory in self.demo_root_trajectories:
                 demo_root_velocity = get_series_derivative(demo_root_trajectory, dt)
                 demo_root_acceleration = get_series_derivative(demo_root_velocity, dt)
                 demo_root_jerk = get_series_derivative(demo_root_acceleration, dt)
+
+                # Compute spectral arc length
+                demo_velocity_profile = demo_root_velocity.cpu().numpy()
+                mean_sparc_demo = 0
+                for ax in range(demo_velocity_profile.shape[-1]):
+                    ax_sparc_spectral_arc_len_demo, _, _ = sparc(demo_velocity_profile[:,ax].squeeze(), 1/dt)
+                    mean_sparc_demo += ax_sparc_spectral_arc_len_demo
+                mean_sparc_demo = mean_sparc_demo/demo_velocity_profile.shape[-1]
+                mean_avg_sparc_demo += mean_sparc_demo
 
                 mean_vel_norm_demo = torch.mean(torch.linalg.norm(demo_root_velocity, dim=1))
                 mean_acc_norm_demo = torch.mean(torch.linalg.norm(demo_root_acceleration, dim=1))
@@ -1097,14 +1119,15 @@ class NEARAgent(a2c_continuous.A2CAgent):
             avg_vel_norm_demo = avg_vel_norm_demo/len(self.demo_root_trajectories)
             avg_acc_norm_demo = avg_acc_norm_demo/len(self.demo_root_trajectories)
             avg_jerk_norm_demo = avg_jerk_norm_demo/len(self.demo_root_trajectories)
-            self.demo_root_body_stats = {'avg_vel_norm_demo': avg_vel_norm_demo.item(), 'avg_acc_norm_demo': avg_acc_norm_demo.item(), 'avg_jerk_norm_demo': avg_jerk_norm_demo.item()}
+            mean_avg_sparc_demo = mean_avg_sparc_demo/len(self.demo_root_trajectories)
+            self.demo_root_body_stats = {'spectral_arc_len_demo': mean_avg_sparc_demo, 'avg_vel_norm_demo': avg_vel_norm_demo.item(), 'avg_acc_norm_demo': avg_acc_norm_demo.item(), 'avg_jerk_norm_demo': avg_jerk_norm_demo.item()}
             self.writer.add_text('demo_root_body_stats', str(self.demo_root_body_stats), 0)
 
         # Print Performance Stats
         print("-----")
         print(f"Evaluating current policy's performance. Mean dynamic time warped pose error {avg_dtw_pose_error}. Time taken {dtw_computation_performance}")
         print(self.demo_root_body_stats)
-        print({'avg_vel_norm_agent': avg_vel_norm.item(), 'avg_acc_norm_agent': avg_acc_norm.item(), 'avg_jerk_norm_agent':avg_jerk_norm.item()})
+        print({'spectral_arc_len_agent': mean_avg_sparc, 'avg_vel_norm_agent': avg_vel_norm.item(), 'avg_acc_norm_agent': avg_acc_norm.item(), 'avg_jerk_norm_agent':avg_jerk_norm.item()})
         print("-----")
 
         self.set_train()
