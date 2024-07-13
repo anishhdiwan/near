@@ -86,6 +86,7 @@ def plot_series(args):
     checkpoints = args.checkpoints
     algo = args.algo
     trials = args.trials
+    aggregated_data = {}
 
     for checkpoint in checkpoints:
         checkpoint_data = []
@@ -110,9 +111,21 @@ def plot_series(args):
                 with open(datafile, 'rb') as handle:
                     checkpoint_data.append(pickle.load(handle))
 
+        if algo == "AMP":
+            checkpoint_aggregated_data = aggregate_checkpoint_data(checkpoint_data)
+            # aggregated_data[f"{checkpoint}_steps"] = checkpoint_aggregated_data
+            for data_key in list(checkpoint_aggregated_data.keys()):
+                if not data_key in aggregated_data.keys():
+                    aggregated_data[data_key] = {f"{checkpoint}_steps": checkpoint_aggregated_data[data_key]}
+                else:
+                    aggregated_data[data_key][f"{checkpoint}_steps"] = checkpoint_aggregated_data[data_key]
 
-    aggregated_data = aggregate_checkpoint_data(checkpoint_data)
-    plot_checkpoint_data(aggregated_data)
+
+
+    if algo == "NEAR":
+        aggregated_data = aggregate_checkpoint_data(checkpoint_data)
+    
+    plot_checkpoint_data(aggregated_data, algo=algo)
 
 
 def combine_dicts(*dicts):
@@ -150,10 +163,15 @@ def aggregate_checkpoint_data(checkpoint_data):
     
     return aggregated_data
 
-def plot_checkpoint_data(aggregated_data):
+def plot_checkpoint_data(aggregated_data, algo):
 
-    data_x = aggregated_data['max_sample_perturbation'][:,0]
-    aggregated_data.pop('max_sample_perturbation')
+    if isinstance(aggregated_data['max_sample_perturbation'], np.ndarray):
+        data_x = aggregated_data['max_sample_perturbation'][:,0]
+        aggregated_data.pop('max_sample_perturbation')
+    elif isinstance(aggregated_data['max_sample_perturbation'], dict):
+        data_x = next(iter(aggregated_data['max_sample_perturbation'].values()))[:,0]
+        aggregated_data.pop('max_sample_perturbation')
+    
 
     data_keys = list(aggregated_data.keys())
 
@@ -192,8 +210,12 @@ def plot_checkpoint_data(aggregated_data):
                     linestyle = 'dotted'
                     hatch = None
 
-                plt.plot(data_x, np.flip(mean_scalar, axis=0), color=Colours[ind], linewidth=1.5, label=f"{data_key}_{k}")
-                plt.fill_between(data_x, np.flip(min_interval, axis=0), np.flip(max_interval, axis=0), alpha=0.1, color=Colours[ind], hatch=hatch, edgecolor=Colours[ind])
+                if algo=="NEAR":
+                    plt.plot(data_x, np.flip(mean_scalar, axis=0), color=Colours[ind], linewidth=1.5, label=f"{data_key}_{k}")
+                    plt.fill_between(data_x, np.flip(min_interval, axis=0), np.flip(max_interval, axis=0), alpha=0.1, color=Colours[ind], hatch=hatch, edgecolor=Colours[ind])
+                elif algo=="AMP":
+                    plt.plot(data_x, mean_scalar, color=Colours[ind], linewidth=1.5, label=f"{data_key}_{k}")
+                    plt.fill_between(data_x, min_interval, max_interval, alpha=0.1, color=Colours[ind], hatch=hatch, edgecolor=Colours[ind])
 
             plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
             plt.ylabel(data_key)
