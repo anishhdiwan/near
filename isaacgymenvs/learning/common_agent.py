@@ -184,6 +184,30 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 if self.perf_metrics_freq > 0:
                     if (self.epoch_num > 0) and (frame % (self.perf_metrics_freq * self.curr_frames) == 0):
                         self.compute_performance_metrics(frame)
+
+                # Discriminator Experiments
+                # If True, then policy training will be paused after a certain number of frames
+                if self.disc_experiment:
+                    if (frame >= self.disc_expt_policy_training):
+                        if not hasattr(self, 'disc_expt_start_epoch'):
+                            self.disc_expt_start_epoch = self.epoch_num
+                            self.disc_expt_start_frame = frame
+                            self.pause_policy_updates = True
+                            self.disc_expt_mean_rew, self.disc_expt_std_rew, self.disc_expt_mean_pred, self.disc_expt_std_pred = [], [], [], []
+                            print("future policy updates to be paused!")
+                            print("------------")
+                        
+                        self.set_eval()
+                        self.compute_disc_performance()
+                        self.set_train()
+                        num_disc_train_iters = 2000
+                        iters_per_epoch = int((self.mini_epochs_num * self.horizon_length * self.num_actors)/self.minibatch_size)
+                        
+
+                        if self.epoch_num - self.disc_expt_start_epoch == -(num_disc_train_iters // -iters_per_epoch):
+                            self.plot_disc_expt(iters_per_epoch=iters_per_epoch)
+                            return 0
+
                 
                 if self.save_freq > 0:
                     if (frame % (self.save_freq * self.curr_frames) == 0):

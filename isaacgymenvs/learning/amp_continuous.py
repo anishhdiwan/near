@@ -256,7 +256,7 @@ class AMPAgent(common_agent.CommonAgent):
 
             elif return_traj_type == "most_rewarding":            
 
-                # Compute energies and set done env energies to 0.0
+                # Compute rews and set done env rews to 0.0
                 env_learnt_rewards = self._calc_disc_rewards(infos['amp_obs'])
                 env_learnt_rewards[done_envs] = 0.0
 
@@ -469,8 +469,15 @@ class AMPAgent(common_agent.CommonAgent):
             disc_info = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo, amp_obs)
             disc_loss = disc_info['disc_loss']
 
-            loss = a_loss + self.critic_coef * c_loss - self.entropy_coef * entropy + self.bounds_loss_coef * b_loss \
-                 + self._disc_coef * disc_loss
+            if self.disc_experiment:
+                if self.pause_policy_updates:
+                    loss = self._disc_coef * disc_loss
+                else:
+                    loss = a_loss + self.critic_coef * c_loss - self.entropy_coef * entropy + self.bounds_loss_coef * b_loss \
+                        + self._disc_coef * disc_loss
+            else:
+                loss = a_loss + self.critic_coef * c_loss - self.entropy_coef * entropy + self.bounds_loss_coef * b_loss \
+                    + self._disc_coef * disc_loss
             
             if self.multi_gpu:
                 self.optimizer.zero_grad()
@@ -479,6 +486,22 @@ class AMPAgent(common_agent.CommonAgent):
                     param.grad = None
 
         self.scaler.scale(loss).backward()
+
+        # If policy updates are paused, zero the gradients of the policy networks
+        if self.disc_experiment:
+            if self.pause_policy_updates:
+                for child in self.model.named_children():
+                    # print(child[0])
+                    if child[0] == 'a2c_network':
+                        for subchild in child[1].named_children():
+                            # print(subchild[0])
+                            if subchild[0] not in ['_disc_mlp', '_disc_logits']:
+                                # print([param for param in subchild[1].parameters()])
+                                for param in subchild[1].parameters():
+                                    param.grad = None
+                                    param.requires_grad = False
+
+
         #TODO: Refactor this ugliest code of the year
         if self.truncate_grads:
             if self.multi_gpu:
@@ -510,6 +533,7 @@ class AMPAgent(common_agent.CommonAgent):
             'lr_mul': lr_mul, 
             'b_loss': b_loss
         }
+
         self.train_result.update(a_info)
         self.train_result.update(c_info)
         self.train_result.update(disc_info)
@@ -534,6 +558,11 @@ class AMPAgent(common_agent.CommonAgent):
         self._disc_reward_scale = config['disc_reward_scale']
         self._normalize_amp_input = config.get('normalize_amp_input', True)
         self.perf_metrics_freq = config.get('perf_metrics_freq', 0)
+        self.disc_experiment = config.get('disc_experiment', False)
+        if self.disc_experiment:
+            self.disc_expt_policy_training = config.get('disc_expt_policy_training', 2e6)
+        self.pause_policy_updates = False
+
         try:
             self._max_episode_length = self.vec_env.env.max_episode_length
         except AttributeError as e:
@@ -727,6 +756,19 @@ class AMPAgent(common_agent.CommonAgent):
         disc_reward_std, disc_reward_mean = torch.std_mean(train_info['disc_rewards'])
         self.writer.add_scalar('info/disc_reward_mean', disc_reward_mean.item(), frame)
         self.writer.add_scalar('info/disc_reward_std', disc_reward_std.item(), frame)
+
+        # Record disc experiment
+        if self.disc_experiment:
+            if self.pause_policy_updates:
+                if not hasattr(self, 'writer_global_iter'):
+                    self.writer_global_iter = 0
+
+                for idx, val in enumerate(train_info['grad_disc_obs']):
+                    self.writer.add_scalar('disc_experiment/grad_disc_obs/iter', val.item(), self.writer_global_iter+idx)
+                self.writer_global_iter += len(train_info['grad_disc_obs'])
+
+
+                
         return
 
     def _amp_debug(self, info):
@@ -883,3 +925,108 @@ class AMPAgent(common_agent.CommonAgent):
         
         # Shape [num_envs, num_bodies, 3]
         return self.vec_env.env._rigid_body_pos.clone()
+
+
+    def compute_disc_performance(self):
+        """Method used to evaluate the discriminator's predictions. 
+        
+        Returns the discriminator predictions and rewards for an episode
+        """
+        print("Evaluating discriminator predictions and rewards")
+        is_deterministic = True
+        max_steps = self._max_episode_length
+        total_env_learnt_rewards = None
+        total_disc_pred = None
+        self.disc_eval_obses = self._env_reset_all()
+
+        for n in range(4 * self.horizon_length):
+            self.disc_eval_obses, _ = self._env_reset_done()
+
+            if self.use_action_masks:
+                masks = self.vec_env.get_action_masks()
+                res_dict = self.get_masked_action_values(self.disc_eval_obses, masks)
+            else:
+                res_dict = self.get_action_values(self.disc_eval_obses)
+
+            if is_deterministic:
+                self.disc_eval_obses, rewards, dones, infos = self.env_step(res_dict['mus'])
+            else:
+                self.disc_eval_obses, rewards, dones, infos = self.env_step(res_dict['actions'])
+                
+
+            all_done_indices = dones.nonzero(as_tuple=False)
+            env_done_indices = all_done_indices[::self.num_agents]
+            done_count = len(env_done_indices)
+
+            # Compute preds and set done env preds to 0.0
+            env_learnt_rewards = self._calc_disc_rewards(infos['amp_obs'])
+            disc_pred = self._eval_disc(infos['amp_obs'])
+
+            if total_env_learnt_rewards is not None:
+                total_env_learnt_rewards += env_learnt_rewards.clone()
+                total_disc_pred += disc_pred.clone()
+            else:
+                total_env_learnt_rewards = env_learnt_rewards.clone() 
+                total_disc_pred = disc_pred.clone()
+                
+        mean_disc_reward = total_env_learnt_rewards.squeeze().mean()
+        std_disc_reward = total_env_learnt_rewards.squeeze().std()
+        mean_disc_pred = total_disc_pred.squeeze().mean()
+        std_disc_pred = total_disc_pred.squeeze().std()
+
+        self.disc_expt_mean_rew.append(mean_disc_reward.item())
+        self.disc_expt_std_rew.append(std_disc_reward.item())
+        self.disc_expt_mean_pred.append(mean_disc_pred.item())
+        self.disc_expt_std_pred.append(std_disc_pred.item())
+
+        self.obs = self._env_reset_all()
+
+
+    def plot_disc_expt(self, iters_per_epoch=1):
+        """ Plot the discriminator experiment results
+        """
+        import matplotlib.pyplot as plt
+        import os
+        import pickle
+        epochs = iters_per_epoch * np.arange(len(self.disc_expt_mean_rew))
+
+        disc_expt_mean_rew = np.array(self.disc_expt_mean_rew)
+        disc_expt_std_rew = np.array(self.disc_expt_std_rew)
+        disc_expt_mean_pred = np.array(self.disc_expt_mean_pred)
+        disc_expt_std_pred = np.array(self.disc_expt_std_pred)
+
+        saved_results = {'disc_expt_mean_rew':disc_expt_mean_rew, 'disc_expt_std_rew':disc_expt_std_rew, 
+        'disc_expt_mean_pred':disc_expt_mean_pred, 'disc_expt_std_pred':disc_expt_std_pred}
+
+        save_path = os.path.join(self.network_path, 
+            self.config['name'] + f'policy_training_{self.disc_expt_policy_training}.pkl')
+
+        with open(save_path, 'wb') as handle:
+            pickle.dump(saved_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        std_interval = 1.0
+        min_rew = disc_expt_mean_rew - std_interval*disc_expt_std_rew
+        max_rew = disc_expt_mean_rew + std_interval*disc_expt_std_rew
+
+        min_pred = disc_expt_mean_pred - std_interval*disc_expt_std_pred
+        max_pred = disc_expt_mean_pred + std_interval*disc_expt_std_pred
+
+        plt.plot(epochs, disc_expt_mean_rew, linewidth=1)
+        plt.fill_between(epochs, min_rew, max_rew, alpha=0.2)
+        plt.title(f'Discriminator behaviour on pausing policy updates at {self.disc_expt_policy_training}')
+        plt.xlabel('Iters after pausing policy updates')
+        plt.ylabel('Discriminator reward')
+        plt.show()
+
+        plt.plot(epochs, disc_expt_mean_pred, linewidth=1)
+        plt.fill_between(epochs, min_pred, max_pred, alpha=0.2)
+        plt.title(f'Discriminator behaviour on pausing policy updates at {self.disc_expt_policy_training}')
+        plt.xlabel('Iters after pausing policy updates')
+        plt.ylabel('Discriminator prediction')
+        plt.show()
+
+
+
+
+        
+
