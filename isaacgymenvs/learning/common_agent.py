@@ -188,12 +188,24 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 # Discriminator Experiments
                 # If True, then policy training will be paused after a certain number of frames
                 if self.disc_experiment:
+                    RESET_DISC = True
+                    DISC_LOGIT_INIT_SCALE = 1.0
                     if (frame >= self.disc_expt_policy_training):
                         if not hasattr(self, 'disc_expt_start_epoch'):
                             self.disc_expt_start_epoch = self.epoch_num
                             self.disc_expt_start_frame = frame
                             self.pause_policy_updates = True
                             self.disc_expt_mean_rew, self.disc_expt_std_rew, self.disc_expt_mean_pred, self.disc_expt_std_pred = [], [], [], []
+
+                            if RESET_DISC:
+                                torch.nn.init.uniform_(self.model.a2c_network._disc_logits.weight, -DISC_LOGIT_INIT_SCALE, DISC_LOGIT_INIT_SCALE)
+                                torch.nn.init.zeros_(self.model.a2c_network._disc_logits.bias)
+                                self.model.a2c_network._disc_mlp.apply(self.init_weights)
+                                for param in self.model.a2c_network._disc_logits.parameters():
+                                    param.grad = None
+                                for param in self.model.a2c_network._disc_mlp.parameters():
+                                    param.grad = None
+
                             print("future policy updates to be paused!")
                             print("------------")
                         
@@ -580,3 +592,9 @@ class CommonAgent(a2c_continuous.A2CAgent):
         self.writer.add_scalar('info/clip_frac', torch_ext.mean_list(train_info['actor_clip_frac']).item(), frame)
         self.writer.add_scalar('info/kl', torch_ext.mean_list(train_info['kl']).item(), frame)
         return
+
+
+    def init_weights(self, m):
+        if isinstance(m, torch.nn.Linear):
+            torch.nn.init.uniform_(m.weight)
+            m.bias.data.fill_(0.01)

@@ -765,6 +765,10 @@ class AMPAgent(common_agent.CommonAgent):
 
                 for idx, val in enumerate(train_info['grad_disc_obs']):
                     self.writer.add_scalar('disc_experiment/grad_disc_obs/iter', val.item(), self.writer_global_iter+idx)
+
+                for idx, val in enumerate(train_info['disc_loss_least_sq']):
+                    self.writer.add_scalar('disc_experiment/disc_loss_least_sq/iter', val.item(), self.writer_global_iter+idx)
+                
                 self.writer_global_iter += len(train_info['grad_disc_obs'])
 
 
