@@ -495,12 +495,12 @@ class AMPAgent(common_agent.CommonAgent):
                     if child[0] == 'a2c_network':
                         for subchild in child[1].named_children():
                             # print(subchild[0])
-                            if subchild[0] not in ['_disc_mlp', '_disc_logits']:
-                                # print([param for param in subchild[1].parameters()])
+                            if subchild[0] in ['_disc_mlp', '_disc_logits']:
+                                pass
+                            else:
                                 for param in subchild[1].parameters():
                                     param.grad = None
                                     param.requires_grad = False
-
 
         #TODO: Refactor this ugliest code of the year
         if self.truncate_grads:
@@ -531,7 +531,7 @@ class AMPAgent(common_agent.CommonAgent):
             'kl': kl_dist,
             'last_lr': self.last_lr, 
             'lr_mul': lr_mul, 
-            'b_loss': b_loss
+            'b_loss': b_loss,
         }
 
         self.train_result.update(a_info)
@@ -589,13 +589,15 @@ class AMPAgent(common_agent.CommonAgent):
         # tracking just the least squares discriminator objective
         disc_loss_least_sq = disc_loss.clone()
 
-        # tracking the gradients of the discriminator least squares loss w.r.t policy observations
-        grad_disc_obs = torch.autograd.grad(disc_loss, obs, grad_outputs=torch.ones_like(disc_loss), create_graph=False, retain_graph=True)[0].detach().clone()
+        # tracking the gradients of the discriminator w.r.t observations
+        grad_disc_obs_agent = torch.autograd.grad(disc_agent_logit, obs, grad_outputs=torch.ones_like(disc_agent_logit), create_graph=False, retain_graph=True)[0].detach().clone()
+        grad_disc_obs_demo = torch.autograd.grad(disc_demo_logit, obs_demo, grad_outputs=torch.ones_like(disc_demo_logit), create_graph=False, retain_graph=True)[0].detach().clone()
         if self.multi_gpu:
             self.optimizer.zero_grad()
         else:
             for param in self.model.parameters():
                 param.grad = None
+        grad_disc_obs = torch.cat([grad_disc_obs_agent, grad_disc_obs_demo], dim=0)
         grad_disc_obs = torch.mean(torch.linalg.norm(grad_disc_obs, dim=-1))
 
         # logit reg
@@ -618,7 +620,7 @@ class AMPAgent(common_agent.CommonAgent):
             disc_weight_decay = torch.sum(torch.square(disc_weights))
             disc_loss += self._disc_weight_decay * disc_weight_decay
 
-        disc_agent_acc, disc_demo_acc = self._compute_disc_acc(disc_agent_logit, disc_demo_logit)
+        disc_agent_acc, disc_demo_acc, disc_combined_acc = self._compute_disc_acc(disc_agent_logit, disc_demo_logit)
 
         disc_info = {
             'disc_loss': disc_loss,
@@ -630,25 +632,30 @@ class AMPAgent(common_agent.CommonAgent):
             'disc_demo_logit': disc_demo_logit,
             'disc_loss_least_sq': disc_loss_least_sq,
             'grad_disc_obs': grad_disc_obs,
+            'disc_combined_acc': disc_combined_acc,
         }
         return disc_info
 
     def _disc_loss_neg(self, disc_logits):
-        bce = torch.nn.BCEWithLogitsLoss()
+        # bce = torch.nn.BCEWithLogitsLoss()
+        bce = torch.nn.BCELoss()
         loss = bce(disc_logits, torch.zeros_like(disc_logits))
         return loss
     
     def _disc_loss_pos(self, disc_logits):
-        bce = torch.nn.BCEWithLogitsLoss()
+        # bce = torch.nn.BCEWithLogitsLoss()
+        bce = torch.nn.BCELoss()
         loss = bce(disc_logits, torch.ones_like(disc_logits))
         return loss
 
     def _compute_disc_acc(self, disc_agent_logit, disc_demo_logit):
-        agent_acc = disc_agent_logit < 0
-        agent_acc = torch.mean(agent_acc.float())
-        demo_acc = disc_demo_logit > 0
-        demo_acc = torch.mean(demo_acc.float())
-        return agent_acc, demo_acc
+        agent_true = disc_agent_logit < 0.5
+        agent_acc = torch.mean(agent_true.float())
+        demo_true = disc_demo_logit > 0.5
+        demo_acc = torch.mean(demo_true.float())
+        combined_true = torch.cat([agent_true, demo_true], dim=0)
+        combined_acc = torch.mean(combined_true.float())
+        return agent_acc, demo_acc, combined_acc
 
     def _fetch_amp_obs_demo(self, num_samples):
         amp_obs_demo = self.vec_env.env.fetch_amp_obs_demo(num_samples)
@@ -768,7 +775,16 @@ class AMPAgent(common_agent.CommonAgent):
 
                 for idx, val in enumerate(train_info['disc_loss_least_sq']):
                     self.writer.add_scalar('disc_experiment/disc_loss_least_sq/iter', val.item(), self.writer_global_iter+idx)
-                
+
+                for idx, val in enumerate(train_info['disc_demo_acc']):
+                    self.writer.add_scalar('disc_experiment/disc_demo_acc/iter', val.item(), self.writer_global_iter+idx)
+
+                for idx, val in enumerate(train_info['disc_agent_acc']):
+                    self.writer.add_scalar('disc_experiment/disc_agent_acc/iter', val.item(), self.writer_global_iter+idx)
+
+                for idx, val in enumerate(train_info['disc_combined_acc']):
+                    self.writer.add_scalar('disc_experiment/disc_combined_acc/iter', val.item(), self.writer_global_iter+idx)
+
                 self.writer_global_iter += len(train_info['grad_disc_obs'])
 
 

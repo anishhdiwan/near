@@ -69,14 +69,14 @@ class AMPBuilder(network_builder.A2CBuilder):
         def eval_critic(self, obs):
             c_out = self.critic_cnn(obs)
             c_out = c_out.contiguous().view(c_out.size(0), -1)
-            c_out = self.critic_mlp(c_out)              
+            c_out = self.critic_mlp(c_out)
             value = self.value_act(self.value(c_out))
             return value
 
         def eval_disc(self, amp_obs):
             disc_mlp_out = self._disc_mlp(amp_obs)
             disc_logits = self._disc_logits(disc_mlp_out)
-            return disc_logits
+            return nn.functional.sigmoid(disc_logits)
 
         def get_disc_logit_weights(self):
             return torch.flatten(self._disc_logits.weight)
