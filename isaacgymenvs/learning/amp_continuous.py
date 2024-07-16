@@ -465,7 +465,15 @@ class AMPAgent(common_agent.CommonAgent):
             losses, sum_mask = torch_ext.apply_masks([a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)], rnn_masks)
             a_loss, c_loss, entropy, b_loss = losses[0], losses[1], losses[2], losses[3]
             
-            disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
+            if self.disc_experiment:
+                if self.pause_policy_updates:
+                    # Avoid passing concatenated logits to make sure that discriminator receives the same number of samples from both datasets
+                    disc_agent_cat_logit = disc_agent_logit
+                else:
+                    disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
+            else:
+                disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
+            
             disc_info = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo, amp_obs)
             disc_loss = disc_info['disc_loss']
 

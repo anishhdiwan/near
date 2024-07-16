@@ -198,9 +198,10 @@ class CommonAgent(a2c_continuous.A2CAgent):
                             self.disc_expt_mean_rew, self.disc_expt_std_rew, self.disc_expt_mean_pred, self.disc_expt_std_pred = [], [], [], []
 
                             if RESET_DISC:
-                                torch.nn.init.uniform_(self.model.a2c_network._disc_logits.weight, -DISC_LOGIT_INIT_SCALE, DISC_LOGIT_INIT_SCALE)
-                                torch.nn.init.zeros_(self.model.a2c_network._disc_logits.bias)
+                                # torch.nn.init.uniform_(self.model.a2c_network._disc_logits.weight, -DISC_LOGIT_INIT_SCALE, DISC_LOGIT_INIT_SCALE)
+                                # torch.nn.init.zeros_(self.model.a2c_network._disc_logits.bias)
                                 self.model.a2c_network._disc_mlp.apply(self.init_weights)
+                                self.model.a2c_network._disc_logits.apply(self.init_weights)
                                 for param in self.model.a2c_network._disc_logits.parameters():
                                     param.grad = None
                                 for param in self.model.a2c_network._disc_mlp.parameters():
@@ -212,7 +213,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                         self.set_eval()
                         self.compute_disc_performance()
                         self.set_train()
-                        num_disc_train_iters = 2000
+                        num_disc_train_iters = 1500
                         iters_per_epoch = int((self.mini_epochs_num * self.horizon_length * self.num_actors)/self.minibatch_size)
                         
 
@@ -596,5 +597,5 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
     def init_weights(self, m):
         if isinstance(m, torch.nn.Linear):
-            torch.nn.init.uniform_(m.weight)
+            torch.nn.init.xavier_uniform_(m.weight)
             m.bias.data.fill_(0.01)
