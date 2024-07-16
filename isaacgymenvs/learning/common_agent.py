@@ -188,7 +188,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 # Discriminator Experiments
                 # If True, then policy training will be paused after a certain number of frames
                 if self.disc_experiment:
-                    RESET_DISC = True
+                    RESET_DISC = self.disc_expt_reset_disc
                     DISC_LOGIT_INIT_SCALE = 1.0
                     if (frame >= self.disc_expt_policy_training):
                         if not hasattr(self, 'disc_expt_start_epoch'):

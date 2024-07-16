@@ -100,6 +100,7 @@ params:
     # Pause training after a certain number of steps to conduct experiments on the discriminator. DO NOT SET TO TRUE for regular runs
     disc_experiment: False
     disc_expt_policy_training: 2e6
+    disc_expt_reset_disc: True
     
     player:
       # Set visualise_disc_landscape to false to run policy

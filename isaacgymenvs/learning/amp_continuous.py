@@ -569,6 +569,7 @@ class AMPAgent(common_agent.CommonAgent):
         self.disc_experiment = config.get('disc_experiment', False)
         if self.disc_experiment:
             self.disc_expt_policy_training = config.get('disc_expt_policy_training', 2e6)
+            self.disc_expt_reset_disc = config.get('disc_expt_reset_disc', True)
         self.pause_policy_updates = False
 
         try:
