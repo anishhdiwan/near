@@ -40,6 +40,7 @@ params:
         name: default
       regularizer:
         name: None
+      sigmoid_logits: ${if:${...config.disc_experiment},${resolve_default:True,${...config.disc_expt_reset_disc}},False}
 
   load_checkpoint: ${if:${...checkpoint},True,False} # flag which sets whether to load the checkpoint
   load_path: ${...checkpoint} # path to the checkpoint to load

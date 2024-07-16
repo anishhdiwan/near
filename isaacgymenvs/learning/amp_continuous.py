@@ -466,7 +466,7 @@ class AMPAgent(common_agent.CommonAgent):
             a_loss, c_loss, entropy, b_loss = losses[0], losses[1], losses[2], losses[3]
             
             if self.disc_experiment:
-                if self.pause_policy_updates:
+                if self.pause_policy_updates and self.disc_expt_reset_disc:
                     # Avoid passing concatenated logits to make sure that discriminator receives the same number of samples from both datasets
                     disc_agent_cat_logit = disc_agent_logit
                 else:
@@ -629,7 +629,14 @@ class AMPAgent(common_agent.CommonAgent):
             disc_weight_decay = torch.sum(torch.square(disc_weights))
             disc_loss += self._disc_weight_decay * disc_weight_decay
 
-        disc_agent_acc, disc_demo_acc, disc_combined_acc = self._compute_disc_acc(disc_agent_logit, disc_demo_logit)
+        if self.disc_experiment:
+            if self.disc_expt_reset_disc:
+                disc_agent_acc, disc_demo_acc, disc_combined_acc = self._compute_disc_acc(disc_agent_logit, disc_demo_logit)
+            else:
+                disc_agent_acc, disc_demo_acc = self._compute_disc_acc(disc_agent_logit, disc_demo_logit)
+        else:
+            disc_agent_acc, disc_demo_acc = self._compute_disc_acc(disc_agent_logit, disc_demo_logit)
+
 
         disc_info = {
             'disc_loss': disc_loss,
@@ -641,30 +648,61 @@ class AMPAgent(common_agent.CommonAgent):
             'disc_demo_logit': disc_demo_logit,
             'disc_loss_least_sq': disc_loss_least_sq,
             'grad_disc_obs': grad_disc_obs,
-            'disc_combined_acc': disc_combined_acc,
         }
+
+        try:
+            disc_info['disc_combined_acc'] = disc_combined_acc
+        except Exception as e:
+            pass
+
         return disc_info
 
     def _disc_loss_neg(self, disc_logits):
-        # bce = torch.nn.BCEWithLogitsLoss()
-        bce = torch.nn.BCELoss()
+        if self.disc_experiment:
+            if self.disc_expt_reset_disc:
+                bce = torch.nn.BCELoss()
+            else:
+                bce = torch.nn.BCEWithLogitsLoss()
+        else:
+            bce = torch.nn.BCEWithLogitsLoss()
+
         loss = bce(disc_logits, torch.zeros_like(disc_logits))
         return loss
     
     def _disc_loss_pos(self, disc_logits):
-        # bce = torch.nn.BCEWithLogitsLoss()
-        bce = torch.nn.BCELoss()
+        if self.disc_experiment:
+            if self.disc_expt_reset_disc:
+                bce = torch.nn.BCELoss()
+            else:
+                bce = torch.nn.BCEWithLogitsLoss()
+        else:
+            bce = torch.nn.BCEWithLogitsLoss()
+
         loss = bce(disc_logits, torch.ones_like(disc_logits))
         return loss
 
     def _compute_disc_acc(self, disc_agent_logit, disc_demo_logit):
-        agent_true = disc_agent_logit < 0.5
-        agent_acc = torch.mean(agent_true.float())
-        demo_true = disc_demo_logit > 0.5
-        demo_acc = torch.mean(demo_true.float())
-        combined_true = torch.cat([agent_true, demo_true], dim=0)
-        combined_acc = torch.mean(combined_true.float())
-        return agent_acc, demo_acc, combined_acc
+        if self.disc_experiment:
+            if self.disc_expt_reset_disc:
+                agent_true = disc_agent_logit < 0.5
+                agent_acc = torch.mean(agent_true.float())
+                demo_true = disc_demo_logit > 0.5
+                demo_acc = torch.mean(demo_true.float())
+                combined_true = torch.cat([agent_true, demo_true], dim=0)
+                combined_acc = torch.mean(combined_true.float())
+                return agent_acc, demo_acc, combined_acc
+            else:
+                agent_acc = disc_agent_logit < 0
+                agent_acc = torch.mean(agent_acc.float())
+                demo_acc = disc_demo_logit > 0
+                demo_acc = torch.mean(demo_acc.float())
+                return agent_acc, demo_acc
+        else:
+            agent_acc = disc_agent_logit < 0
+            agent_acc = torch.mean(agent_acc.float())
+            demo_acc = disc_demo_logit > 0
+            demo_acc = torch.mean(demo_acc.float())
+            return agent_acc, demo_acc
 
     def _fetch_amp_obs_demo(self, num_samples):
         amp_obs_demo = self.vec_env.env.fetch_amp_obs_demo(num_samples)
@@ -775,7 +813,7 @@ class AMPAgent(common_agent.CommonAgent):
 
         # Record disc experiment
         if self.disc_experiment:
-            if self.pause_policy_updates:
+            if self.pause_policy_updates and self.disc_expt_reset_disc:
                 if not hasattr(self, 'writer_global_iter'):
                     self.writer_global_iter = 0
 
