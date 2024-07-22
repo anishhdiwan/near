@@ -1,7 +1,12 @@
-# from tbparse import SummaryReader
+from tbparse import SummaryReader
 import matplotlib.pyplot as plt
 import numpy as np
 import os, sys
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes 
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+
+plt.rcParams['text.usetex'] = True
+# plt.rcParams.update({'font.size': 22})
 
 PARENT_DIR_PATH = os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(PARENT_DIR_PATH)
@@ -38,6 +43,7 @@ Colours = [
     '#800000'
 ]
 
+PLOT_AVG = False
 
 def get_scalars_from_dfs(scalar, trial_dfs):
     # Returns a list of np  arrays, of the scalar from each trial and a np array of steps
@@ -56,13 +62,17 @@ def get_scalars_from_dfs(scalar, trial_dfs):
 if __name__ == "__main__":
 
     # Get all events in this dir
-    event_file = "./ncsn_runs/temp_runs/"
+    event_file = "../../NEAR_experiments/plot_runs_temp/"
     reader = SummaryReader(event_file, pivot=True, extra_columns={'dir_name'})
     df = reader.scalars
 
 
-    trial_names = ["Humanoid_SM_run0/summaries/_", "Humanoid_SM_run1/summaries/_", "Humanoid_SM_run2/summaries/_"]
-    scalars = ["loss", "demo_data_energy/sigma_level_9"]
+    trial_names = ["DISCEXP_HumanoidAMP_run_700_500k/summaries", "DISCEXP_HumanoidAMP_run_700_2M/summaries", "DISCEXP_HumanoidAMP_run_700_5M/summaries"]
+    trial_labels = ["After 0.5e6 samples", "After 2e6 samples", "After 5e6 samples"]
+    scalars = ["disc_experiment/disc_combined_acc/iter", "disc_experiment/disc_loss_least_sq/iter", "disc_experiment/grad_disc_obs/iter"]
+    # xlabels = ["Training Iterations"]
+    titles = [r"Discriminator's Accuracy (on both $p_G$ and $p_D$)", r"Discriminator's Error", r"Grad. Disc()"]
+    ylabels = ["Accuracy", "Cross-Entropy", r"$ norm(\nabla_x D(x)) $"]
 
     exp_dfs = []
     for trial in trial_names:
@@ -71,17 +81,63 @@ if __name__ == "__main__":
 
     for idx, scalar in enumerate(scalars):
         exp_scalars, exp_steps = get_scalars_from_dfs(scalar, exp_dfs)
-        exp_scalars = np.stack(exp_scalars, axis=1)
-        mean_scalar = np.mean(exp_scalars, axis=1)
-        std_scalar = np.std(exp_scalars, axis=1)
-        std_interval = 1.0
-        min_interval = mean_scalar - std_interval*std_scalar
-        max_interval = mean_scalar + std_interval*std_scalar
 
-        plt.plot(exp_steps, mean_scalar, color=Colours[idx], linewidth=1)
-        plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[idx])
+        if PLOT_AVG:
 
-        plt.xlabel('steps')
-        plt.ylabel(scalar)
-        plt.show()
+            if scalar != "disc_experiment/disc_combined_acc/iter":
+                plt.yscale("log")
+            else:
+                plt.yscale("linear")
+
+            exp_scalars = np.stack(exp_scalars, axis=1)
+            mean_scalar = np.mean(exp_scalars, axis=1)
+            std_scalar = np.std(exp_scalars, axis=1)
+            std_interval = 1.0
+            min_interval = mean_scalar - std_interval*std_scalar
+            max_interval = mean_scalar + std_interval*std_scalar
+
+            plt.plot(exp_steps, mean_scalar, color=Colours[idx], linewidth=1)
+            plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[idx])
+
+            plt.xlabel('Training Iterations')
+            plt.ylabel(ylabels[idx])
+            plt.show()
+        
+        else:
+            if scalar != "disc_experiment/disc_combined_acc/iter":
+                plt.yscale("log")
+            else:
+                plt.yscale("linear")
+
+            for exp_idx, exp_scalar in enumerate(exp_scalars):
+                plt.plot(exp_steps, exp_scalar, color=Colours[exp_idx], linewidth=1, label=trial_labels[exp_idx])
+
+
+            plt.xlabel('Training Iterations')
+            plt.ylabel(ylabels[idx])
+            plt.title(titles[idx])
+            if scalar == "disc_experiment/disc_combined_acc/iter":
+                plt.legend(loc=8)
+            else:
+                plt.legend()
+
+            if scalar == "disc_experiment/disc_combined_acc/iter":
+                x1 = 0.
+                x2 = 150.
+                y1 = 0.8
+                y2 = 1.02
+                ax = plt.gca()
+                axins = zoomed_inset_axes(ax, 2.5, loc=4) # zoom = 2.5
+                for exp_idx, exp_scalar in enumerate(exp_scalars):
+                    axins.plot(exp_steps, exp_scalar, color=Colours[exp_idx], linewidth=1)
+                axins.set_xlim(x1, x2)
+                axins.set_ylim(y1, y2)
+                plt.xticks(visible=False)
+                plt.yticks(visible=False)
+                mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+                plt.draw()
+            
+            plt.tight_layout()
+            plt.show()
+
 
