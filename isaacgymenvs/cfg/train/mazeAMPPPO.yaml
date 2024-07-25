@@ -87,8 +87,8 @@ params:
     seq_length: 4
     bounds_loss_coef: 0
 
-    amp_obs_demo_buffer_size: 20000
-    amp_replay_buffer_size: 10000
+    amp_obs_demo_buffer_size: 2000
+    amp_replay_buffer_size: 1000
     amp_replay_keep_prob: 0.1
     amp_batch_size: 64
     amp_minibatch_size: 16 # amp_minibatch size <= minibatch_size 
@@ -98,8 +98,8 @@ params:
     disc_reward_scale: 2
     disc_weight_decay: 0.0001
     normalize_amp_input: True
-    task_reward_w: 1.0
-    disc_reward_w: 0.0
+    task_reward_w: 0.0
+    disc_reward_w: 1.0
 
     player:
       render: True

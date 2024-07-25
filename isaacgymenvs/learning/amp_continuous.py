@@ -62,8 +62,9 @@ class AMPAgent(common_agent.CommonAgent):
             self._amp_input_mean_std = RunningMeanStd(self._amp_observation_space.shape).to(self.ppo_device)
 
         # Fetch demo trajectories for computing eval metrics
-        self._fetch_demo_dataset()
-        self.sim_asset_root_body_id = None 
+        if not "maze" in params['config']['name']:
+            self._fetch_demo_dataset()
+            self.sim_asset_root_body_id = None 
 
         return
 

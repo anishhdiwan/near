@@ -442,6 +442,15 @@ class MazeEnv(gym.Env):
             pygame.event.pump()
             pygame.display.update()
 
+        save_canvas = False
+        if save_canvas:
+            if not hasattr(self, 'canvas_saved'):
+                self.canvas_saved = False
+            
+            if not self.canvas_saved:
+                pygame.image.save(self.window, "maze_env_screenshot.tga")
+                self.canvas_saved=True
+
 
 
     def drawCrossHair(self, surface, x, y):

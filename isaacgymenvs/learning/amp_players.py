@@ -205,7 +205,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         viz_min = 0
         viz_max = 512
         kernel_size = 3 # must be odd
-        grid_steps = 128
+        grid_steps = 256
         window_idx_left = int((kernel_size - 1)/2)
         window_idx_right = int((kernel_size + 1)/2)
 
@@ -243,7 +243,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         disc_grid = disc_grid.reshape(-1,x.shape[0])
         rew_grid = rew_grid.reshape(-1,x.shape[0])
 
-
+        label = "500k Samples"
         plt.figure(figsize=(8, 6))
         mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), disc_grid.cpu().detach().numpy(), cmap ='gray')
         plt.gca().invert_yaxis()
@@ -251,7 +251,12 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.ylabel("env - y")
         plt.title(f"Maze Env disc(s,s') | Mean disc pred in agent's reachable set")
         plt.colorbar(mesh)
-        plt.show()
+        plt.locator_params(axis='x', nbins=6)
+        plt.locator_params(axis='y', nbins=6)
+        plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#f58231')
+        plt.tight_layout()
+        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_pred_{label}.pdf", format="pdf", bbox_inches="tight")
+        # plt.show()
 
 
         plt.figure(figsize=(8, 6))
@@ -261,4 +266,9 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.ylabel("env - y")
         plt.title(f"Maze Env amp_reward(s,s') | Mean amp reward in agent's reachable set")
         plt.colorbar(mesh)
-        plt.show()
+        plt.locator_params(axis='x', nbins=6)
+        plt.locator_params(axis='y', nbins=6)
+        plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#f58231')
+        plt.tight_layout()
+        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_rew.pdf", format="pdf", bbox_inches="tight")
+        # plt.show()
