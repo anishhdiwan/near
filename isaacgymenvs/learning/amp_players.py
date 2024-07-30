@@ -243,9 +243,14 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         disc_grid = disc_grid.reshape(-1,x.shape[0])
         rew_grid = rew_grid.reshape(-1,x.shape[0])
 
+        disc_grid = disc_grid[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
+        rew_grid = rew_grid[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
+        x = x[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
+        y = y[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
+
         label = "500k Samples"
         plt.figure(figsize=(8, 6))
-        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), disc_grid.cpu().detach().numpy(), cmap ='gray')
+        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), disc_grid.cpu().detach().numpy(), cmap ='bone')
         plt.gca().invert_yaxis()
         plt.xlabel("env - x")
         plt.ylabel("env - y")
@@ -253,14 +258,14 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.colorbar(mesh)
         plt.locator_params(axis='x', nbins=6)
         plt.locator_params(axis='y', nbins=6)
-        plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#f58231')
+        # plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#42d4f4')
         plt.tight_layout()
-        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_pred_{label}.pdf", format="pdf", bbox_inches="tight")
+        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_pred_{label}.png", format="png", bbox_inches="tight", dpi=300)
         # plt.show()
 
 
         plt.figure(figsize=(8, 6))
-        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), rew_grid.cpu().detach().numpy(), cmap ='gray')
+        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), rew_grid.cpu().detach().numpy(), cmap ='bone')
         plt.gca().invert_yaxis()
         plt.xlabel("env - x")
         plt.ylabel("env - y")
@@ -268,7 +273,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.colorbar(mesh)
         plt.locator_params(axis='x', nbins=6)
         plt.locator_params(axis='y', nbins=6)
-        plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#f58231')
+        # plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#42d4f4')
         plt.tight_layout()
-        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_rew.pdf", format="pdf", bbox_inches="tight")
+        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_rew.png", format="png", bbox_inches="tight", dpi=300)
         # plt.show()

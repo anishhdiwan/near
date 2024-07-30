@@ -76,7 +76,7 @@ params:
       training:
         batch_size: 128
         n_epochs: 500000
-        n_iters: 15000
+        n_iters: 50000
         ngpu: 1
         snapshot_freq: 5000
         algo: 'dsm'
@@ -89,9 +89,9 @@ params:
         motion_file: "custom_envs/data/maze_env/maze_motions.zarr"
       
       model:
-        sigma_begin: 1
+        sigma_begin: 20
         sigma_end: 0.01
-        L: 10
+        L: 50
         # number of features in an observation
         in_dim: 2
         # needed for standardization computation
@@ -99,7 +99,16 @@ params:
         encoder_hidden_layers: [32, 64]
         latent_space_dim: 128
         decoder_hidden_layers: [64, 32, 8]
-        # The out dim is set to 1 internally (out_dim: 1) 
+        # The out dim is set to 1 internally (out_dim: 1)
+        # Whether to encode a temporal feature in the state transition pair when training
+        encode_temporal_feature: False
+        # If using temporal features, temporal_enb_dim is the dimensionality of the temporal embedding vector
+        temporal_emb_dim: 8
+        # Whether to use exponentially moving average of network weights during inference (ncsn-v2)
+        ema: True
+        ema_rate: 0.999
+        # Whether to use the modifications proposed in ncsnv2
+        ncsnv2: True
         
       optim:
         weight_decay: 0.0
@@ -122,11 +131,11 @@ params:
       inference:
         task_reward_w: 1.0
         energy_reward_w: 0.0
-        sigma_level: 7 # Must be in range(0,L)
+        sigma_level: 49 # Must be in range(0,L)
         # Relative to the train.py file
-        eb_model_checkpoint: ""
+        eb_model_checkpoint: "ncsn_runs/mazeNCSNv2/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
-        running_mean_std_checkpoint: ""
+        running_mean_std_checkpoint: "ncsn_runs/mazeNCSNv2/nn/running_mean_std.pth"
 
 
     player:
