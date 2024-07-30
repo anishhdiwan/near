@@ -8,6 +8,8 @@ import yaml
 import re
 import pickle
 
+plt.rcParams['text.usetex'] = True
+
 FILE_PATH = os.path.join(os.path.dirname(__file__))
 sys.path.append(FILE_PATH)
 
@@ -17,7 +19,8 @@ motions = {
     "crane_pose": "amp_humanoid_crane_pose.yaml",
     "cartwheel": "amp_humanoid_cartwheel.yaml",
     "jump_in_place": "amp_humanoid_jump_in_place.yaml",
-    "bassai": "amp_humanoid_martial_arts_bassai.yaml"
+    "bassai": "amp_humanoid_martial_arts_bassai.yaml",
+    "single_left_punch": "amp_humanoid_single_left_punch.yaml"
 }
 
 
@@ -174,6 +177,9 @@ def plot_checkpoint_data(aggregated_data, algo):
     
 
     data_keys = list(aggregated_data.keys())
+    ylabels = [r"$ \texttt{mean}(D_{\theta_D}(W(\pi_{\theta_G}(s))))$", r"$\texttt{mean}(rew\_fn(D_{\theta_D}(W(\pi_{\theta_G}(s)))))$", r"$ \texttt{std}(D_{\theta_D}(W(\pi_{\theta_G}(s))))$"]
+    titles = ["Mean Discriminator Prediction", "Mean Discriminator Reward", "Discriminator Prediction Std."]
+    checkpoint_labels = ["After 4e6 samples", "After 10e6 samples", "After 20e6 samples", "After 30e6 samples", "After 40e6 samples", "After 60e6 samples"]
 
     for idx, data_key in enumerate(data_keys):
         data = aggregated_data[data_key]
@@ -211,16 +217,19 @@ def plot_checkpoint_data(aggregated_data, algo):
                     hatch = None
 
                 if algo=="NEAR":
-                    plt.plot(data_x, np.flip(mean_scalar, axis=0), color=Colours[ind], linewidth=1.5, label=f"{data_key}_{k}")
+                    plt.plot(data_x, np.flip(mean_scalar, axis=0), color=Colours[ind], linewidth=1.5, label=f"{checkpoint_labels[ind]}")
                     plt.fill_between(data_x, np.flip(min_interval, axis=0), np.flip(max_interval, axis=0), alpha=0.1, color=Colours[ind], hatch=hatch, edgecolor=Colours[ind])
                 elif algo=="AMP":
-                    plt.plot(data_x, mean_scalar, color=Colours[ind], linewidth=1.5, label=f"{data_key}_{k}")
+                    plt.plot(data_x, mean_scalar, color=Colours[ind], linewidth=1.5, label=f"{checkpoint_labels[ind]}")
                     plt.fill_between(data_x, min_interval, max_interval, alpha=0.1, color=Colours[ind], hatch=hatch, edgecolor=Colours[ind])
 
-            plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
-            plt.ylabel(data_key)
-            plt.title(f"Avg {data_key} vs distance from demo data")
+            # plt.xlabel("max perturbation r (where sample = sample + unif[-r,r])")
+            plt.xlabel(r"Distance $r$ From $p_D$ (where $x = x + \texttt{unif}[-r, r]$)")
+            plt.ylabel(ylabels[idx])
+            # plt.title(f"Avg {data_key} vs distance from demo data")
+            plt.title(titles[idx])
             plt.legend()
+            plt.tight_layout()
             plt.show()
                 
 
