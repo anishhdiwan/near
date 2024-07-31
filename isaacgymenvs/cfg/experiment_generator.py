@@ -5,13 +5,17 @@ from datetime import datetime
 from pathlib import Path
 import argparse
 import re
+import pandas as pd
+import fcntl
+import json
+from time import sleep
 
 FILE_PATH = os.path.dirname(__file__)
 sys.path.append(FILE_PATH)
 
 algos = [
     "HumanoidNEAR", 
-    "HumanoidAMP"
+    # "HumanoidAMP"
 ]
 
 motions = [
@@ -47,7 +51,7 @@ amp_task_specific_cfg = {
 }
 
 
-manual_seeds = []
+manual_seeds = [42, 700, 8125, 97, 3538]
 
 def generate_seeds(start=0, end=int(1e4), k=3, manual_seeds=[]):
 
@@ -59,7 +63,7 @@ def generate_seeds(start=0, end=int(1e4), k=3, manual_seeds=[]):
     return seeds
 
 def generate_train_commands():
-    train_cmds = Path(os.path.join(FILE_PATH, "train_cmds.yaml"))
+    train_cmds = Path(os.path.join(FILE_PATH, "train_cmds.pkl"))
     if train_cmds.is_file():
         # Avoid overwriting automatically
         pass
@@ -77,13 +81,34 @@ def generate_train_commands():
             for motion in motions:
                 for seed in seeds:
                     # cmd = {counter: {"cmd":f"task={algo} ++task.env.motion_file={motion} seed={seed}", "exp_name":f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"}}
-                    cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
-                    pending_cmds.append(cmd)
-                    counter += 1
+                    base_cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
+
+                    if algo == "HumanoidNEAR":    
+                        ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
+                        
+                        ncsn_dir = base_cmd[1]
+                        eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
+                        running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
+                        rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
+                        + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={base_cmd[1]}"
+
+                        pending_cmds.append([ncsn_cmd, rl_cmd, False, False, False])
+                        counter += 1
+                    elif algo == "HumanoidAMP":
+                        ncsn_cmd = ""
+                        rl_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {amp_task_specific_cfg[motion]}"
+
+                        pending_cmds.append([ncsn_cmd, rl_cmd, False, False, False])
+                        counter += 1
+
+
         
-        cmds = [{"algos": algos, "motions":motions, "seeds":seeds, "pending_cmds":pending_cmds, "completed_cmds":[], "num_runs": counter}]
+        cmds = [{"algos": algos, "motions":motions, "seeds":seeds, "pending_cmds":pending_cmds, "num_runs": counter}]
         with open(os.path.join(FILE_PATH, "train_cmds.yaml"), 'w') as yaml_file:
             yaml.dump(cmds, yaml_file, default_flow_style=False)
+
+        pending_cmds_df = pd.DataFrame(pending_cmds, columns=["ncsn_cmd", "rl_cmd", "job_assigned", "ncsn_cmd_passed", "rl_cmd_passed"])
+        pending_cmds_df.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
 
         # print(f"Train commands generated! Please manually delete the file {train_cmds} to create a new one and call this script again to start training")
 
@@ -93,79 +118,60 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model", type=str, required=True, help="type of model to train (reinforcement learning or NCSN)")
+    parser.add_argument("-jid", "--job_idx", type=int, required=False, help="ID of the command assigned to a job")
     args = parser.parse_args()
 
     # Does nothing if cmds already exist
     generate_train_commands()
 
-    # open the training commands yaml file
-    with open(os.path.join(FILE_PATH, "train_cmds.yaml")) as stream:
+    for _ in range(3):
         try:
-            cmds = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print(exc)
+            with open(os.path.join(FILE_PATH, "train_cmds.pkl"), "a") as file:
+                # Acquire exclusive lock on the file
+                fcntl.flock(file.fileno(), fcntl.LOCK_EX)
 
-    if args.model == "ncsn":
-        try:
-            # get the first one
-            next_cmd = cmds[0]['pending_cmds'][0]
-        except IndexError as e:
-            print("done")
-            quit()
+                # Perform operations on the file
+                # open the training commands file
+                cmds = pd.read_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
 
-        if 'HumanoidNEAR' in next_cmd[0]:
-            # add experiment name to cmd and add it to the completed cmds
-            pattern = r"\+\+task\.env\.motion_file=([^ ]+)"
-            rgx_match = re.search(pattern, next_cmd[0])
-            motion = rgx_match.group(1)
-            command_to_pass = next_cmd[0] + f" experiment={next_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
+                if args.model == "ncsn":
+                    non_assigned = cmds[cmds['job_assigned']==False]
+                    if non_assigned.empty:
+                        print("done")
+                        quit()
 
-            cmds[0]['completed_cmds'].append([command_to_pass])
-            # save the training commands yaml file
-            with open(os.path.join(FILE_PATH, "train_cmds.yaml"), 'w') as yaml_file:
-                yaml.dump(cmds, yaml_file, default_flow_style=False) 
+                    else:
+                        first_non_assigned = non_assigned.loc[non_assigned.index.min()]
+                        job_idx = first_non_assigned.name
+                        command_to_pass = first_non_assigned["ncsn_cmd"]
+                        cmds.loc[job_idx, "job_assigned"] = True
+                        cmds.loc[job_idx, "ncsn_cmd_passed"] = True
+                        cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
+                        output = {"cmd":command_to_pass, "job_idx":int(job_idx)}
+                        print(json.dumps(output))
+                        
 
-            print(command_to_pass)
-            
-        elif 'HumanoidAMP' in next_cmd[0]:
-            print("") 
+                elif args.model == "rl":
+                    non_assigned = cmds[(cmds['job_assigned']==True) & (cmds['rl_cmd_passed']==False)]
+                    if non_assigned.empty:
+                        print("done")
+                        quit()
 
-    elif args.model == "rl":
+                    else:
+                        job_idx = args.job_idx
+                        job_cmds = non_assigned.loc[job_idx]
+                        command_to_pass = job_cmds["rl_cmd"]
+                        cmds.loc[job_idx, "rl_cmd_passed"] = True
+                        cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
+                        print(command_to_pass)
 
-        try:
-            # pop the first one
-            next_cmd = cmds[0]['pending_cmds'].pop(0)
-        except IndexError as e:
-            print("done")
-            quit()
+                # Release the lock
+                fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+                break
 
-        if 'HumanoidNEAR' in next_cmd[0]:
-            # pass ncsn checkpoint as well
-            # add experiment name to cmd and add it to the completed cmds
-            ncsn_dir = next_cmd[1]
-            eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
-            running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
-            command_to_pass = next_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
-            + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={next_cmd[1]}"
-            
-            cmds[0]['completed_cmds'][-1].append(command_to_pass)
-
-        elif 'HumanoidAMP' in next_cmd[0]:
-            pattern = r"\+\+task\.env\.motion_file=([^ ]+)"
-            rgx_match = re.search(pattern, next_cmd[0])
-            motion = rgx_match.group(1)
-            # add experiment name to cmd and add it to the completed cmds
-            command_to_pass = next_cmd[0] + f" experiment={next_cmd[1]}" + f" {amp_task_specific_cfg[motion]}"
-            cmds[0]['completed_cmds'].append([command_to_pass])
-
-        # save the training commands yaml file
-        with open(os.path.join(FILE_PATH, "train_cmds.yaml"), 'w') as yaml_file:
-            yaml.dump(cmds, yaml_file, default_flow_style=False) 
-
-        print(command_to_pass)
-
-
-
+        except Exception as e:
+            # print(e)
+            sleep(1.0)
 
     
 
