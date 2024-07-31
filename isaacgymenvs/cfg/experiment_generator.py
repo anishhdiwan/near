@@ -143,7 +143,8 @@ if __name__ == "__main__":
                     else:
                         first_non_assigned = non_assigned.loc[non_assigned.index.min()]
                         job_idx = first_non_assigned.name
-                        command_to_pass = first_non_assigned["ncsn_cmd"]
+                        job_cmds = non_assigned.loc[job_idx]
+                        command_to_pass = job_cmds["ncsn_cmd"]
                         cmds.loc[job_idx, "job_assigned"] = True
                         cmds.loc[job_idx, "ncsn_cmd_passed"] = True
                         cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))

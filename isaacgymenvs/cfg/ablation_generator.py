@@ -23,7 +23,7 @@ motions = [
     "amp_humanoid_walk.yaml", # standard
     "amp_humanoid_run.yaml",
     "amp_humanoid_crane_pose.yaml", # dynamics learning
-    "amp_humanoid_single_left_punch.yaml",
+    # "amp_humanoid_single_left_punch.yaml",
     # "amp_humanoid_tai_chi.yaml" # long horizon task
 ]
 
@@ -51,7 +51,7 @@ near_task_specific_cfg = {
     "amp_humanoid_tai_chi.yaml": "++train.params.config.near_config.training.n_iters=150000"
 }
 
-manual_seeds = [42, 700, 8125, 97, 3538]
+manual_seeds = [42, 700, 8125] #97, 3538
 
 
 def generate_train_commands():
@@ -139,7 +139,8 @@ if __name__ == "__main__":
                     else:
                         first_non_assigned = non_assigned.loc[non_assigned.index.min()]
                         job_idx = first_non_assigned.name
-                        command_to_pass = first_non_assigned["ncsn_cmd"]
+                        job_cmds = non_assigned.loc[job_idx]
+                        command_to_pass = job_cmds["ncsn_cmd"]
                         cmds.loc[job_idx, "job_assigned"] = True
                         cmds.loc[job_idx, "ncsn_cmd_passed"] = True
                         cmds.to_pickle(os.path.join(FILE_PATH, "ablation_cmds.pkl"))
