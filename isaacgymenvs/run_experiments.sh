@@ -1,8 +1,11 @@
 #!/bin/bash
 
 ncsn_output=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/cfg/experiment_generator.py --model=ncsn)
-ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
-job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
+# ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
+# job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
+ncsn_cfg=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')
+job_idx=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.job_idx')
+
 
 echo "Job assigned a row ID ${job_idx}"
 echo "-----------"

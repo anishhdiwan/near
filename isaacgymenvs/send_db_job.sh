@@ -25,8 +25,11 @@ cd /scratch/adiwan
 #####
 
 ncsn_output=$(python ~/near/isaacgymenvs/cfg/experiment_generator.py --model=ncsn)
-ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
-job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
+# ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
+# job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
+ncsn_cfg=$(python ~/near/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')
+job_idx=$(python ~/near/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.job_idx')
+
 
 echo "Job assigned a row ID ${job_idx}"
 echo "-----------"
