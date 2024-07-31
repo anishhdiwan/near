@@ -304,7 +304,8 @@ class NEARAgent(a2c_continuous.A2CAgent):
         if self._ncsnv2:
             labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
         else:
-            labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * c # c ranges from [0,L-1]
+            labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
+            # labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * c # c ranges from [0,L-1]
         used_sigmas = sigmas[labels].view(paired_obs.shape[0], *([1] * len(paired_obs.shape[1:])))
         perturbation_levels = {'labels':labels, 'used_sigmas':used_sigmas}
 
