@@ -23,15 +23,15 @@ export LD_LIBRARY_PATH=/home/adiwan/.conda/envs/rlgpu/lib/python3.7/site-package
 cd /scratch/adiwan
 
 #####
-
-ncsn_output=$(python ~/near/isaacgymenvs/cfg/ablation_generator.py --model=ncsn)
-# ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
-# job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
-ncsn_cfg=$(python ~/near/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')
-job_idx=$(python ~/near/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.job_idx')
-
+job_idx=$1
 echo "Job assigned a row ID ${job_idx}"
 echo "-----------"
+
+ncsn_cfg=$(python ~/near/isaacgymenvs/cfg/ablation_generator.py --model=ncsn --job_idx=${job_idx})
+# ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
+# job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
+# ncsn_cfg=$(python ~/near/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')
+# job_idx=$(python ~/near/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.job_idx')
 
 # Run ncsn if the cfg is not empty or done
 if [ "${ncsn_cfg}" = "done" ]; then

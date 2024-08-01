@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model", type=str, required=True, help="type of model to train (reinforcement learning or NCSN)")
-    parser.add_argument("-jid", "--job_idx", type=int, required=False, help="ID of the command assigned to a job")
+    parser.add_argument("-jid", "--job_idx", type=int, required=True, help="ID of the command assigned to a job")    
     args = parser.parse_args()
 
     # Does nothing if cmds already exist
@@ -135,32 +135,42 @@ if __name__ == "__main__":
                 cmds = pd.read_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
 
                 if args.model == "ncsn":
-                    non_assigned = cmds[cmds['job_assigned']==False]
-                    if non_assigned.empty:
+                    # non_assigned = cmds[cmds['job_assigned']==False]
+                    # if non_assigned.empty:
+                    #     print("done")
+                    #     quit()
+
+                    if args.job_idx == None:
                         print("done")
                         quit()
 
                     else:
-                        first_non_assigned = non_assigned.loc[non_assigned.index.min()]
-                        job_idx = first_non_assigned.name
-                        job_cmds = non_assigned.loc[job_idx]
+                        # first_non_assigned = non_assigned.loc[non_assigned.index.min()]
+                        # job_idx = first_non_assigned.name
+                        job_idx = args.job_idx
+                        job_cmds = cmds.loc[job_idx]
                         command_to_pass = job_cmds["ncsn_cmd"]
                         cmds.loc[job_idx, "job_assigned"] = True
                         cmds.loc[job_idx, "ncsn_cmd_passed"] = True
                         cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
-                        output = {"cmd":command_to_pass, "job_idx":int(job_idx)}
-                        print(json.dumps(output))
+                        # output = {"cmd":command_to_pass, "job_idx":int(job_idx)}
+                        # print(json.dumps(output))
+                        print(command_to_pass)
                         
 
                 elif args.model == "rl":
-                    non_assigned = cmds[(cmds['job_assigned']==True) & (cmds['rl_cmd_passed']==False)]
-                    if non_assigned.empty:
+                    # non_assigned = cmds[(cmds['job_assigned']==True) & (cmds['rl_cmd_passed']==False)]
+                    # if non_assigned.empty:
+                    #     print("done")
+                    #     quit()
+
+                    if args.job_idx == None:
                         print("done")
                         quit()
 
                     else:
                         job_idx = args.job_idx
-                        job_cmds = non_assigned.loc[job_idx]
+                        job_cmds = cmds.loc[job_idx]
                         command_to_pass = job_cmds["rl_cmd"]
                         cmds.loc[job_idx, "rl_cmd_passed"] = True
                         cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))

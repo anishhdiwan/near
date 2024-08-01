@@ -1,14 +1,14 @@
 #!/bin/bash
 
-ncsn_output=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/cfg/experiment_generator.py --model=ncsn)
-# ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
-# job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
-ncsn_cfg=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')
-job_idx=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.job_idx')
-
-
+job_idx=$(python ~/thesis_background/IsaacGymEnvs/utils/plan_cmds.py --run_type=experiment --num_runs=1)
 echo "Job assigned a row ID ${job_idx}"
 echo "-----------"
+
+ncsn_output=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/cfg/experiment_generator.py --model=ncsn --job_idx=${job_idx})
+# ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
+# job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
+# ncsn_cfg=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')
+# job_idx=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.job_idx')
 
 # Run ncsn if the cfg is not empty or done
 if [ "${ncsn_cfg}" = "done" ]; then
