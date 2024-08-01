@@ -21,7 +21,7 @@ if __name__ == "__main__":
         cmds = pd.read_pickle(os.path.join(FILE_PATH, "../cfg/ablation_cmds.pkl"))
     elif args.run_type == "experiment":
         generate_experiment_commands()
-        cmds = pd.read_pickle(os.path.join(FILE_PATH, "../cgf/experiment_cmds.pkl"))
+        cmds = pd.read_pickle(os.path.join(FILE_PATH, "../cfg/train_cmds.pkl"))
 
     
     non_assigned = cmds[cmds['job_assigned']==False]

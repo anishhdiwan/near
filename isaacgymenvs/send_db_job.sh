@@ -42,6 +42,7 @@ elif [ "${ncsn_cfg}" = "" ]; then
   echo "NCSN Skipped"
   echo "------------"
 else
+  echo "NCSN"
   echo ${ncsn_cfg}
   srun python ~/near/isaacgymenvs/train_ncsn.py ${ncsn_cfg}
 fi
@@ -55,6 +56,7 @@ if [ "${rl_cfg}" = "done" ]; then
   echo "cmds done!"
   echo "------------"
 else
+  echo "RL"
   echo ${rl_cfg}
   srun python ~/near/isaacgymenvs/train.py ${rl_cfg}
 fi

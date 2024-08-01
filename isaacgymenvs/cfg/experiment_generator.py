@@ -122,7 +122,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Does nothing if cmds already exist
-    generate_train_commands()
+    # generate_train_commands()
 
     for _ in range(3):
         try:

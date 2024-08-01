@@ -1,10 +1,10 @@
 #!/bin/bash
 
-job_idx=$(python ~/thesis_background/IsaacGymEnvs/utils/plan_cmds.py --run_type=experiment --num_runs=1)
+job_idx=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/plan_cmds.py --run_type=experiment --num_runs=1)
 echo "Job assigned a row ID ${job_idx}"
 echo "-----------"
 
-ncsn_output=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/cfg/experiment_generator.py --model=ncsn --job_idx=${job_idx})
+ncsn_cfg=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/cfg/experiment_generator.py --model=ncsn --job_idx=${job_idx})
 # ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
 # job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
 # ncsn_cfg=$(python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')
@@ -18,6 +18,7 @@ elif [ "${ncsn_cfg}" = "" ]; then
   echo "NCSN Skipped"
   echo "------------"
 else
+  echo "NCSN"
   echo ${ncsn_cfg}
   # python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/train_ncsn.py ${ncsn_cfg}
 fi
@@ -30,6 +31,7 @@ if [ "${rl_cfg}" = "done" ]; then
   echo "cmds done!"
   echo "------------"
 else
+  echo "RL"
   echo ${rl_cfg}
   # python ~/thesis_background/IsaacGymEnvs/isaacgymenvs/train.py ${rl_cfg}
 fi
