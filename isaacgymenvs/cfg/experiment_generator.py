@@ -150,9 +150,9 @@ if __name__ == "__main__":
                         job_idx = args.job_idx
                         job_cmds = cmds.loc[job_idx]
                         command_to_pass = job_cmds["ncsn_cmd"]
-                        cmds.loc[job_idx, "job_assigned"] = True
-                        cmds.loc[job_idx, "ncsn_cmd_passed"] = True
-                        cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
+                        # cmds.loc[job_idx, "job_assigned"] = True
+                        # cmds.loc[job_idx, "ncsn_cmd_passed"] = True
+                        # cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
                         # output = {"cmd":command_to_pass, "job_idx":int(job_idx)}
                         # print(json.dumps(output))
                         print(command_to_pass)
@@ -172,8 +172,8 @@ if __name__ == "__main__":
                         job_idx = args.job_idx
                         job_cmds = cmds.loc[job_idx]
                         command_to_pass = job_cmds["rl_cmd"]
-                        cmds.loc[job_idx, "rl_cmd_passed"] = True
-                        cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
+                        # cmds.loc[job_idx, "rl_cmd_passed"] = True
+                        # cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
                         print(command_to_pass)
 
                 # Release the lock

@@ -18,10 +18,12 @@ if __name__ == "__main__":
 
     if args.run_type == "ablation":
         generate_ablation_commands()
-        cmds = pd.read_pickle(os.path.join(FILE_PATH, "../cfg/ablation_cmds.pkl"))
+        cmds_path = os.path.join(FILE_PATH, "../cfg/ablation_cmds.pkl")
+        cmds = pd.read_pickle(cmds_path)
     elif args.run_type == "experiment":
         generate_experiment_commands()
-        cmds = pd.read_pickle(os.path.join(FILE_PATH, "../cfg/train_cmds.pkl"))
+        cmds_path = os.path.join(FILE_PATH, "../cfg/train_cmds.pkl")
+        cmds = pd.read_pickle(cmds_path)
 
     
     non_assigned = cmds[cmds['job_assigned']==False]
@@ -31,8 +33,17 @@ if __name__ == "__main__":
     else:
         non_assigned_indices = list(non_assigned.index)
         if len(non_assigned_indices) >= args.num_runs:
+            cmds.loc[non_assigned_indices[:args.num_runs], "job_assigned"] = True
+            cmds.loc[non_assigned_indices[:args.num_runs], "ncsn_cmd_passed"] = True
+            cmds.loc[non_assigned_indices[:args.num_runs], "rl_cmd_passed"] = True
+            print(cmds)
+            cmds.to_pickle(cmds_path)
             print(' '.join(map(str, non_assigned_indices[:args.num_runs])))
         else:
+            cmds.loc[non_assigned_indices, "job_assigned"] = True
+            cmds.loc[non_assigned_indices, "ncsn_cmd_passed"] = True
+            cmds.loc[non_assigned_indices, "rl_cmd_passed"] = True
+            cmds.to_pickle(cmds_path)
             print(' '.join(map(str, non_assigned_indices)))
             
 
