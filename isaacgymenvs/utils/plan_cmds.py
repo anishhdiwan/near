@@ -36,7 +36,6 @@ if __name__ == "__main__":
             cmds.loc[non_assigned_indices[:args.num_runs], "job_assigned"] = True
             cmds.loc[non_assigned_indices[:args.num_runs], "ncsn_cmd_passed"] = True
             cmds.loc[non_assigned_indices[:args.num_runs], "rl_cmd_passed"] = True
-            print(cmds)
             cmds.to_pickle(cmds_path)
             print(' '.join(map(str, non_assigned_indices[:args.num_runs])))
         else:

@@ -73,14 +73,28 @@ if __name__ == "__main__":
         df.to_pickle(df_path)
     
 
+    ###### INPUTS #######
+    
+    TASK_NAME = "walk"
+    seeds = [42, 700, 8125, 97, 3538]
+
     experiment_lables = {
-        r"NCSN-v2 $\vert$ Annealing $\vert$ $r^{energy}$":["ABLATION_HumanoidNEAR_walk_-1_True_w_style_10_42", "ABLATION_HumanoidNEAR_walk_-1_True_w_style_10_700", "ABLATION_HumanoidNEAR_walk_-1_True_w_style_10_8125"],
-        r"NCSN-v2 $\vert$ Annealing $\vert$ $0.5 r^{energy} + 0.5 r^{task}$":["ABLATION_HumanoidNEAR_walk_-1_True_w_style_05_42", "ABLATION_HumanoidNEAR_walk_-1_True_w_style_05_700", "ABLATION_HumanoidNEAR_walk_-1_True_w_style_05_8125"],
-        r"NCSN-v2 $\vert$ $\sigma = 18.64 (lvl. 5)$ $\vert$ $r^{energy}$":["ABLATION_HumanoidNEAR_walk_5_True_w_style_10_42", "ABLATION_HumanoidNEAR_walk_5_True_w_style_10_700", "ABLATION_HumanoidNEAR_walk_5_True_w_style_10_8125"],
-        r"NCSN-v2 $\vert$ $\sigma = 18.64 (lvl. 5)$ $\vert$ $0.5 r^{energy} + 0.5 r^{task}$":["ABLATION_HumanoidNEAR_walk_5_True_w_style_05_42", "ABLATION_HumanoidNEAR_walk_5_True_w_style_05_700", "ABLATION_HumanoidNEAR_walk_5_True_w_style_05_8125"],
-        r"NCSN-v1 $\vert$ Annealing $\vert$ $r^{energy}$":["ABLATION_HumanoidNEAR_walk_-1_False_w_style_10_42", "ABLATION_HumanoidNEAR_walk_-1_False_w_style_10_700", "ABLATION_HumanoidNEAR_walk_-1_False_w_style_10_8125"],
+        r"NCSN-v2 $\vert$ Annealing $\vert$ $r^{energy}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ Annealing $\vert$ $0.5 r^{energy} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_05_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ $\sigma = 18.64 (lvl. 5)$ $\vert$ $r^{energy}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_10_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ $\sigma = 18.64 (lvl. 5)$ $\vert$ $0.5 r^{energy} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_05_{seed}" for seed in seeds],
+        # r"NCSN-v1 $\vert$ Annealing $\vert$ $r^{energy}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_False_w_style_10_{seed}" for seed in seeds],
     }
-    # trial_names = ["Humanoid_SM_run0/summaries/_", "Humanoid_SM_run1/summaries/_", "Humanoid_SM_run2/summaries/_"]
+
+    expert_values = {
+        "walk": {"spectral_arc_length/step": -5.40, "root_body_velocity/step": 1.31, "root_body_acceleration/step": 3.37, "root_body_jerk/step": 130.11},
+        "run": {"spectral_arc_length/step":  -3.79, "root_body_velocity/step": 3.55, "root_body_acceleration/step": 16.35, "root_body_jerk/step": 513.68},
+        "crane_pose": {"spectral_arc_length/step": -12.28, "root_body_velocity/step": 0.03, "root_body_acceleration/step": 0.96, "root_body_jerk/step": 49.05}
+        }
+    expert_values = expert_values[TASK_NAME]
+
+    title = f"Humanoid {TASK_NAME.title()}"
+    ###### INPUTS #######
     
     scalars = [
         # "episode_lengths/step", 
@@ -104,8 +118,6 @@ if __name__ == "__main__":
         "Root Body Velocity",
         "Spectral Arc Length (SPARC)",
         ]
-    expert_values = {"spectral_arc_length/step": -5.40, "root_body_velocity/step": 1.31, "root_body_acceleration/step": 3.37, "root_body_jerk/step": 130.11}
-    title = "Humanoid Walk"
 
     for idx, scalar in enumerate(scalars):
         colour_idx = 0
@@ -126,8 +138,17 @@ if __name__ == "__main__":
             min_interval = mean_scalar - std_interval*std_scalar
             max_interval = mean_scalar + std_interval*std_scalar
 
-            plt.plot(exp_steps, mean_scalar, color=Colours[colour_idx], linewidth=1.5, label=exp_label)
-            plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx])
+            # if colour_idx % 2 == 0:
+            #     linestyle = "dashdot"
+            #     hatch = None
+            # else:
+            #     linestyle = '-'
+            #     hatch = None
+            linestyle = '-'
+            hatch = None
+    
+            plt.plot(exp_steps, mean_scalar, color=Colours[colour_idx], linewidth=1.5, label=exp_label, linestyle=linestyle)
+            plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
             if annotate:
                 if scalar not in ["minibatch_combined_reward/step"]:
                     annotations[round(mean_scalar[-1], 4)] = [(exp_steps[-1], mean_scalar[-1]), Colours[colour_idx]]
