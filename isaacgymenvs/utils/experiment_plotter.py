@@ -79,11 +79,11 @@ if __name__ == "__main__":
     seeds = [42, 700, 8125, 97, 3538]
 
     experiment_lables = {
-        r"NCSN-v2 $\vert$ Annealing $\vert$ $r^{energy}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}" for seed in seeds],
-        r"NCSN-v2 $\vert$ Annealing $\vert$ $0.5 r^{energy} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_05_{seed}" for seed in seeds],
-        r"NCSN-v2 $\vert$ $\sigma = 18.64 (lvl. 5)$ $\vert$ $r^{energy}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_10_{seed}" for seed in seeds],
-        r"NCSN-v2 $\vert$ $\sigma = 18.64 (lvl. 5)$ $\vert$ $0.5 r^{energy} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_05_{seed}" for seed in seeds],
-        # r"NCSN-v1 $\vert$ Annealing $\vert$ $r^{energy}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_False_w_style_10_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ Annealing $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_05_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_10_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_05_{seed}" for seed in seeds],
+        # r"NCSN-v1 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_False_w_style_10_{seed}" for seed in seeds],
     }
 
     expert_values = {
@@ -99,10 +99,10 @@ if __name__ == "__main__":
     scalars = [
         # "episode_lengths/step", 
         "mean_dtw_pose_error/step", 
-        "minibatch_combined_reward/step", 
+        # "minibatch_combined_reward/step", 
         # "minibatch_energy/step", 
         # "ncsn_perturbation_level/step", 
-        "root_body_acceleration/step",
+        # "root_body_acceleration/step",
         "root_body_jerk/step",
         "root_body_velocity/step",
         "spectral_arc_length/step",
@@ -110,19 +110,20 @@ if __name__ == "__main__":
     scalar_labels = [
         # "Episode Length", 
         "Average Pose Error", 
-        "Horizon Return", 
+        # "Horizon Return", 
         # "Horizon Energy Return", 
         # "NCSN Perturbation Level", 
-        "Root Body Acceleration",
+        # "Root Body Acceleration",
         "Root Body Jerk",
         "Root Body Velocity",
         "Spectral Arc Length (SPARC)",
         ]
 
     for idx, scalar in enumerate(scalars):
-        colour_idx = 0
-        annotations = {}
+        subplt_idx = 0
         annotate = True
+        fig, (ax1, ax2) = plt.subplots(2)
+        annotations = {ax1:{}, ax2:{}}
         for exp_label, trial_names in experiment_lables.items():
             trial_names = [name + "/summaries" for name in trial_names]
             exp_dfs = []
@@ -138,44 +139,63 @@ if __name__ == "__main__":
             min_interval = mean_scalar - std_interval*std_scalar
             max_interval = mean_scalar + std_interval*std_scalar
 
-            # if colour_idx % 2 == 0:
+            # if subplt_idx % 2 == 0:
             #     linestyle = "dashdot"
             #     hatch = None
             # else:
             #     linestyle = '-'
             #     hatch = None
             linestyle = '-'
-            hatch = None
-    
-            plt.plot(exp_steps, mean_scalar, color=Colours[colour_idx], linewidth=1.5, label=exp_label, linestyle=linestyle)
-            plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
+            hatch = None            
+            # Ablate Task Reward
+            colours = {0:0, 1:1, 2:0, 3:1}
+
+            # Ablate Annealing
+            # colours = {0:0, 1:0, 2:1, 3:1}
+            
+            colour_idx = colours[subplt_idx]
+
+            # Ablate Annealing
+            # if subplt_idx%2 == 0:
+            
+            # Ablate Task Reward
+            if subplt_idx < 2:
+                ax1.plot(exp_steps, mean_scalar, color=Colours[colour_idx], linewidth=1.5, label=exp_label, linestyle=linestyle)
+                ax1.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
+
+                if annotate:
+                    if scalar not in ["minibatch_combined_reward/step"]:
+                        annotations[ax1][round(mean_scalar[-1], 4)] = [(exp_steps[-1], mean_scalar[-1]), Colours[colour_idx]]
+            
+            else:
+                ax2.plot(exp_steps, mean_scalar, color=Colours[colour_idx], linewidth=1.5, label=exp_label, linestyle=linestyle)
+                ax2.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
+
+                if annotate:
+                    if scalar not in ["minibatch_combined_reward/step"]:
+                        annotations[ax2][round(mean_scalar[-1], 4)] = [(exp_steps[-1], mean_scalar[-1]), Colours[colour_idx]]
+
+            subplt_idx += 1
+
+
+        for ax in (ax1, ax2):
+            ax.set_xlabel('Training Samples')
+            ax.set_ylabel(scalar_labels[idx])
+            ax.set_title(title)
+            if scalar in list(expert_values.keys()):
+                ax.axhline(y=expert_values[scalar], color='#f032e6', linestyle='-', linewidth=1.5, label="Expert's Value")
+                if annotate:
+                    ax.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color='#f032e6')
+
             if annotate:
-                if scalar not in ["minibatch_combined_reward/step"]:
-                    annotations[round(mean_scalar[-1], 4)] = [(exp_steps[-1], mean_scalar[-1]), Colours[colour_idx]]
-                    # offset = random.choice([x for x in np.arange(mean_scalar.max()*0., mean_scalar.max()*0.3, mean_scalar.max()*0.1)])
-                    # offset = np.arange(mean_scalar.max()*0.1, mean_scalar.max()*0.6, mean_scalar.max()*0.1)[colour_idx]
-                    # plt.annotate(f'{round(mean_scalar[-1], 2)}', xy=(exp_steps[-1], mean_scalar[-1]), xytext=(exp_steps[-1] + exp_steps.max()*0.06,  mean_scalar[-1] + offset), arrowprops=dict(arrowstyle='->', color=Colours[colour_idx]))
-                
-            colour_idx += 1
+                ax_annotations = annotations[ax]
+                if len(ax_annotations) > 0:
+                    for offset_idx, text in enumerate(sorted(list(ax_annotations.keys()), key=float)):
+                        offset = float(offset_idx+1)*0.05*plt.gca().get_ylim()[1]
+                        ax.annotate(round(text,2), xy=ax_annotations[text][0], xytext=(1.001*plt.gca().get_xlim()[1],  ax_annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=ax_annotations[text][1]))
 
+            ax.legend()
 
-        plt.xlabel('Training Samples')
-        plt.ylabel(scalar_labels[idx])
-        plt.title(title)
         plt.tight_layout()
-        if scalar in list(expert_values.keys()):
-            plt.axhline(y=expert_values[scalar], color='#f032e6', linestyle='-', linewidth=1.5, label="Expert's Value")
-            if annotate:
-                plt.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color='#f032e6')
-
-        if annotate:    
-            if len(annotations) > 0:
-                for offset_idx, text in enumerate(sorted(list(annotations.keys()), key=float)):
-                    offset = float(offset_idx+1)*0.05*plt.gca().get_ylim()[1]
-                    plt.annotate(round(text,2), xy=annotations[text][0], xytext=(1.001*plt.gca().get_xlim()[1],  annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=annotations[text][1]))
-
-
-
-        plt.legend()
         plt.show()
 
