@@ -11,37 +11,8 @@ plt.rcParams['text.usetex'] = True
 PARENT_DIR_PATH = os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(PARENT_DIR_PATH)
 
-# https://sashamaps.net/docs/tools/20-colors/
-# Colours = [
-#     '#000000',
-#     '#e6194B', 
-#     '#3cb44b', 
-#     # '#ffe119', 
-#     '#4363d8', 
-#     '#f58231', 
-#     '#911eb4', 
-#     '#42d4f4', 
-#     '#f032e6', 
-#     # '#bfef45', 
-#     # '#fabed4', 
-#     '#469990', 
-#     # '#dcbeff', 
-#     '#9A6324', 
-#     # '#fffac8', 
-#     '#800000', 
-#     # '#aaffc3', 
-#     '#808000', 
-#     # '#ffd8b1', 
-#     '#000075', 
-#     # '#a9a9a9', 
-#     # '#ffffff', 
-# ]
 
-Colours = [
-    '#000000', '#42d4f4', '#e6194B', '#4363d8', '#f58231', '#000075',
-    '#3cb44b', '#911eb4', '#469990', '#f032e6', '#9A6324', '#808000',
-    '#800000'
-]
+from experiment_plotter import Colours
 
 
 def get_scalars_from_dfs(scalar, trial_dfs):
@@ -75,13 +46,16 @@ if __name__ == "__main__":
 
     ###### INPUTS #######
     
-    TASK_NAME = "run"
-    PLOT_SUBPLOTS = False
+    TASK_NAME = "crane_pose"
+    PLOT_SUBPLOTS = True
     seeds = [42, 700, 8125, 97, 3538]
 
     experiment_lables = {
-        r"NEAR":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}/summaries" for seed in seeds],
-        r"AMP":[f"HumanoidAMP_{TASK_NAME}_{seed}/summaries" for seed in seeds],
+        r"NCSN-v2 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ Annealing $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_05_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_10_{seed}" for seed in seeds],
+        r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_05_{seed}" for seed in seeds],
+        # r"NCSN-v1 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_False_w_style_10_{seed}" for seed in seeds],
     }
 
     expert_values = {
@@ -91,33 +65,31 @@ if __name__ == "__main__":
         }
     expert_values = expert_values[TASK_NAME]
 
-    title = f"Humanoid {TASK_NAME.replace('_', ' ').title()}"
+    title = f"Humanoid {TASK_NAME.replace('_', ' ').title()} - NCSN Ablation"
     ###### INPUTS #######
     
     scalars = [
-        "episode_lengths/step", 
-        "mean_dtw_pose_error/step",
-        "minibatch_combined_reward/step", 
+        # "episode_lengths/step", 
+        "mean_dtw_pose_error/step", 
+        # "minibatch_combined_reward/step", 
         # "minibatch_energy/step", 
         # "ncsn_perturbation_level/step", 
-        "root_body_acceleration/step",
+        # "root_body_acceleration/step",
         "root_body_jerk/step",
         "root_body_velocity/step",
         "spectral_arc_length/step",
         ]
     scalar_labels = [
-        "Episode Length", 
+        # "Episode Length", 
         "Average Pose Error", 
-        "Horizon Return", 
+        # "Horizon Return", 
         # "Horizon Energy Return", 
         # "NCSN Perturbation Level", 
-        "Root Body Acceleration",
+        # "Root Body Acceleration",
         "Root Body Jerk",
         "Root Body Velocity",
         "Spectral Arc Length (SPARC)",
         ]
-
-    no_annotate = ["episode_lengths/step", "minibatch_combined_reward/step"]
 
     for idx, scalar in enumerate(scalars):
         subplt_idx = 0
@@ -129,20 +101,14 @@ if __name__ == "__main__":
             annotations = {}
 
         for exp_label, trial_names in experiment_lables.items():
-            # trial_names = [name + "/summaries" for name in trial_names]
+            trial_names = [name + "/summaries" for name in trial_names]
             exp_dfs = []
             for trial in trial_names:
                 exp_dfs.append(df[df['dir_name'] == trial])
 
+            # for idx, scalar in enumerate(scalars):
             exp_scalars, exp_steps = get_scalars_from_dfs(scalar, exp_dfs)
-
-            for element_idx, element in enumerate(exp_scalars):
-                if isinstance(element[0], list):
-                    element = np.array(list(element)).max(axis=1)
-                    exp_scalars[element_idx] = element
-
             exp_scalars = np.stack(exp_scalars, axis=1)
-            exp_scalars = exp_scalars.astype(float)
             mean_scalar = np.mean(exp_scalars, axis=1)
             std_scalar = np.std(exp_scalars, axis=1)
             std_interval = 1.0
@@ -169,7 +135,7 @@ if __name__ == "__main__":
                     ax1.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
 
                     if annotate:
-                        if scalar not in no_annotate:
+                        if scalar not in ["minibatch_combined_reward/step"]:
                             annotations[ax1][round(mean_scalar[-1], 4)] = [(exp_steps[-1], mean_scalar[-1]), Colours[colour_idx]]
                 
                 else:
@@ -177,7 +143,7 @@ if __name__ == "__main__":
                     ax2.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
 
                     if annotate:
-                        if scalar not in no_annotate:
+                        if scalar not in ["minibatch_combined_reward/step"]:
                             annotations[ax2][round(mean_scalar[-1], 4)] = [(exp_steps[-1], mean_scalar[-1]), Colours[colour_idx]]
             
             else:
@@ -186,7 +152,7 @@ if __name__ == "__main__":
                 plt.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
 
                 if annotate:
-                    if scalar not in no_annotate:
+                    if scalar not in ["minibatch_combined_reward/step"]:
                         annotations[round(mean_scalar[-1], 4)] = [(exp_steps[-1], mean_scalar[-1]), Colours[colour_idx]]
 
             subplt_idx += 1
