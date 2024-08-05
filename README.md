@@ -1,19 +1,14 @@
 # Imitation Learning via Score/Energy-Based Generative Modelling 
 
-<div style="display: flex; justify-content: center; align-items: center; text-align: center;">
-  <div style="margin: 10px;">
-    <img src="./docs/images/left_punch.gif" alt="Learnt Punching Imitation Policy" width="400"/> <br/>
-    <em>Punching policy (learnt using NEAR)</em>
-  </div>
-  <div style="margin: 10px;">
-    <img src="./docs/images/run.gif" alt="Learnt Running Imitation Policy" width="400"/> <br/>
-    <em>Running policy (learnt using NEAR)</em>
-  </div>
-  <div style="margin: 10px;">
-    <img src="./docs/images/crane.gif" alt="Learnt Balancing Imitation Policy" width="400"/> <br/>
-    <em>Martial arts "crane pose" policy (learnt using NEAR)</em>
-  </div>
-</div>
+<p align="center">
+  <img src="./docs/images/left_punch.gif" alt="Learnt Punching Imitation Policy" width="30%"/> 
+  <img src="./docs/images/run.gif" alt="Learnt Running Imitation Policy" width="30%"/> 
+  <img src="./docs/images/crane.gif" alt="Learnt Balancing Imitation Policy" width="30%"/> 
+</p>
+
+<p align="center">
+  <em>Punching (left), running (middle), and martial arts crane pose (right) policies learnt using NEAR</em>
+</p>
 
 
 ## About this repository
