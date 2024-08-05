@@ -32,6 +32,7 @@ from rl_games.algos_torch import players
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.common.player import BasePlayer
+from isaacgymenvs.tasks.humanoid_amp import HumanoidAMP 
 import time
 
 
@@ -103,6 +104,8 @@ class CommonPlayer(players.PpoPlayerContinuous):
                 break
 
             obs_dict = self.env_reset(self.env)
+            self.env._state_init = HumanoidAMP.StateInit.Random
+            obs_dict = self.env.reset_all()
             batch_size = 1
             batch_size = self.get_batch_size(obs_dict['obs'], batch_size)
 
