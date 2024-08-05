@@ -75,49 +75,56 @@ if __name__ == "__main__":
 
     ###### INPUTS #######
     
-    TASK_NAME = "run"
+    TASK_NAME = "single_left_punch"
     PLOT_SUBPLOTS = False
     seeds = [42, 700, 8125, 97, 3538]
 
     experiment_lables = {
-        r"NEAR":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}/summaries" for seed in seeds],
-        r"AMP":[f"HumanoidAMP_{TASK_NAME}_{seed}/summaries" for seed in seeds],
+        # r"NEAR":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}/summaries" for seed in seeds],
+        r"NEAR":[f"HumanoidNEAR_{TASK_NAME}_{seed}/summaries" for seed in seeds],
+        # r"AMP":[f"HumanoidAMP_{TASK_NAME}_{seed}/summaries" for seed in seeds],
     }
 
     expert_values = {
         "walk": {"spectral_arc_length/step": -5.40, "root_body_velocity/step": 1.31, "root_body_acceleration/step": 3.37, "root_body_jerk/step": 130.11},
         "run": {"spectral_arc_length/step":  -3.79, "root_body_velocity/step": 3.55, "root_body_acceleration/step": 16.35, "root_body_jerk/step": 513.68},
-        "crane_pose": {"spectral_arc_length/step": -12.28, "root_body_velocity/step": 0.03, "root_body_acceleration/step": 0.96, "root_body_jerk/step": 49.05}
+        "crane_pose": {"spectral_arc_length/step": -12.28, "root_body_velocity/step": 0.03, "root_body_acceleration/step": 0.96, "root_body_jerk/step": 49.05},
+        "single_left_punch": {"spectral_arc_length/step": -1.73, "root_body_velocity/step": 0.16, "root_body_acceleration/step": 2.51, "root_body_jerk/step": 72.49}
         }
     expert_values = expert_values[TASK_NAME]
 
-    title = f"Humanoid {TASK_NAME.replace('_', ' ').title()}"
+    # title = f"Humanoid {TASK_NAME.replace('_', ' ').title()}"
+    title = f"Humanoid {TASK_NAME.replace('_', ' ').replace('single', '').title()}"
     ###### INPUTS #######
     
     scalars = [
         "episode_lengths/step", 
-        "mean_dtw_pose_error/step",
+        # "mean_dtw_pose_error/step",
         "minibatch_combined_reward/step", 
         # "minibatch_energy/step", 
         # "ncsn_perturbation_level/step", 
-        "root_body_acceleration/step",
-        "root_body_jerk/step",
-        "root_body_velocity/step",
-        "spectral_arc_length/step",
+        # "root_body_acceleration/step",
+        # "root_body_jerk/step",
+        # "root_body_velocity/step",
+        # "spectral_arc_length/step",
+        "minibatch_energy/step",
+        "ncsn_perturbation_level/step",
         ]
     scalar_labels = [
         "Episode Length", 
-        "Average Pose Error", 
-        "Horizon Return", 
+        # "Average Pose Error", 
+        "Mini-batch Return", 
         # "Horizon Energy Return", 
         # "NCSN Perturbation Level", 
-        "Root Body Acceleration",
-        "Root Body Jerk",
-        "Root Body Velocity",
-        "Spectral Arc Length (SPARC)",
+        # "Root Body Acceleration",
+        # "Root Body Jerk",
+        # "Root Body Velocity",
+        # "Spectral Arc Length (SPARC)",
+        "Mini-batch Energy Return",
+        r"Perturbation Level ($\in [0,49]$)"
         ]
 
-    no_annotate = ["episode_lengths/step", "minibatch_combined_reward/step"]
+    no_annotate = ["episode_lengths/step", "minibatch_combined_reward/step", "minibatch_energy/step", "ncsn_perturbation_level/step"]
 
     for idx, scalar in enumerate(scalars):
         subplt_idx = 0
@@ -228,8 +235,8 @@ if __name__ == "__main__":
             if annotate:
                 if len(annotations) > 0:
                     for offset_idx, text in enumerate(sorted(list(annotations.keys()), key=float)):
-                        offset = float(offset_idx+1)*0.1*plt.gca().get_ylim()[1]
-                        # offset = [float(1)*0.25*plt.gca().get_ylim()[1], float(1)*0.2*plt.gca().get_ylim()[1]][offset_idx]
+                        # offset = float(offset_idx+1)*0.1*plt.gca().get_ylim()[1]
+                        offset = [-float(1)*0.1*plt.gca().get_ylim()[1], float(1)*0.15*plt.gca().get_ylim()[1]][offset_idx]
                         plt.annotate(round(text,2), xy=annotations[text][0], xytext=(1.002*plt.gca().get_xlim()[1],  annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=annotations[text][1]))
 
             plt.legend()

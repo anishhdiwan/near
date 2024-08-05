@@ -103,5 +103,5 @@ params:
     
     player:
       # Set visualise_disc_landscape to false to run policy
-      visualise_disc_landscape: True
+      visualise_disc_landscape: False
       env_params: ${.....task.env}
