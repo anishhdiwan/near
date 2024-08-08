@@ -1,4 +1,4 @@
-# Imitation Learning via Score/Energy-Based Generative Modelling 
+# Noise-conditioned Energy-based Annealed Rewards (NEAR) - A Generative Framework for Imitation Learning from Observation
 
 <p align="center">
   <img src="./docs/images/left_punch.gif" alt="Learnt Punching Imitation Policy" width="30%"/> 
@@ -13,7 +13,7 @@
 
 ## About this repository
 
-This repository contains the implementation of a graduate thesis on imitation learning via score/energy-based generative modelling. This is a fork of the [Nvidia IsaacGym Environments](https://github.com/NVIDIA-Omniverse/IsaacGymEnvs) repository. It contains additional openAI_gym-based environments, the main code for this thesis, and baselines for comparison.
+This repository contains the implementation of NEAR, a state-only imitation learning algorithm based on score/energy-based generative modelling. The base version of this repository was forked from [Nvidia IsaacGym Environments](https://github.com/NVIDIA-Omniverse/IsaacGymEnvs). This fork contains the newly proposed algorithm, experiments, and reporoduction information. We also provide additional information like documentation on parts of the code and the datasets used in this research.
 
 <br><br>
 
@@ -22,11 +22,11 @@ This repository contains the implementation of a graduate thesis on imitation le
 
 **NOTE: This repository requires Ubuntu 20.04 and Python 3.7. These are hard requirements and are the latest possible Ubuntu/Python versions that are supported by Nvidia Isaac Gym**
 
-This installation proceeds in three main steps. First, we install Isaac Gym, then we install the Isaacgymenvs (this repo) package. Finally we install the remaining packages required to train the proposed score/energy-based imitation learning algorithm.
+This installation proceeds in three main steps. First, we install Isaac Gym, then we install the `isaacgymenvs` package (this repo). Finally we install the remaining packages required to train the proposed score/energy-based imitation learning algorithm.
 
 1. Download the Isaac Gym Preview 4 release from the [website](https://developer.nvidia.com/isaac-gym), then follow the installation instructions in the documentation. The conda environment installation option is required to run the code base from this project (other options might work but are not tested).
 
-2. Ensure that Isaac Gym works on your system by running one of the examples from the `python/examples` directory, like `joint_monkey.py`. Follow the troubleshooting steps described in the Isaac Gym Preview 4 install instructions if you have any trouble running the samples. For instance, you might need to add the environment variable LD_LIB_PATH. 
+2. Ensure that Isaac Gym works on your system by running one of the examples from the `python/examples` directory, like `joint_monkey.py`. Follow the troubleshooting steps described in the Isaac Gym Preview 4 install instructions if you have any trouble running the samples. For instance, you might need to add the environment variable `LD_LIB_PATH`. 
 
 3. Once Isaac Gym is installed and samples work within your current Python environment, install this repo:
 
@@ -60,7 +60,7 @@ pip install -r requirements.txt
 **Training is a two-step procedure. First we train the energy-based model and subsequently use the trained model to learn a policy.**
 
 **Note:** 
-- Set params in the `near_cfg` part of the `train/<task-name>NEARPPO.yml` file. 
+- Set params in the `near_cfg` part of the `train/<task-name>NEARPPO.yml` file. The main params that need to be set are also mentioned below.
 - The task data for CPU environments (mazeNEAR, pushTNEAR) is loaded automatically. The task data for the Humanoid environment is passed in the `motion_file` param of the `task/HumanoidNEAR.yaml` file. This data is either in the `custom_envs/data/humanoid` directory or in the `assets` directory. Passing a .yaml file loads several motions while passing a single .npy file does single-clip training.
 - Before training the policy, add the path to the trained energy-based model checkpoint in the `near_cfg` part of the `train/<task-name>NEAR.yml` file.
 - With IsaacGym, by default we show a preview window, which will usually slow down training. You can use the `v` key while running to disable viewer updates and allow training to proceed faster. Hit the `v` key again to resume viewing. Use the `esc` key or close the viewer window to stop training early. Alternatively, you can train headlessly by adding the headless:True argument. 
@@ -69,6 +69,11 @@ pip install -r requirements.txt
 ```bash
 # tasks = [mazeNEAR, pushTNEAR, HumanoidNEAR]
 python train_ncsn.py task=<task-name>
+
+# The following additional params can be set to override defaults
+# ++task.env.motion_file= seed=
+# ++train.params.config.near_config.model.ncsnv2={bool; ncsnv2} 
+
 ```
 
 ### Step 2: Training the energy-based policy
@@ -85,10 +90,22 @@ python train_gym_envs.py task=<task-name> headless=<bool>
 python train.py task=<task-name> headless=<bool>  
 ```
 
+```bash
+# The following additional params can be set to override defaults
+# ++task.env.motion_file= seed=
+# max_iterations=ke6 num_envs= ++train.params.config.minibatch_size=
+# ++train.params.config.near_config.inference.sigma_level={-1 if annealing} 
+# ++train.params.config.near_config.model.ncsnv2={bool; ncsnv2} 
+# ++train.params.config.near_config.inference.task_reward_w={w_task} 
+# ++train.params.config.near_config.inference.energy_reward_w={w_style} 
+# ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}"
+# ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}
+```
+
 <br><br>
 
 
-## Training Baselines 
+## Training baselines 
 
 **Baselines such as Adversarial Motion Priors and Cross Entropy Method (currently only for CPU envs) are trained similarly to the previous procedure. However, they do not need the first step of training the energy based model. Training can be done as follows.**
 
@@ -111,28 +128,25 @@ python train.py task=<task-name> headless=<bool>
 <br><br>
 
 
-## Visualising Trained Policies
+## Visualising trained policies
 
-Trained policies can be visualised as follows
+Trained policies can be visualised as follows. Make sure to set the visualise_disc and visualise_disc_landscape arguments of in `tasks/mazeAMPPPO.yaml` and `tasks/HumanoidAMPPPO.yaml` to False.
 
 ```bash
 # For CPU-based environments
 # tasks = [mazeAMP, pushTAMP, pushT, maze, mazeNEAR, pushTNEAR]
-# If no algo is mentioned, then PPO is assumed by default
-# Make sure to set the visualise_disc argument of in tasks/mazeAMPPPO.yaml to False
 python train_gym_envs.py task=<task-name> test=True checkpoint=<path-to-saved-checkpoint>
 ```
 
 ```bash
 # For Isaac Gym environments
 # tasks = [HumanoidAMP, Humanoid, HumanoidNEAR]
-# If no algo is mentioned, then PPO is assumed by default
 python train.py task=<task-name> test=True checkpoint=<path-to-saved-checkpoint> 
 ```
 
 
 ### Visualising the energy function or AMP discriminator
-Since the maze environment is 2-dimensional, the energy-function or the adversarial motion priors discriminator can be visualised. 
+The energy-function or the adversarial motion priors discriminator can be visualised with the following commands.
 
 ```bash
 # Visualising the energy function
@@ -160,7 +174,7 @@ python train_gym_envs.py task=mazeAMP test=True checkpoint=<path-to-saved-checkp
 This repository contains processed expert demonstration data (reformatted, retargeted, and grouped as per tasks) for training both AMP and the proposed approach. Hence, no additional data procurement/manipulation is needed to train the methods in this repository. The processed expert motions are placed in the `isaacgymenvs/custom_envs/data/humanoid` directory and a .yaml file is created to pass them all together to the learning algorithm. The following section describes these data processing steps and provides a general guide to using the pipelines in this repository to manipulate the [CMU mo-cap dataset (.fbx version)](https://doi.org/10.4121/0448aab2-3332-449f-a8e2-d208cb58c7df)
 
 
-### Viewing, Reformatting, and Retargeting Motion Data
+### Viewing, reformatting, and retargeting motion data
 
 The Adversarial Motion Priors codebase provides useful tools to process .fbx format conversions of the CMU mo-cap dataset. This repository extends these tools. To process your own demonstration data first obtain the dataset in the .fbx format ([available here](https://doi.org/10.4121/0448aab2-3332-449f-a8e2-d208cb58c7df)). The dataset contains a directory housing all .fbx format motion files (numbered xx_yy where the first part indicates the subject number and the second part indicates the motion number). It also contains a .txt file describing all motions and a .csv file where some of the motions are grouped as per the "task" seen in the clip. Finally, the dataset also contains a .txt file with a list of the identified tasks (not exhaustive). These tasks are ultimately used to process groups of motions together to create sub-datasets.
  
@@ -196,10 +210,43 @@ python generate_retargeted_dataset.py --data_dir=cmu_jump_task --view --view_srg
 
 <br><br>
 
-## Troubleshooting
 
-Please review the Isaac Gym installation instructions first if you run into any issues.
+## Reproducing our experiments
 
-You can either submit issues through GitHub or through the [Isaac Gym forum here](https://forums.developer.nvidia.com/c/agx-autonomous-machines/isaac/isaac-gym/322).
+### Main experiments
+
+The main comparative experiments between NEAR and AMP and ablations can be reproduced using the `run_experiments.sh` and `run_ablations.sh` shell scripts. Before running these scripts, set up the experiment details (algorithms, seeds, motions, ablations configurations etc.) in the `cfg/experiment_generator.py` and `cfg/ablation_generator.py` scripts. When the shell script is called for the first time, a pandas dataframe of all experiment commands is created and stored in the `\cfg` directory. Subsequently, one of these commands is executed every time the shell script is called from here onwards. This can of course also be automated (we leave this to the reproducers). 
+
+Additionally, we also supply `SLURM` compatible experiment scripts for reproduction on a GPU cluster. Our scripts (`send_db_job.sh` and `send_db_ablation_job.sh`) are specifically designed for the [DelftBlue cluster at TU Delft](https://doc.dhpc.tudelft.nl/delftblue/), however the scripts can easily be modified for a custom SLURM setup. Once the experiments are completed, results can be plotted using the `utils/experiment_plotter.py` and `utils/ablation_plotter.py` scripts. We use the [tbparse](https://github.com/j3soon/tbparse) package to parse tensorboard summaries. The reward functions learnt using both AMP and NEAR can also be plotted. Use the `utils/plot_learnt_rewards.sh` script for this. Note that the scalars and trials to be plotted need to be manually supplied to these scripts. 
+ 
+
+### Perfect discriminator experiments
+
+The perfect discriminator experiments are housed on a separate branch of the repository. To reproduce these, switch to the `disc_exp` branch. There are additional config parameters in the `HumanoidAMPPPO.yaml` file on this branch. 
+
+```yaml
+# Pause training after a certain number of steps to conduct experiments on the discriminator. DO NOT SET TO TRUE for regular runs
+disc_experiment: False
+disc_expt_policy_training: 2e6
+disc_expt_reset_disc: True
+```
+
+To run any experiment in this section, first set `disc_experiment=True`. For the perfect discriminator experiment, pass `disc_expt_policy_training` and `disc_expt_reset_disc=True` as additional arguments. For the discriminator predictions variance experiment, set `disc_expt_reset_disc=False`. These experiments save additional `.pkl` files with the mean prediction. These can be plotted using the `utils/plot_rewards.py` script. 
+
+
+### Pretrained checkpoints
+
+Finally, we also provide pre-trained checkpoints for all runs in our experiments. These can also be visualised with the commands provided above.
+
+
+### Notes on reproducibility and determinism (from IsaacGymEnvs)
+To achieve deterministic behaviour on multiple training runs, a seed value can be set in the training config file for each task. This will potentially allow for individual runs of the same task to be deterministic when executed on the same machine and system setup. Alternatively, a seed can also be set via command line argument `seed=<seed>` to override any settings in config files. If no seed is specified in either config files or command line arguments, we default to generating a random seed. In that case, individual runs of the same task should not be expected to be deterministic. For convenience, we also support setting `seed=-1` to generate a random seed, which will override any seed values set in config files. By default, we have explicitly set all seed values in config files to be 42.
+
+We also include a `torch_deterministic` argument for uses when running RL training. Enabling this flag (passing `torch_deterministic=True`) will apply additional settings to PyTorch that can force the usage of deterministic algorithms in PyTorch, but may also negatively impact run-time performance. For more details regarding PyTorch reproducibility, refer to <https://pytorch.org/docs/stable/notes/randomness.html>. If both `torch_deterministic=True` and `seed=-1` are set, the seed value will be fixed to 42. Note that in PyTorch version 1.9 and 1.9.1 there appear to be bugs affecting the `torch_deterministic` setting, and using this mode will result in a crash, though in our testing we did not notice determinacy issues arising from not setting this flag.
+
+Note that using a fixed seed value will only **potentially** allow for deterministic behavior. Due to GPU work scheduling, it is possible that runtime changes to simulation parameters can alter the order in which operations take place, as environment updates can happen while the GPU is doing other work. Because of the nature of floating point numeric storage, any alteration of execution ordering can cause small changes in the least significant bits of output data, leading to divergent execution over the simulation of thousands of environments and simulation frames. Hence, unfortunately, even with the same seed value, some runs might diverge as training progresses. We are also aware that the Humanoid environment that does not train deterministically when simulated on CPU with multiple PhysX worker threads. Similar to GPU determinism issues, this is likely due to subtle simulation operation ordering issues, and additional effort will be needed to enforce synchronization between threads.
+
+<br><br>
+
 
 ## Citing
