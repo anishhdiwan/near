@@ -1,0 +1,3 @@
+motions:
+- file: amp_sfu_overhead_kick_task/amp_overhead_kick.npy
+  weight: 1.0

@@ -18,7 +18,6 @@ task_index['motion_file'] = data_path + "CMU_fbx/" + task_index['motion_index'] 
 motion_files = task_index['motion_file'].to_list()
 
 
-
 """
 This script imports an FBX format motion file from the given dataset depending on the given task. It then extracts a SkletonState from 
 the first frame and exports this into a T-pose. Can be used further for retargeting motions to other T-poses.
@@ -31,5 +30,5 @@ SkeletonMotion.tpose_from_fbx(
     fbx_file_path=fbx_file,
     root_joint="Hips",
     fps=60,
-    file_name="horizontal_cmu_tpose"
+    file_name="some_tpose"
 )

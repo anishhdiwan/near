@@ -191,9 +191,11 @@ def project_joints(motion):
 
 def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
     # load retarget config
-    # retarget_data_path = "data/configs/retarget_horizontal_cmu_to_amp.json"
+    # retarget_data_path = "data/configs/retarget_sideways_sfu_to_amp.json"
 
     VISUALIZE = visualise
+    # VISUALIZE = True
+    # visualise_src_tgt = False
 
     with open(retarget_data_path) as f:
         retarget_data = json.load(f)
@@ -208,6 +210,13 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
     if visualise_src_tgt:
         print("Plotting the target pose")
         plot_skeleton_state(target_tpose)
+
+    # print(source_tpose.skeleton_tree.node_names)
+    # print(len(source_tpose.skeleton_tree.node_names))
+    # print("---")
+    # print(target_tpose.skeleton_tree.node_names)
+    # print(len(target_tpose.skeleton_tree.node_names))
+    # quit()
 
     # parse data from retarget config
     joint_mapping = retarget_data["joint_mapping"]
@@ -224,6 +233,11 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
     savepath = data_path + "amp_" + data_dir + "/" 
     if not os.path.exists(savepath):
         os.makedirs(savepath)
+
+    # motion_path = "/home/anishdiwan/thesis_background/Datasets/SFU_humanoid_fbx/"
+    # motion_files = ["sfu_wushu_kicks.npy"]
+    # savepath = "/home/anishdiwan/thesis_background/Datasets/SFU_humanoid_fbx/"
+
 
     print(f"Number of mo-cap files to remap: {len(motion_files)}")
     for idx, source_file_name in enumerate(motion_files):
@@ -270,6 +284,10 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
         
         ]
 
+        # motion_frames = [
+        #     [(900, 1090)]
+        # ]
+
         for ind, frame_tuple in enumerate(motion_frames[idx]):
             print(f"Splitting between frames {frame_tuple}")
             target_motion = copy.deepcopy(target_motion_main)
@@ -302,6 +320,7 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
 
             # save retargeted motion
             target_file_path = savepath + "amp_" + f"{ind}_" + source_file_name
+            # target_file_path = savepath + "amp_" + "spin_kick.npy"
             target_motion.to_file(target_file_path)
 
             # visualize retargeted motion

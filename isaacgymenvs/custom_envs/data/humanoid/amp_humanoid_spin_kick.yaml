@@ -1,0 +1,3 @@
+motions:
+- file: amp_sfu_spin_kick_task/amp_spin_kick.npy
+  weight: 1.0
