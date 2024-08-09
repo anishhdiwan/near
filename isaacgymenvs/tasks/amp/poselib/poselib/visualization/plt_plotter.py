@@ -253,6 +253,7 @@ class Matplotlib3DPlotter(BasePlotter):
             "Draw3DDots": self._dots_update_impl,
             "Draw3DTrail": self._trail_update_impl,
         }
+        # self._saved_frame_num = 0
         self._init_lim()
         super().__init__(task)
 
@@ -397,6 +398,8 @@ class Matplotlib3DPlotter(BasePlotter):
         for task in task_list:
             self._update_impl_callables[task.task_type](task)
         self._draw()
+        # plt.savefig(f"/home/anishdiwan/temp_skeleton_videos/left_punch/frame{self._saved_frame_num}.png", dpi=150, format="png")
+        # self._saved_frame_num += 1
 
     def _set_aspect_equal_3d(self):
         xlim = self._ax.get_xlim3d()
@@ -425,3 +428,4 @@ class Matplotlib3DPlotter(BasePlotter):
         self._fig.canvas.draw()
         self._fig.canvas.flush_events()
         plt.pause(0.00001)
+        # plt.pause(0.2)
