@@ -464,7 +464,10 @@ class HumanoidAMP(HumanoidAMPBase):
             "amp_humanoid_indian_dance_bharatnatyam1": ["time"],
             "amp_humanoid_indian_dance_bharatnatyam2": ["time"],
             "amp_humanoid_indian_dance_kuchipudi": ["time"],
-            "amp_humanoid_single_left_punch": ["time"]
+            "amp_humanoid_single_left_punch": ["time"],
+            "amp_humanoid_overhead_kick": ["time"],
+            "amp_humanoid_spin_kick": ["time", "height"],
+            "amp_humanoid_crescent_kick": ["time"]
         }
 
         motion_file = os.path.splitext(motion_file)[0]
