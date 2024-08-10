@@ -7,11 +7,11 @@ import json
 from poselib.skeleton.skeleton3d import SkeletonTree, SkeletonState, SkeletonMotion
 from poselib.visualization.common import plot_skeleton_state, plot_skeleton_motion_interactive
 
-# source fbx file path
-fbx_file = "data/sfu_wushu_kicks.npy"
+# source npy file path
+npy_file = "data/sfu_wushu_kicks.npy"
 
 # import fbx file - make sure to provide a valid joint name for root_joint
-motion = SkeletonMotion.from_file(fbx_file)
+motion = SkeletonMotion.from_file(npy_file)
 # visualize motion
 plot_skeleton_motion_interactive(motion)
 

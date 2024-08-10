@@ -19,10 +19,13 @@ algos = [
 ]
 
 motions = [
-    "amp_humanoid_walk.yaml",
-    "amp_humanoid_run.yaml",
-    "amp_humanoid_crane_pose.yaml",
-    "amp_humanoid_single_left_punch.yaml",
+    # "amp_humanoid_walk.yaml",
+    # "amp_humanoid_run.yaml",
+    # "amp_humanoid_crane_pose.yaml",
+    # "amp_humanoid_single_left_punch.yaml",
+    "amp_humanoid_zombie_walk.yaml",
+    "amp_humanoid_bow.yaml",
+    "amp_humanoid_marching.yaml",
     # "amp_humanoid_tai_chi.yaml"
 ]
 
@@ -32,6 +35,9 @@ task_specific_cfg = {
     "amp_humanoid_crane_pose.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_single_left_punch.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_tai_chi.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_zombie_walk.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_bow.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_marching.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
 }
 
 near_task_specific_cfg = {
@@ -39,7 +45,10 @@ near_task_specific_cfg = {
     "amp_humanoid_run.yaml": "++train.params.config.near_config.training.n_iters=120000",
     "amp_humanoid_crane_pose.yaml": "++train.params.config.near_config.training.n_iters=100000",
     "amp_humanoid_single_left_punch.yaml": "++train.params.config.near_config.training.n_iters=120000",
-    "amp_humanoid_tai_chi.yaml": "++train.params.config.near_config.training.n_iters=150000"
+    "amp_humanoid_tai_chi.yaml": "++train.params.config.near_config.training.n_iters=150000",
+    "amp_humanoid_zombie_walk.yaml": "++train.params.config.near_config.training.n_iters=80000",
+    "amp_humanoid_bow.yaml": "++train.params.config.near_config.training.n_iters=80000",
+    "amp_humanoid_marching.yaml": "++train.params.config.near_config.training.n_iters=120000",
 }
 
 amp_task_specific_cfg = {
@@ -47,11 +56,14 @@ amp_task_specific_cfg = {
     "amp_humanoid_run.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_crane_pose.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_single_left_punch.yaml": "++train.params.config.amp_minibatch_size=4096",
-    "amp_humanoid_tai_chi.yaml": "++train.params.config.amp_minibatch_size=4096"
+    "amp_humanoid_tai_chi.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_zombie_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_bow.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_marching.yaml": "++train.params.config.amp_minibatch_size=4096",
 }
 
 
-manual_seeds = [42, 700, 8125, 97, 3538]
+manual_seeds = [42, 700, 8125] #, 97, 3538
 
 def generate_seeds(start=0, end=int(1e4), k=3, manual_seeds=[]):
 
