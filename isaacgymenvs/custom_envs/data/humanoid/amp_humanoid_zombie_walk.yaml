@@ -1,0 +1,3 @@
+motions:
+- file: amp_cmu_zombie_walk_task/amp_cmu_104_41.npy
+  weight: 1.0

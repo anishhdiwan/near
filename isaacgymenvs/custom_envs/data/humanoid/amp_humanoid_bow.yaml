@@ -1,0 +1,3 @@
+motions:
+- file: amp_cmu_bow_task/amp_cmu_111_02.npy
+  weight: 1.0

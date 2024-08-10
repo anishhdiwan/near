@@ -1313,7 +1313,28 @@ class SkeletonMotion(SkeletonState):
             skeleton_state = skeleton_state.global_repr()
 
         # Extracting the first frame
-        skeleton_state.tensor = skeleton_state.tensor[0] 
+        skeleton_state.tensor = skeleton_state.tensor[0]
+
+        
+        # Apply additional rotation to align the tpose in the actual direction of the motion
+        additional_rotation = False
+        # Quaternion rotation according to the axes of the tpose. Use https://www.andre-gaschler.com/rotationconverter/ 
+        additional_rotation_val = [ 0, -0.7071068, 0, 0.7071068 ]
+        rotation_to_target_skeleton = torch.tensor(additional_rotation_val)
+        if additional_rotation:
+            new_local_rotation = skeleton_state.local_rotation.clone()
+            new_local_rotation[..., 0, :] = quat_mul_norm(
+                rotation_to_target_skeleton, skeleton_state.local_rotation[..., 0, :]
+            )
+
+            skeleton_state = SkeletonState.from_rotation_and_root_translation(
+                skeleton_tree=skeleton_state.skeleton_tree,
+                r=new_local_rotation,
+                t=quat_rotate(rotation_to_target_skeleton, skeleton_state.root_translation),
+                is_local=True,
+            )
+
+
         skeleton_state.to_file(f"data/{file_name}.npy")
         plot_skeleton_state(skeleton_state)
 

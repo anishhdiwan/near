@@ -12,7 +12,7 @@ home = str(Path.home())
 # fbx data path
 data_path = home + "/thesis_background/Datasets/CMU_humanoid_fbx/"
 data_index = pd.read_csv(data_path + "cmu_mocap_task_index.csv")
-task_name = ['walk']
+task_name = ['bow']
 task_index = data_index.loc[data_index['task'].isin(task_name)]
 task_index['motion_file'] = data_path + "CMU_fbx/" + task_index['motion_index'] + ".fbx"
 motion_files = task_index['motion_file'].to_list()

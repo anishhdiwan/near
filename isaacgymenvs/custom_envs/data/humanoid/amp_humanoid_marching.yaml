@@ -1,0 +1,21 @@
+motions:
+- file: amp_cmu_marching_task/amp_cmu_138_03.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_05.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_07.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_09.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_04.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_06.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_01.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_02.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_08.npy
+  weight: 1.0
+- file: amp_cmu_marching_task/amp_cmu_138_10.npy
+  weight: 1.0

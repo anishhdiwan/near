@@ -467,7 +467,10 @@ class HumanoidAMP(HumanoidAMPBase):
             "amp_humanoid_single_left_punch": ["time"],
             "amp_humanoid_overhead_kick": ["time"],
             "amp_humanoid_spin_kick": ["time", "height"],
-            "amp_humanoid_crescent_kick": ["time"]
+            "amp_humanoid_crescent_kick": ["time"],
+            "amp_humanoid_marching": ["time", "dist"],
+            "amp_humanoid_bow": ["time"],
+            "amp_humanoid_zombie_walk": ["time", "dist"],
         }
 
         motion_file = os.path.splitext(motion_file)[0]
