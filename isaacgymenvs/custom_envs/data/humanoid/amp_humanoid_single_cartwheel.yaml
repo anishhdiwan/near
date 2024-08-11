@@ -1,0 +1,3 @@
+motions:
+- file: amp_cmu_cartwheel_task/amp_cartwheel.npy
+  weight: 1.0
