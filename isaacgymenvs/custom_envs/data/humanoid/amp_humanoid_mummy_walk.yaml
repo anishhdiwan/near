@@ -1,0 +1,3 @@
+motions:
+- file: amp_cmu_mummy_walk_task/amp_cmu_91_05.npy
+  weight: 1.0

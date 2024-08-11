@@ -8,7 +8,9 @@ from poselib.skeleton.skeleton3d import SkeletonTree, SkeletonState, SkeletonMot
 from poselib.visualization.common import plot_skeleton_state, plot_skeleton_motion_interactive
 
 # source npy file path
-npy_file = "data/sfu_wushu_kicks.npy"
+# npy_file = "/home/anishdiwan/thesis_background/IsaacGymEnvs/isaacgymenvs/custom_envs/data/humanoid/amp_cmu_walk_task/amp_cmu_02_02.npy"
+# npy_file = "data/amp_humanoid_dance.npy"
+npy_file = "/home/anishdiwan/thesis_background/Datasets/CMU_humanoid_fbx/cmu_mummy_walk_task/cmu_91_05.npy"
 
 # import fbx file - make sure to provide a valid joint name for root_joint
 motion = SkeletonMotion.from_file(npy_file)
