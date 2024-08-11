@@ -59,6 +59,8 @@ class HumanoidAMP(HumanoidAMPBase):
         Hybrid = 3
         # Initialise environments at a uniform linspace in the motions
         Uniform = 4
+        # Initialised at a random pose but the sampling is guided by a weighting. Meaning that some phases can be sampled more frequently. Allows for better exploration
+        WeightedRandom = 5
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
         self.cfg = cfg
@@ -177,6 +179,8 @@ class HumanoidAMP(HumanoidAMPBase):
             self._reset_hybrid_state_init(env_ids)
         elif (self._state_init == HumanoidAMP.StateInit.Uniform):
             self._reset_uniform_state_init(env_ids)
+        elif (self._state_init == HumanoidAMP.StateInit.WeightedRandom):
+            self._reset_weighted_ref_state_init(env_ids)
         else:
             assert(False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
 
@@ -258,6 +262,28 @@ class HumanoidAMP(HumanoidAMPBase):
             motion_times = np.zeros(num_envs)
         else:
             assert(False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
+
+        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
+               = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
+        self._set_env_state(env_ids=env_ids, 
+                            root_pos=root_pos, 
+                            root_rot=root_rot, 
+                            dof_pos=dof_pos, 
+                            root_vel=root_vel, 
+                            root_ang_vel=root_ang_vel, 
+                            dof_vel=dof_vel)
+
+        self._reset_ref_env_ids = env_ids
+        self._reset_ref_motion_ids = motion_ids
+        self._reset_ref_motion_times = motion_times
+        return
+
+    def _reset_weighted_ref_state_init(self, env_ids):
+        num_envs = env_ids.shape[0]
+        motion_ids = self._motion_lib.sample_motions(num_envs)
+        
+        motion_times = self._motion_lib.sample_time(motion_ids, beta_dist=True)
 
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                = self._motion_lib.get_motion_state(motion_ids, motion_times)

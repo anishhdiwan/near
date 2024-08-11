@@ -66,7 +66,21 @@ class MotionLib():
 
     def sample_time(self, motion_ids, truncate_time=None, **kwargs):
         n = len(motion_ids)
-        phase = np.random.uniform(low=0.0, high=1.0, size=motion_ids.shape)
+        
+        # Sample from a non-uniform (beta) distribution
+        if "beta_dist" in list(kwargs.keys()):
+            # assert "dist_low" in list(kwargs.keys()), "Beta dist params must be provided to sample from a beta distribution. Provide params dist_low and dist_high"
+            # assert "dist_high" in list(kwargs.keys()), "Beta dist params must be provided to sample from a beta distribution. Provide params dist_low and dist_high"
+            # dist_mode = (dist_low + dist_high)/2
+            # dist_alpha = 2.0
+            # dist_beta = (((1 - dist_mode) * (dist_alpha - 1)) / dist_mode) + 1
+
+            dist_alpha = 1.5
+            dist_beta = 3.0
+            phase = np.random.beta(dist_alpha, dist_beta, size=motion_ids.shape)
+        
+        else:
+            phase = np.random.uniform(low=0.0, high=1.0, size=motion_ids.shape)
         
         motion_len = self._motion_lengths[motion_ids]
         if (truncate_time is not None):

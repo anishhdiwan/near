@@ -14,13 +14,13 @@ env:
   pdControl: True
   powerScale: 1.0
   controlFrequencyInv: 2 # 30 Hz
-  stateInit: "Random"
+  stateInit: "WeightedRandom"
   hybridInitProb: 0.3
   numAMPObsSteps: 2
 
   localRootObs: False
   contactBodies: ["right_foot", "left_foot", "right_hand", "left_hand"]
-  terminationHeight: 0.3
+  terminationHeight: 0.2
   enableEarlyTermination: True
 
   # animation files to learn from
