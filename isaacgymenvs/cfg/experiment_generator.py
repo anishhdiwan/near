@@ -23,10 +23,12 @@ motions = [
     # "amp_humanoid_run.yaml",
     # "amp_humanoid_crane_pose.yaml",
     # "amp_humanoid_single_left_punch.yaml",
-    "amp_humanoid_zombie_walk.yaml",
-    "amp_humanoid_bow.yaml",
-    "amp_humanoid_marching.yaml",
-    # "amp_humanoid_tai_chi.yaml"
+    # "amp_humanoid_zombie_walk.yaml",
+    # "amp_humanoid_bow.yaml",
+    # "amp_humanoid_marching.yaml",
+    # "amp_humanoid_tai_chi.yaml",
+    "amp_humanoid_mummy_walk.yaml",
+    "amp_humanoid_single_cartwheel.yaml",
 ]
 
 task_specific_cfg = {
@@ -38,6 +40,8 @@ task_specific_cfg = {
     "amp_humanoid_zombie_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_bow.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_marching.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_mummy_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
 }
 
 near_task_specific_cfg = {
@@ -49,6 +53,8 @@ near_task_specific_cfg = {
     "amp_humanoid_zombie_walk.yaml": "++train.params.config.near_config.training.n_iters=100000",
     "amp_humanoid_bow.yaml": "++train.params.config.near_config.training.n_iters=100000",
     "amp_humanoid_marching.yaml": "++train.params.config.near_config.training.n_iters=150000",
+    "amp_humanoid_mummy_walk.yaml": "++train.params.config.near_config.training.n_iters=80000",
+    "amp_humanoid_single_cartwheel.yaml""++train.params.config.near_config.training.n_iters=80000",
 }
 
 amp_task_specific_cfg = {
@@ -60,6 +66,8 @@ amp_task_specific_cfg = {
     "amp_humanoid_zombie_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_bow.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_marching.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_mummy_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_single_cartwheel.yaml": "++train.params.config.amp_minibatch_size=4096",
 }
 
 
@@ -92,8 +100,10 @@ def generate_train_commands():
         for algo in algos:
             for motion in motions:
                 for seed in seeds:
-                    # cmd = {counter: {"cmd":f"task={algo} ++task.env.motion_file={motion} seed={seed}", "exp_name":f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"}}
-                    base_cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
+                    if not motion == "amp_humanoid_single_cartwheel.yaml":
+                        base_cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
+                    else:
+                        base_cmd = [f"task={algo}Hands train={algo}PPO ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]                        
 
                     if algo == "HumanoidNEAR":    
                         ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
