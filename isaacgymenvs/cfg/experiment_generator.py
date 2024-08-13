@@ -15,7 +15,7 @@ sys.path.append(FILE_PATH)
 
 algos = [
     "HumanoidNEAR", 
-    # "HumanoidAMP"
+    "HumanoidAMP"
 ]
 
 motions = [
@@ -27,8 +27,9 @@ motions = [
     # "amp_humanoid_bow.yaml",
     # "amp_humanoid_marching.yaml",
     # "amp_humanoid_tai_chi.yaml",
-    "amp_humanoid_mummy_walk.yaml",
-    "amp_humanoid_single_cartwheel.yaml",
+    # "amp_humanoid_mummy_walk.yaml",
+    # "amp_humanoid_single_cartwheel.yaml",
+    "amp_humanoid_spin_kick.yaml",
 ]
 
 task_specific_cfg = {
@@ -42,6 +43,7 @@ task_specific_cfg = {
     "amp_humanoid_marching.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_mummy_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_spin_kick.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
 }
 
 near_task_specific_cfg = {
@@ -55,6 +57,7 @@ near_task_specific_cfg = {
     "amp_humanoid_marching.yaml": "++train.params.config.near_config.training.n_iters=150000",
     "amp_humanoid_mummy_walk.yaml": "++train.params.config.near_config.training.n_iters=80000",
     "amp_humanoid_single_cartwheel.yaml": "++train.params.config.near_config.training.n_iters=80000",
+    "amp_humanoid_spin_kick.yaml": "++train.params.config.near_config.training.n_iters=120000",
 }
 
 amp_task_specific_cfg = {
@@ -68,6 +71,7 @@ amp_task_specific_cfg = {
     "amp_humanoid_marching.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_mummy_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_single_cartwheel.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_spin_kick.yaml": "++train.params.config.amp_minibatch_size=4096",
 }
 
 
