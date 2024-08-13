@@ -8,8 +8,8 @@ from poselib.skeleton.skeleton3d import SkeletonTree, SkeletonState, SkeletonMot
 from poselib.visualization.common import plot_skeleton_state, plot_skeleton_motion_interactive
 
 # source npy file path
-# npy_file = "/home/anishdiwan/thesis_background/IsaacGymEnvs/isaacgymenvs/custom_envs/data/humanoid/amp_cmu_cartwheel_sideways_task/amp_cmu_90_02.npy"
-npy_file = "data/amp_humanoid_cartwheel.npy"
+npy_file = "/home/anishdiwan/thesis_background/IsaacGymEnvs/isaacgymenvs/custom_envs/data/humanoid/amp_cmu_cartwheel_sideways_task/amp_cmu_90_02.npy"
+# npy_file = "data/amp_humanoid_cartwheel.npy"
 # npy_file = "/home/anishdiwan/thesis_background/Datasets/CMU_humanoid_fbx/cmu_roll_task/cmu_90_34.npy"
 
 # import fbx file - make sure to provide a valid joint name for root_joint

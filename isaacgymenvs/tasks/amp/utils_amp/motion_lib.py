@@ -75,7 +75,7 @@ class MotionLib():
             # dist_alpha = 2.0
             # dist_beta = (((1 - dist_mode) * (dist_alpha - 1)) / dist_mode) + 1
 
-            dist_alpha = 1.5
+            dist_alpha = 1.0
             dist_beta = 3.0
             phase = np.random.beta(dist_alpha, dist_beta, size=motion_ids.shape)
         

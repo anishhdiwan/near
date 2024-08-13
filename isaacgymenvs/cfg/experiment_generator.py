@@ -54,7 +54,7 @@ near_task_specific_cfg = {
     "amp_humanoid_bow.yaml": "++train.params.config.near_config.training.n_iters=100000",
     "amp_humanoid_marching.yaml": "++train.params.config.near_config.training.n_iters=150000",
     "amp_humanoid_mummy_walk.yaml": "++train.params.config.near_config.training.n_iters=80000",
-    "amp_humanoid_single_cartwheel.yaml""++train.params.config.near_config.training.n_iters=80000",
+    "amp_humanoid_single_cartwheel.yaml": "++train.params.config.near_config.training.n_iters=80000",
 }
 
 amp_task_specific_cfg = {
