@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # event_file = "./ncsn_runs/temp_runs/"
     event_file = "../../NEAR_experiments/plot_runs_temp/"
     
-    df_path = Path(os.path.join(PARENT_DIR_PATH, "../../NEAR_experiments/plot_runs_df.pkl"))
+    df_path = Path(os.path.join(PARENT_DIR_PATH, "../../NEAR_experiments/plot_runs_df_extended_experiments.pkl"))
     if df_path.is_file():
         df = pd.read_pickle(df_path)
     else:
@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
     ###### INPUTS #######
     
-    TASK_NAME = "single_left_punch"
+    TASK_NAME = "mummy_walk"
     PLOT_SUBPLOTS = False
     seeds = [42, 700, 8125, 97, 3538]
 
@@ -89,20 +89,20 @@ if __name__ == "__main__":
         "walk": {"spectral_arc_length/step": -5.40, "root_body_velocity/step": 1.31, "root_body_acceleration/step": 3.37, "root_body_jerk/step": 130.11},
         "run": {"spectral_arc_length/step":  -3.79, "root_body_velocity/step": 3.55, "root_body_acceleration/step": 16.35, "root_body_jerk/step": 513.68},
         "crane_pose": {"spectral_arc_length/step": -12.28, "root_body_velocity/step": 0.03, "root_body_acceleration/step": 0.96, "root_body_jerk/step": 49.05},
-        "single_left_punch": {"spectral_arc_length/step": -1.73, "root_body_velocity/step": 0.16, "root_body_acceleration/step": 2.51, "root_body_jerk/step": 72.49}
+        "single_left_punch": {"spectral_arc_length/step": -1.73, "root_body_velocity/step": 0.16, "root_body_acceleration/step": 2.51, "root_body_jerk/step": 72.49},
+        "mummy_walk": {"spectral_arc_length/step": -4.71, "root_body_velocity/step": 0.73, "root_body_acceleration/step": 2.32, "root_body_jerk/step": 79.63},
+        "spin_kick": {"spectral_arc_length/step": -3.39, "root_body_velocity/step": 1.05, "root_body_acceleration/step": 10.31, "root_body_jerk/step": 273.61}
         }
     expert_values = expert_values[TASK_NAME]
 
-    # title = f"Humanoid {TASK_NAME.replace('_', ' ').title()}"
-    title = f"Humanoid {TASK_NAME.replace('_', ' ').replace('single', '').title()}"
+    title = f"Humanoid {TASK_NAME.replace('_', ' ').title()}"
+    # title = f"Humanoid {TASK_NAME.replace('_', ' ').replace('single', '').title()}"
     ###### INPUTS #######
     
     scalars = [
-        "episode_lengths/step", 
+        # "episode_lengths/step", 
         # "mean_dtw_pose_error/step",
-        "minibatch_combined_reward/step", 
-        # "minibatch_energy/step", 
-        # "ncsn_perturbation_level/step", 
+        # "minibatch_combined_reward/step",  
         # "root_body_acceleration/step",
         # "root_body_jerk/step",
         # "root_body_velocity/step",
@@ -111,11 +111,9 @@ if __name__ == "__main__":
         "ncsn_perturbation_level/step",
         ]
     scalar_labels = [
-        "Episode Length", 
+        # "Episode Length", 
         # "Average Pose Error", 
-        "Mini-batch Return", 
-        # "Horizon Energy Return", 
-        # "NCSN Perturbation Level", 
+        # "Horizon Return", 
         # "Root Body Acceleration",
         # "Root Body Jerk",
         # "Root Body Velocity",
@@ -235,8 +233,8 @@ if __name__ == "__main__":
             if annotate:
                 if len(annotations) > 0:
                     for offset_idx, text in enumerate(sorted(list(annotations.keys()), key=float)):
-                        # offset = float(offset_idx+1)*0.1*plt.gca().get_ylim()[1]
-                        offset = [-float(1)*0.1*plt.gca().get_ylim()[1], float(1)*0.15*plt.gca().get_ylim()[1]][offset_idx]
+                        offset = float(offset_idx+1)*0.1*plt.gca().get_ylim()[1]
+                        # offset = [-float(1)*0.1*plt.gca().get_ylim()[0], float(1)*0.1*plt.gca().get_ylim()[0]][offset_idx]
                         plt.annotate(round(text,2), xy=annotations[text][0], xytext=(1.002*plt.gca().get_xlim()[1],  annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=annotations[text][1]))
 
             plt.legend()
