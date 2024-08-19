@@ -350,6 +350,7 @@ class HumanoidAMP(HumanoidAMPBase):
         return
 
     def _set_env_state(self, env_ids, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel):
+        humanoid_env_ids = self.num_actors_per_env * env_ids
         self._root_states[env_ids, 0:3] = root_pos
         self._root_states[env_ids, 3:7] = root_rot
         self._root_states[env_ids, 7:10] = root_vel
@@ -359,10 +360,11 @@ class HumanoidAMP(HumanoidAMPBase):
         self._dof_vel[env_ids] = dof_vel
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
-        self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._root_states), 
-                                                    gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+        humanoid_env_ids_int32 = humanoid_env_ids.to(dtype=torch.int32)
+        self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._all_root_states), 
+                                                    gymtorch.unwrap_tensor(humanoid_env_ids_int32), len(humanoid_env_ids_int32))
         self.gym.set_dof_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._dof_state),
-                                                    gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+                                                    gymtorch.unwrap_tensor(humanoid_env_ids_int32), len(humanoid_env_ids_int32))
         return
 
     def _update_hist_amp_obs(self, env_ids=None):

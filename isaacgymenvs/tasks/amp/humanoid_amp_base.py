@@ -103,7 +103,8 @@ class HumanoidAMPBase(VecTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
-        self._root_states = gymtorch.wrap_tensor(actor_root_state)
+        self._all_root_states = gymtorch.wrap_tensor(actor_root_state)
+        self._root_states = self._all_root_states.view(self.num_envs, self.num_actors_per_env, 13)[:, :1, :].squeeze()
         self._initial_root_states = self._root_states.clone()
         self._initial_root_states[:, 7:13] = 0
 
@@ -121,11 +122,11 @@ class HumanoidAMPBase(VecTask):
         self._initial_dof_vel = torch.zeros_like(self._dof_vel, device=self.device, dtype=torch.float)
         
         self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
-        self._rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 0:3]
-        self._rigid_body_rot = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 3:7]
-        self._rigid_body_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 7:10]
-        self._rigid_body_ang_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 10:13]
-        self._contact_forces = gymtorch.wrap_tensor(contact_force_tensor).view(self.num_envs, self.num_bodies, 3)
+        self._rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 0:3]
+        self._rigid_body_rot = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 3:7]
+        self._rigid_body_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 7:10]
+        self._rigid_body_ang_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 10:13]
+        self._contact_forces = gymtorch.wrap_tensor(contact_force_tensor).view(self.num_envs, self.num_bodies, 3)[:,:-1,:]
         
         self._terminate_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
         
@@ -238,7 +239,7 @@ class HumanoidAMPBase(VecTask):
             for additional_actor_name, additional_actor_file in ADDITIONAL_ACTORS.items():
                 # Define additional actor start poses
                 actor_start_pose = gymapi.Transform()
-                actor_start_pose.p = gymapi.Vec3(*[0.5, 0.0, 0.6])
+                actor_start_pose.p = gymapi.Vec3(*[0.5, 0.0, 0.15])
                 actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
                 additional_actor_start_poses[additional_actor_name] = actor_start_pose
 
@@ -267,9 +268,6 @@ class HumanoidAMPBase(VecTask):
             
             handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", i, contact_filter, 0)
             self.gym.enable_actor_dof_force_sensors(env_ptr, handle)
-
-            if self.multi_actor:
-                pass
 
             for j in range(humanoid_num_bodies):
                 self.gym.set_rigid_body_color(
