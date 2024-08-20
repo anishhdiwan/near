@@ -42,7 +42,13 @@ DOF_BODY_IDS = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14]
 DOF_OFFSETS = [0, 3, 6, 9, 10, 13, 14, 17, 18, 21, 24, 25, 28]
 NUM_OBS = 13 + 52 + 28 + 12 # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
 NUM_ACTIONS = 28
-ADDITIONAL_ACTORS = {"football": "amp/soccerball.urdf"}
+
+# Dict with actor name as key and a dict of actor params as value
+
+ADDITIONAL_ACTORS = {
+    "football": {"file": "amp/soccerball.urdf", "num_instances":1, "texture":"amp/meshes/soccer_ball.png"},
+    "flagpole": {"file": "amp/flagpole.urdf", "num_instances":1, "colour": gymapi.Vec3(0.078, 0.671, 0.114)}
+    }
 
 
 KEY_BODY_NAMES = ["right_hand", "left_hand", "right_foot", "left_foot"]
@@ -75,10 +81,17 @@ class HumanoidAMPBase(VecTask):
 
 
         # Whether the scene has other physical actors (here, an actor could also be a non-agent asset like a football) 
-        self.multi_actor = True
-        self.num_actors_per_env = 1 + len(ADDITIONAL_ACTORS)
-        if self.multi_actor:
-            assert self.num_actors_per_env != None
+        self.env_assets = self.cfg["env"].get("envAssets", [])
+        if self.env_assets == []:
+            self.env_assets = False
+        else:
+            global ADDITIONAL_ACTORS
+            ADDITIONAL_ACTORS = dict((k, ADDITIONAL_ACTORS[k]) for k in self.env_assets if k in ADDITIONAL_ACTORS)
+            self.env_assets = True
+    
+        self.num_actors_per_env = 1
+        if self.env_assets:
+            self.num_actors_per_env = 1 + sum([ADDITIONAL_ACTORS[additional_actor]["num_instances"] for additional_actor in list(ADDITIONAL_ACTORS.keys())])
 
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
         
@@ -122,11 +135,11 @@ class HumanoidAMPBase(VecTask):
         self._initial_dof_vel = torch.zeros_like(self._dof_vel, device=self.device, dtype=torch.float)
         
         self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
-        self._rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 0:3]
-        self._rigid_body_rot = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 3:7]
-        self._rigid_body_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 7:10]
-        self._rigid_body_ang_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:-1, 10:13]
-        self._contact_forces = gymtorch.wrap_tensor(contact_force_tensor).view(self.num_envs, self.num_bodies, 3)[:,:-1,:]
+        self._rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:self.humanoid_num_bodies, 0:3]
+        self._rigid_body_rot = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:self.humanoid_num_bodies, 3:7]
+        self._rigid_body_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:self.humanoid_num_bodies, 7:10]
+        self._rigid_body_ang_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:self.humanoid_num_bodies, 10:13]
+        self._contact_forces = gymtorch.wrap_tensor(contact_force_tensor).view(self.num_envs, self.num_bodies, 3)[:,:self.humanoid_num_bodies,:]
         
         self._terminate_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
         
@@ -212,12 +225,12 @@ class HumanoidAMPBase(VecTask):
         self.motor_efforts = to_torch(motor_efforts, device=self.device)
 
         self.torso_index = 0
-        humanoid_num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
-        humanoid_num_dof = self.gym.get_asset_dof_count(humanoid_asset)
-        humanoid_num_joints = self.gym.get_asset_joint_count(humanoid_asset)
-        self.num_bodies = humanoid_num_bodies
-        self.num_dof = humanoid_num_dof
-        self.num_joints = humanoid_num_joints
+        self.humanoid_num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
+        self.humanoid_num_dof = self.gym.get_asset_dof_count(humanoid_asset)
+        self.humanoid_num_joints = self.gym.get_asset_joint_count(humanoid_asset)
+        self.num_bodies = self.humanoid_num_bodies
+        self.num_dof = self.humanoid_num_dof
+        self.num_joints = self.humanoid_num_joints
 
         print(f"Loading humanoid asset. Asset has {self.num_bodies} bodies {self.num_dof} dofs and {self.num_joints} joints")
 
@@ -232,31 +245,37 @@ class HumanoidAMPBase(VecTask):
         self.dof_limits_lower = []
         self.dof_limits_upper = []
 
-        if self.multi_actor:
+        if self.env_assets:
             additional_actor_assets = {}
             additional_actor_start_poses = {}
             self.additional_actor_handles = {}
-            for additional_actor_name, additional_actor_file in ADDITIONAL_ACTORS.items():
+            self.additional_actor_visual = {}
+            for additional_actor_name, additional_actor_params in ADDITIONAL_ACTORS.items():
                 # Define additional actor start poses
-                actor_start_pose = gymapi.Transform()
-                actor_start_pose.p = gymapi.Vec3(*[0.5, 0.0, 0.15])
-                actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
-                additional_actor_start_poses[additional_actor_name] = actor_start_pose
-
+                additional_actor_start_poses[additional_actor_name] = self.get_additional_actor_start_poses(additional_actor_name, additional_actor_params["num_instances"])
+                
                 # Load additional actor assets
-                additional_actor_asset = self.gym.load_asset(self.sim, asset_root, additional_actor_file, asset_options)
+                additional_actor_asset_options = self.get_additional_actor_asset_options(additional_actor_name)
+                additional_actor_asset = self.gym.load_asset(self.sim, asset_root, additional_actor_params["file"], additional_actor_asset_options)
                 additional_actor_assets[additional_actor_name] = additional_actor_asset
+
                 actor_num_bodies = self.gym.get_asset_rigid_body_count(additional_actor_asset)
                 actor_num_dof = self.gym.get_asset_dof_count(additional_actor_asset)
                 actor_num_joints = self.gym.get_asset_joint_count(additional_actor_asset)
                 print(f"Loading {additional_actor_name} asset. Asset has {actor_num_bodies} bodies {actor_num_dof} dofs and {actor_num_joints} joints")
 
-                self.num_bodies += actor_num_bodies
-                self.num_dof += actor_num_dof
-                self.num_joints += actor_num_joints
+                self.num_bodies += actor_num_bodies * additional_actor_params["num_instances"]
+                self.num_dof += actor_num_dof * additional_actor_params["num_instances"]
+                self.num_joints += actor_num_joints * additional_actor_params["num_instances"]
 
                 # Define the list of additional actor handles
                 self.additional_actor_handles[additional_actor_name] = []
+
+                # Define asset visual properties
+                if "texture" in list(additional_actor_params.keys()):
+                    self.additional_actor_visual[additional_actor_name] = {"texture": self.gym.create_texture_from_file(self.sim, additional_actor_params["texture"])}
+                if "colour" in list(additional_actor_params.keys()):
+                    self.additional_actor_visual[additional_actor_name] = {"colour": additional_actor_params["colour"]}
             
         
         for i in range(self.num_envs):
@@ -269,16 +288,23 @@ class HumanoidAMPBase(VecTask):
             handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", i, contact_filter, 0)
             self.gym.enable_actor_dof_force_sensors(env_ptr, handle)
 
-            for j in range(humanoid_num_bodies):
+            for j in range(self.humanoid_num_bodies):
                 self.gym.set_rigid_body_color(
                     env_ptr, handle, j, gymapi.MESH_VISUAL, gymapi.Vec3(0.4706, 0.549, 0.6863))
 
             self.envs.append(env_ptr)
             self.humanoid_handles.append(handle)
 
-            for additional_actor_name in list(additional_actor_assets.keys()):
-                additional_actor_handle = self.gym.create_actor(env_ptr, additional_actor_assets[additional_actor_name], additional_actor_start_poses[additional_actor_name], additional_actor_name, i, contact_filter, 0)
-                self.additional_actor_handles[additional_actor_name] = additional_actor_handle
+            if self.env_assets:
+                for additional_actor_name in list(additional_actor_assets.keys()):
+                    for ind in range(ADDITIONAL_ACTORS[additional_actor_name]["num_instances"]):
+                        additional_actor_handle = self.gym.create_actor(env_ptr, additional_actor_assets[additional_actor_name], additional_actor_start_poses[additional_actor_name][ind], f"{additional_actor_name}_{ind}", i, contact_filter, 0)
+                        self.additional_actor_handles[additional_actor_name].append(additional_actor_handle)
+                        if "texture" in list(ADDITIONAL_ACTORS[additional_actor_name].keys()):
+                            self.gym.set_rigid_body_texture(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, self.additional_actor_visual[additional_actor_name]["texture"])
+                        elif "colour" in list(ADDITIONAL_ACTORS[additional_actor_name].keys()):
+                            self.gym.set_rigid_body_color(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, self.additional_actor_visual[additional_actor_name]["colour"])
+
 
             if (self._pd_control):
                 dof_prop = self.gym.get_asset_dof_properties(humanoid_asset)
@@ -286,7 +312,7 @@ class HumanoidAMPBase(VecTask):
                 self.gym.set_actor_dof_properties(env_ptr, handle, dof_prop)
 
         dof_prop = self.gym.get_actor_dof_properties(env_ptr, handle)
-        for j in range(self.num_dof):
+        for j in range(self.humanoid_num_dof):
             if dof_prop['lower'][j] > dof_prop['upper'][j]:
                 self.dof_limits_lower.append(dof_prop['upper'][j])
                 self.dof_limits_upper.append(dof_prop['lower'][j])
@@ -512,6 +538,61 @@ class HumanoidAMPBase(VecTask):
     def _update_debug_viz(self):
         self.gym.clear_lines(self.viewer)
         return
+
+
+    def get_additional_actor_asset_options(self, additional_actor_name):
+        """
+        Get asset options for the actor
+        """
+
+        if additional_actor_name == "football":
+            asset_options = gymapi.AssetOptions()
+            asset_options.angular_damping = 0.01
+            asset_options.max_angular_velocity = 20.0
+            asset_options.max_linear_velocity = 10.0
+            asset_options.linear_damping = 0.01
+            asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+            # asset_options.use_mesh_materials = True
+            return asset_options
+
+        elif additional_actor_name == "flagpole":
+            asset_options = gymapi.AssetOptions()
+            asset_options.fix_base_link = True
+            asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+            return asset_options
+
+
+
+    def get_additional_actor_start_poses(self, additional_actor_name, num_instances):
+        """ Return a list of start poses for the actors based on some initialisation logic
+        """
+
+        if additional_actor_name == "football":
+            start_poses = []
+            # Initialise the asset at some random point away from the agent with z = 0.15
+            x_pos = np.linspace(1.0, 2.0, num_instances)
+            y_pos = np.linspace(1.0, 2.0, num_instances)
+            for i in range(num_instances):
+                start_p = np.array([x_pos[i], y_pos[i], 0.15])
+                actor_start_pose = gymapi.Transform()
+                actor_start_pose.p = gymapi.Vec3(*list(start_p))
+                actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+                start_poses.append(actor_start_pose)
+            
+            return start_poses
+
+
+        elif additional_actor_name == "flagpole":
+            assert num_instances == 1, "There can only be one flagpole asset. Change the code in humanoid_amp_base to change this"
+
+            # Initialise the asset at some random point away from the agent with z = 0
+            start_p = np.random.uniform(low=0.2, high=0.5, size=3)
+            start_p[-1] = 0.0
+            actor_start_pose = gymapi.Transform()
+            actor_start_pose.p = gymapi.Vec3(*list(start_p))
+            actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
+            return [actor_start_pose]
 
 #####################################################################
 ###=========================jit functions=========================###

@@ -29,6 +29,9 @@ env:
   terminationHeight: 0.3
   enableEarlyTermination: True
 
+  # A list of environment assets to add. If not given or an empty dict is provided, then no env assets are added
+  envAssets: ["football"]
+
   # animation files to learn from
   # these motions should use hyperparameters from HumanoidAMPPPO.yaml
   #motion_file: "amp_humanoid_walk.npy"

@@ -8,13 +8,14 @@
 
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-       <mass value="10.0"/>
-       <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+       <mass value="0.45"/>
+       <!-- Inertia assuming a mass of 0.45kg and a radius of 0.11m. Ixx=Iyy=Izz=0.4mr^2. Inertia products are 0 -->
+       <inertia ixx="0.002178" ixy="0" ixz="0" iyy="0.002178" iyz="0" izz="0.002178"/>
     </inertial>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-				<mesh filename="meshes/soccerball.obj" scale="0.22 0.22 0.22"/>      
+	<mesh filename="meshes/soccerball.obj" scale="0.22 0.22 0.22"/>      
       </geometry>
       <material name="white">
         <color rgba="1 1 1 1"/>
@@ -24,7 +25,8 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-	 <mesh filename="meshes/soccerball.obj" scale="0.22 0.22 0.22"/>
+	 <!-- <mesh filename="meshes/soccerball.obj" scale="0.22 0.22 0.22"/> -->
+	 <sphere radius="0.11"/>
       </geometry>
     </collision>
   </link>
