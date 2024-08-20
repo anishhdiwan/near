@@ -469,30 +469,38 @@ class HumanoidAMP(HumanoidAMPBase):
     def _compute_reward(self, actions):
         """Inherit to add reward types
         """
-        reward_buffers = []
+        if self.env_assets:
+            goal_type = list(self.additional_actor_handles.keys())[0]
+            if goal_type == "flagpole":
+                self.rew_buf[:] = compute_humanoid_target_reaching_reward(self._rigid_body_pos, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'])
+            elif goal_type == "football":
+                raise NotImplementedError
 
-        for reward_type in self.reward_types:
-            if reward_type == "time":
-                reward_buffers.append(compute_humanoid_reward(self.obs_buf))
-            
-            if reward_type == "dist":
-                try:
-                    reward_buffers.append(compute_humanoid_dist_reward(self._rigid_body_pos, self._prev_dist_rew_body_pos, self.body_ids_dict['pelvis']))
-                except AttributeError:
-                    # Small positive reward for first timestep to avoid nan errors
-                    reward_buffers.append(torch.full_like(self.obs_buf[:, 0], 0.001))
-
-                self._prev_dist_rew_body_pos = self._rigid_body_pos.clone()
-
-            if reward_type == "height":
-                reward_buffers.append(compute_humanoid_height_reward(self._rigid_body_pos, self.body_ids_dict['pelvis']))
-
-        # Add all types of rewards proportionally
-        if len(reward_buffers) > 1:
-            reward_buffers = [reward_buffer/len(reward_buffers) for reward_buffer in reward_buffers]
-            self.rew_buf[:] = torch.add(*reward_buffers)
         else:
-            self.rew_buf[:] = reward_buffers[0]
+            reward_buffers = []
+
+            for reward_type in self.reward_types:
+                if reward_type == "time":
+                    reward_buffers.append(compute_humanoid_reward(self.obs_buf))
+                
+                if reward_type == "dist":
+                    try:
+                        reward_buffers.append(compute_humanoid_dist_reward(self._rigid_body_pos, self._prev_dist_rew_body_pos, self.body_ids_dict['pelvis']))
+                    except AttributeError:
+                        # Small positive reward for first timestep to avoid nan errors
+                        reward_buffers.append(torch.full_like(self.obs_buf[:, 0], 0.001))
+
+                    self._prev_dist_rew_body_pos = self._rigid_body_pos.clone()
+
+                if reward_type == "height":
+                    reward_buffers.append(compute_humanoid_height_reward(self._rigid_body_pos, self.body_ids_dict['pelvis']))
+
+            # Add all types of rewards proportionally
+            if len(reward_buffers) > 1:
+                reward_buffers = [reward_buffer/len(reward_buffers) for reward_buffer in reward_buffers]
+                self.rew_buf[:] = torch.add(*reward_buffers)
+            else:
+                self.rew_buf[:] = reward_buffers[0]
 
         return
 
@@ -600,6 +608,28 @@ def compute_humanoid_height_reward(rigid_body_pos, root_body_id):
 
     # Scale to [0,1]
     reward = root_body_z_pos/max_disp
+
+    return reward
+
+
+@torch.jit.script
+def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, target_pos, root_body_id):
+    # type: (Tensor, Tensor, int) -> Tensor
+
+    agent_root_pos = agent_rigid_body_pos.clone()[:, root_body_id, :]
+    agent_root_pos[:,-1] = 0.0
+    target_pos = target_pos.clone()
+    target_pos[:,-1] = 0.0
+
+    pos_error = target_pos - agent_root_pos
+
+    relative_heading_unit_vector = pos_error/pos_error.norm(p=2)
+    desired_heading_unit_vector = torch.zeros_like(relative_heading_unit_vector, dtype=relative_heading_unit_vector.dtype, device=relative_heading_unit_vector.device)
+    desired_heading_unit_vector[:,0] = 1.0
+
+    reward = torch.exp(-0.5*pos_error.norm(p=2, dim=1)**2) 
+    
+    # 0.3*torch.exp(-(torch.max(0, desired_heading_unit_vector-relative_heading_unit_vector*target_pos))**2)
 
     return reward
 
