@@ -544,6 +544,39 @@ def matrix_to_quaternion(matrix: torch.Tensor) -> torch.Tensor:
     ].reshape(batch_dim + (4,))
 
 
+def euler_to_quaternion(euler_angles):
+    """
+    Convert Euler angles in radians to quaternions with the order (x, y, z, w).
+    
+    Args:
+        euler_angles: A tensor of shape (..., 3) where the last dimension contains (x, y, z) Euler angles in radians.
+    
+    Returns:
+        A tensor of shape (..., 4) where the last dimension contains the quaternion (x, y, z, w).
+    """
+    # Unpack Euler angles
+    x = euler_angles[..., 0]  # Roll
+    y = euler_angles[..., 1]  # Pitch
+    z = euler_angles[..., 2]  # Yaw
+
+    # Compute half angles
+    cx = torch.cos(x * 0.5)
+    sx = torch.sin(x * 0.5)
+    cy = torch.cos(y * 0.5)
+    sy = torch.sin(y * 0.5)
+    cz = torch.cos(z * 0.5)
+    sz = torch.sin(z * 0.5)
+
+    # Compute quaternion components
+    w = cx * cy * cz + sx * sy * sz
+    qx = sx * cy * cz - cx * sy * sz
+    qy = cx * sy * cz + sx * cy * sz
+    qz = cx * cy * sz - sx * sy * cz
+
+    # Return quaternion with (x, y, z, w)
+    return torch.stack([qx, qy, qz, w], dim=-1)
+
+
 @torch.jit.script
 def quat_to_tan_norm(q):
     # type: (Tensor) -> Tensor

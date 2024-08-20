@@ -30,19 +30,21 @@ import numpy as np
 import os
 import yaml
 
-from ..poselib.poselib.skeleton.skeleton3d import SkeletonMotion
+from ..poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
 from ..poselib.poselib.core.rotation3d import *
 
-from isaacgymenvs.utils.torch_jit_utils import to_torch, slerp, quat_to_exp_map, quat_to_angle_axis, normalize_angle
+from isaacgymenvs.utils.torch_jit_utils import to_torch, slerp, quat_to_exp_map, quat_to_angle_axis, normalize_angle, euler_to_quaternion
 
 from isaacgymenvs.tasks.amp.humanoid_amp_base import DOF_BODY_IDS, DOF_OFFSETS
 
 
+
 class MotionLib():
-    def __init__(self, motion_file, num_dofs, key_body_ids, device):
+    def __init__(self, motion_file, num_dofs, key_body_ids, device, randomise_heading=False):
         self._num_dof = num_dofs
         self._key_body_ids = key_body_ids
         self._device = device
+        self._randomise_heading = randomise_heading
         self._load_motions(motion_file)
 
         self.motion_ids = torch.arange(len(self._motions), dtype=torch.long, device=self._device)
@@ -132,7 +134,25 @@ class MotionLib():
         unique_ids = np.unique(motion_ids)
         for uid in unique_ids:
             ids = np.where(motion_ids == uid)
-            curr_motion = self._motions[uid]
+            curr_motion = self._motions[uid].clone()
+
+            if self._randomise_heading:
+                # Quaternion rotation according to the axes of the tpose. Use https://www.andre-gaschler.com/rotationconverter/ 
+                # Some rotation in the vertical axis between 0-pi radians
+                rot_to_apply = euler_to_quaternion(3.14*torch.rand(3)*torch.tensor([0.,0.,1.]))
+
+                new_local_rotation = curr_motion.local_rotation.clone()
+                new_local_rotation[..., 0, :] = quat_mul_norm(
+                    rot_to_apply, curr_motion.local_rotation[..., 0, :]
+                )
+
+                curr_motion = SkeletonMotion.from_skeleton_state(SkeletonState.from_rotation_and_root_translation(
+                    skeleton_tree=curr_motion.skeleton_tree,
+                    r=new_local_rotation,
+                    t=quat_rotate(rot_to_apply, curr_motion.root_translation),
+                    is_local=True,
+                ), curr_motion.fps)
+                curr_motion.dof_vels = self._compute_motion_dof_vels(curr_motion)
 
             root_pos0[ids, :]  = curr_motion.global_translation[frame_idx0[ids], 0].numpy()
             root_pos1[ids, :]  = curr_motion.global_translation[frame_idx1[ids], 0].numpy()

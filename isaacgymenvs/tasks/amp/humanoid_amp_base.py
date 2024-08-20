@@ -85,6 +85,7 @@ class HumanoidAMPBase(VecTask):
         if self.env_assets == []:
             self.env_assets = False
         else:
+            
             global ADDITIONAL_ACTORS
             ADDITIONAL_ACTORS = dict((k, ADDITIONAL_ACTORS[k]) for k in self.env_assets if k in ADDITIONAL_ACTORS)
             self.env_assets = True
@@ -593,6 +594,32 @@ class HumanoidAMPBase(VecTask):
             actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
             return [actor_start_pose]
+
+    def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids):
+        """ Return a list of reset poses for the actors. Outputs a tensor of shape [num_env_ids*num_instances, 3]
+        """
+
+        if additional_actor_name[0] == "football":
+            start_poses = []
+            # Initialise the asset at some random point away from the agent with z = 0.15
+            min_dist = -1.0
+            max_dist = 1.0
+            reset_poses = torch.FloatTensor(num_instances*num_env_ids, 3).uniform_(min_dist, max_dist)   
+            reset_poses[:,-1] = 0.15         
+            return reset_poses
+
+
+        elif additional_actor_name[0] == "flagpole":
+            assert num_instances == 1, "There can only be one flagpole asset. Change the code in humanoid_amp_base to change this"
+
+            start_poses = []
+            # Initialise the asset at some random point away from the agent with z = 0.15
+            min_dist = 1.5
+            max_dist = 4.0
+            reset_poses = torch.FloatTensor(num_instances*num_env_ids, 3).uniform_(min_dist, max_dist)    
+            reset_poses[:,-1] = 0.0          
+            return reset_poses
+
 
 #####################################################################
 ###=========================jit functions=========================###

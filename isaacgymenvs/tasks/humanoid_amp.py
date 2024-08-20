@@ -161,7 +161,8 @@ class HumanoidAMP(HumanoidAMPBase):
         self._motion_lib = MotionLib(motion_file=motion_file, 
                                      num_dofs=self.num_dof,
                                      key_body_ids=self._key_body_ids.cpu().numpy(), 
-                                     device=self.device)
+                                     device=self.device,
+                                     randomise_heading=self.env_assets)
         return
 
     def reset_idx(self, env_ids):
@@ -369,6 +370,22 @@ class HumanoidAMP(HumanoidAMPBase):
                                                     gymtorch.unwrap_tensor(humanoid_env_ids_int32), len(humanoid_env_ids_int32))
         self.gym.set_dof_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._dof_state),
                                                     gymtorch.unwrap_tensor(humanoid_env_ids_int32), len(humanoid_env_ids_int32))
+
+        # Reset assets
+        if self.env_assets:
+            actor_root_pos = self.get_additional_actor_reset_poses(list(self.additional_actor_handles.keys()), self.num_actors_per_env-1, len(humanoid_env_ids))
+            actor_root_rot = torch.zeros((self.num_actors_per_env-1)*len(humanoid_env_ids), 4)
+            actor_root_rot[:,-1] = 1.0
+            actor_ids = torch.cat([humanoid_env_ids+i for i in range(1,self.num_actors_per_env)])
+            self._all_root_states[actor_ids, 0:3] = actor_root_pos.to('cuda:0', dtype=torch.float)
+            self._all_root_states[actor_ids, 3:7] = actor_root_rot.to('cuda:0', dtype=torch.float)
+            self._all_root_states[actor_ids, 7:10] = torch.zeros_like(actor_root_pos, dtype=torch.float, device='cuda:0')
+            self._all_root_states[actor_ids, 10:13] = torch.zeros_like(actor_root_pos, dtype=torch.float, device='cuda:0')
+
+            actor_ids_int32 = actor_ids.to(dtype=torch.int32)
+            self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._all_root_states), 
+                                                        gymtorch.unwrap_tensor(actor_ids_int32), len(actor_ids_int32))
+        
         return
 
     def _update_hist_amp_obs(self, env_ids=None):
