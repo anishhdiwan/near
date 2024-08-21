@@ -375,10 +375,22 @@ class HumanoidAMPBase(VecTask):
         return
 
     def _compute_reset(self):
-        self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(self.reset_buf, self.progress_buf,
-                                                   self._contact_forces, self._contact_body_ids,
-                                                   self._rigid_body_pos, self.max_episode_length,
-                                                   self._enable_early_termination, self._termination_height)
+        if self.env_assets:
+            goal_type = list(self.additional_actor_handles.keys())[0]
+            if goal_type == "flagpole":
+                self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_target_reaching_reset(self.reset_buf, self.progress_buf,
+                                                        self._contact_forces, self._contact_body_ids,
+                                                        self._rigid_body_pos, self._additional_actor_rigid_body_pos, self.max_episode_length,
+                                                        self._enable_early_termination, self._termination_height, self.body_ids_dict['pelvis'])
+            elif goal_type == "football":
+                raise NotImplementedError
+        else:
+            self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(self.reset_buf, self.progress_buf,
+                                                    self._contact_forces, self._contact_body_ids,
+                                                    self._rigid_body_pos, self.max_episode_length,
+                                                    self._enable_early_termination, self._termination_height)
+
+
         return
 
     def _refresh_sim_tensors(self):
@@ -726,5 +738,43 @@ def compute_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_id
         terminated = torch.where(has_fallen, torch.ones_like(reset_buf), terminated)
     
     reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
+
+    return reset, terminated
+
+
+@torch.jit.script
+def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos, target_pos,
+                           max_episode_length, enable_early_termination, termination_height, root_body_id):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, bool, float, int) -> Tuple[Tensor, Tensor]
+    terminated = torch.zeros_like(reset_buf)
+
+    if (enable_early_termination):
+        masked_contact_buf = contact_buf.clone()
+        masked_contact_buf[:, contact_body_ids, :] = 0
+        fall_contact = torch.any(masked_contact_buf > 0.1, dim=-1)
+        fall_contact = torch.any(fall_contact, dim=-1)
+
+        body_height = rigid_body_pos[..., 2]
+        fall_height = body_height < termination_height
+        fall_height[:, contact_body_ids] = False
+        fall_height = torch.any(fall_height, dim=-1)
+
+        has_fallen = torch.logical_and(fall_contact, fall_height)
+
+        # first timestep can sometimes still have nonzero contact forces
+        # so only check after first couple of steps
+        has_fallen *= (progress_buf > 1)
+        terminated = torch.where(has_fallen, torch.ones_like(reset_buf), terminated)
+    
+    reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
+
+    agent_root_pos = rigid_body_pos.clone()[:, root_body_id, :]
+    agent_root_pos[:,-1] = 0.0
+    target_pos = target_pos.clone()
+    target_pos[:,-1] = 0.0
+    pos_error = torch.norm(target_pos - agent_root_pos, p=2, dim=1)
+    pos_error_thresh = 0.25
+
+    reset = torch.where(pos_error <= pos_error_thresh, torch.ones_like(reset_buf), reset)
 
     return reset, terminated
