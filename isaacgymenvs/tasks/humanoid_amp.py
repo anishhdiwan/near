@@ -373,11 +373,11 @@ class HumanoidAMP(HumanoidAMPBase):
 
         # Reset assets
         if self.env_assets:
-            actor_root_pos = self.get_additional_actor_reset_poses(list(self.additional_actor_handles.keys()), self.num_actors_per_env-1, len(humanoid_env_ids))
+            actor_root_pos = self.get_additional_actor_reset_poses(list(self.additional_actor_handles.keys()), self.num_actors_per_env-1, len(humanoid_env_ids), root_pos)
             actor_root_rot = torch.zeros((self.num_actors_per_env-1)*len(humanoid_env_ids), 4)
             actor_root_rot[:,-1] = 1.0
             actor_ids = torch.cat([humanoid_env_ids+i for i in range(1,self.num_actors_per_env)])
-            self._all_root_states[actor_ids, 0:3] = actor_root_pos.to('cuda:0', dtype=torch.float)
+            self._all_root_states[actor_ids, 0:3] = actor_root_pos
             self._all_root_states[actor_ids, 3:7] = actor_root_rot.to('cuda:0', dtype=torch.float)
             self._all_root_states[actor_ids, 7:10] = torch.zeros_like(actor_root_pos, dtype=torch.float, device='cuda:0')
             self._all_root_states[actor_ids, 10:13] = torch.zeros_like(actor_root_pos, dtype=torch.float, device='cuda:0')
@@ -472,7 +472,7 @@ class HumanoidAMP(HumanoidAMPBase):
         if self.env_assets:
             goal_type = list(self.additional_actor_handles.keys())[0]
             if goal_type == "flagpole":
-                self.rew_buf[:] = compute_humanoid_target_reaching_reward(self._rigid_body_pos, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'])
+                self.rew_buf[:] = compute_humanoid_target_reaching_reward(self._rigid_body_pos, self._rigid_body_vel, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'])
             elif goal_type == "football":
                 raise NotImplementedError
 
@@ -630,23 +630,25 @@ def compute_humanoid_height_reward(rigid_body_pos, root_body_id):
 
 
 @torch.jit.script
-def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, target_pos, root_body_id):
-    # type: (Tensor, Tensor, int) -> Tensor
+def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_body_vel, target_pos, root_body_id):
+    # type: (Tensor, Tensor, Tensor, int) -> Tensor
 
     agent_root_pos = agent_rigid_body_pos.clone()[:, root_body_id, :]
     agent_root_pos[:,-1] = 0.0
     target_pos = target_pos.clone()
     target_pos[:,-1] = 0.0
+    agent_root_body_vel = agent_rigid_body_vel.clone()[:, root_body_id, :]
+    agent_root_body_vel[:,-1] = 0.0
+    # agent_root_body_vel = agent_root_body_vel.norm(p=2, dim=1)
 
     pos_error = target_pos - agent_root_pos
+    pos_error_norm = pos_error.norm(p=2, dim=1)
+    root_to_target_unit_vector = (pos_error.mT/pos_error_norm).mT
+    agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)
+    heading_error = 1.0 - agent_vel_in_unit_vector_direction
 
-    relative_heading_unit_vector = pos_error/pos_error.norm(p=2)
-    desired_heading_unit_vector = torch.zeros_like(relative_heading_unit_vector, dtype=relative_heading_unit_vector.dtype, device=relative_heading_unit_vector.device)
-    desired_heading_unit_vector[:,0] = 1.0
-
-    reward = torch.exp(-0.5*pos_error.norm(p=2, dim=1)**2) 
-    
-    # 0.3*torch.exp(-(torch.max(0, desired_heading_unit_vector-relative_heading_unit_vector*target_pos))**2)
+    reward = 0.4*torch.exp(-0.5*pos_error_norm**2) + 0.6*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
+    reward[pos_error_norm < 1.05] += 0.5
 
     return reward
 

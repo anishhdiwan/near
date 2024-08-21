@@ -291,9 +291,10 @@ class HumanoidAMPBase(VecTask):
             handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", i, contact_filter, 0)
             self.gym.enable_actor_dof_force_sensors(env_ptr, handle)
 
+            random_colour = gymapi.Vec3(*np.random.uniform(0.0, 1.0, 3))
             for j in range(self.humanoid_num_bodies):
                 self.gym.set_rigid_body_color(
-                    env_ptr, handle, j, gymapi.MESH_VISUAL, gymapi.Vec3(0.4706, 0.549, 0.6863))
+                    env_ptr, handle, j, gymapi.MESH_VISUAL, random_colour) #gymapi.Vec3(0.4706, 0.549, 0.6863)
 
             self.envs.append(env_ptr)
             self.humanoid_handles.append(handle)
@@ -306,7 +307,7 @@ class HumanoidAMPBase(VecTask):
                         if "texture" in list(ADDITIONAL_ACTORS[additional_actor_name].keys()):
                             self.gym.set_rigid_body_texture(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, self.additional_actor_visual[additional_actor_name]["texture"])
                         elif "colour" in list(ADDITIONAL_ACTORS[additional_actor_name].keys()):
-                            self.gym.set_rigid_body_color(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, self.additional_actor_visual[additional_actor_name]["colour"])
+                            self.gym.set_rigid_body_color(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, random_colour) #self.additional_actor_visual[additional_actor_name]["colour"]
 
 
             if (self._pd_control):
@@ -609,12 +610,11 @@ class HumanoidAMPBase(VecTask):
 
             return [actor_start_pose]
 
-    def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids):
+    def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids, agent_pos):
         """ Return a list of reset poses for the actors. Outputs a tensor of shape [num_env_ids*num_instances, 3]
         """
 
         if additional_actor_name[0] == "football":
-            start_poses = []
             # Initialise the asset at some random point away from the agent with z = 0.15
             min_dist = -1.0
             max_dist = 1.0
@@ -622,16 +622,21 @@ class HumanoidAMPBase(VecTask):
             reset_poses[:,-1] = 0.15         
             return reset_poses
 
-
         elif additional_actor_name[0] == "flagpole":
             assert num_instances == 1, "There can only be one flagpole asset. Change the code in humanoid_amp_base to change this"
 
-            start_poses = []
-            # Initialise the asset at some random point away from the agent with z = 0.15
+            # Initialise the asset in a band defined by a min and max radius relative to the agent with z = 0.0
             min_dist = 1.5
-            max_dist = 4.0
-            reset_poses = torch.FloatTensor(num_instances*num_env_ids, 3).uniform_(min_dist, max_dist)    
-            reset_poses[:,-1] = 0.0          
+            max_dist = 6.0
+            directions = torch.randn(num_instances*num_env_ids, 2)
+            norms = torch.norm(directions, dim=1, keepdim=True) 
+            unit_vectors = directions/norms  # Normalize to get points on the unit sphere
+            radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
+            reset_poses = unit_vectors * radii[:, None]
+            reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
+            reset_poses += agent_pos[:, :-1] # Translate reset pos relative to the agent
+            reset_poses = torch.cat([reset_poses, torch.zeros(reset_poses.shape[0], 1).to('cuda:0', dtype=torch.float)], dim=1)    
+
             return reset_poses
 
 
@@ -774,8 +779,9 @@ def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf,
     target_pos[:,-1] = 0.0
     relative_target_pos = target_pos - agent_root_pos
     pos_error = torch.norm(relative_target_pos, p=2, dim=1)
-    pos_error_thresh = 0.25
+    min_pos_error_thresh = 1.0
+    max_pos_error_thresh = 8.0
 
-    reset = torch.where(pos_error <= pos_error_thresh, torch.ones_like(reset_buf), reset)
+    reset = torch.where(((pos_error <= min_pos_error_thresh) | (pos_error >= max_pos_error_thresh)), torch.ones_like(reset_buf), reset)
 
     return reset, terminated

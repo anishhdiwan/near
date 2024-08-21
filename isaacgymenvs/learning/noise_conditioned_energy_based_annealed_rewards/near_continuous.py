@@ -286,7 +286,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         self.mean_energy.update(rewards.sum(dim=0))
 
         # Update the reward transformation once every few frames
-        if (self.epoch_num % 3==0) or (self.epoch_num==1):
+        if (self.epoch_num % 3==0) or (self.epoch_num==1) or not hasattr(self, "mean_offset_rew"):
             self.mean_offset_rew = self._transformed_rewards_buffer.append(rewards)
         else:
             self._transformed_rewards_buffer.append(rewards, return_avg=False)
@@ -599,6 +599,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
                     obs1 = torch.cat((progress1,obs1), -1)
                     obs0 = torch.cat((progress0,obs0), -1)
                     infos['amp_obs'] = torch.cat((obs1, obs0), -1)
+
+            if self._goal_conditioning:
+                if n == (self.horizon_length - 1):
+                    goal_features1 = self.vec_env.env.get_goal_features()
+                    self.obs['obs'] = torch.cat((goal_features1, self.obs['obs']), -1)
 
             shaped_rewards = self.rewards_shaper(rewards)
             if self.value_bootstrap and 'time_outs' in infos:

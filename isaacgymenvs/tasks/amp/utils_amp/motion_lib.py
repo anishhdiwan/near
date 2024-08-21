@@ -134,9 +134,10 @@ class MotionLib():
         unique_ids = np.unique(motion_ids)
         for uid in unique_ids:
             ids = np.where(motion_ids == uid)
-            curr_motion = self._motions[uid].clone()
 
+            self._randomise_heading = False
             if self._randomise_heading:
+                curr_motion = self._motions[uid].clone()
                 # Quaternion rotation according to the axes of the tpose. Use https://www.andre-gaschler.com/rotationconverter/ 
                 # Some rotation in the vertical axis between 0-pi radians
                 rot_to_apply = euler_to_quaternion(3.14*torch.rand(3)*torch.tensor([0.,0.,1.]))
@@ -153,6 +154,8 @@ class MotionLib():
                     is_local=True,
                 ), curr_motion.fps)
                 curr_motion.dof_vels = self._compute_motion_dof_vels(curr_motion)
+            else:
+                curr_motion = self._motions[uid]
 
             root_pos0[ids, :]  = curr_motion.global_translation[frame_idx0[ids], 0].numpy()
             root_pos1[ids, :]  = curr_motion.global_translation[frame_idx1[ids], 0].numpy()
