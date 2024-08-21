@@ -537,6 +537,23 @@ class HumanoidAMP(HumanoidAMPBase):
         except KeyError:
             self.reward_types = ["time"]
 
+    def get_goal_features(self):
+        goal_type = list(self.additional_actor_handles.keys())[0]
+        if goal_type == "flagpole":
+            agent_rigid_body_pos = self._rigid_body_pos.clone()
+            target_pos = self._additional_actor_rigid_body_pos.clone()
+            root_body_id = self.body_ids_dict['pelvis']
+            
+            agent_root_pos = agent_rigid_body_pos[:, root_body_id, :]
+            agent_root_pos[:,-1] = 0.0
+            target_pos[:,-1] = 0.0
+
+            relative_target_pos = target_pos - agent_root_pos
+            return relative_target_pos[:,:-1]
+
+        elif goal_type == "football":
+            raise NotImplementedError
+
 
 
 #####################################################################

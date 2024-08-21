@@ -264,7 +264,7 @@ class RLGPUEnv(vecenv.IVecEnv):
 
                 info = {}
                 info['action_space'] = self.env.action_space
-                # Increase the observation space dims by 1 to account for the added temporal feature
+                # Increase the observation space dims to account for the added temporal feature
                 info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + temporal_emb_dim) * -np.Inf, np.ones(self.env.num_obs + temporal_emb_dim) * np.Inf)
 
                 if hasattr(self.env, "amp_observation_space"):
@@ -280,6 +280,32 @@ class RLGPUEnv(vecenv.IVecEnv):
                     print(info['action_space'], info['observation_space'])
 
                 return info
+
+        elif "goal_conditioning" in list(kwargs.keys()):
+            if kwargs["goal_conditioning"] == True:
+                assert "goal_type" in list(kwargs.keys()), "A goal type must be provided for the appropriate goal features to be passed on to the policy"
+                goal_type = kwargs["goal_type"]
+
+                if goal_type == "flagpole":
+                    info = {}
+                    info['action_space'] = self.env.action_space
+                    # Increase the observation space dims by 2 (x,y pos of flagpole) to account for the added temporal feature
+                    info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + 2) * -np.Inf, np.ones(self.env.num_obs + 2) * np.Inf)
+
+                    if hasattr(self.env, "amp_observation_space"):
+                        info['amp_observation_space'] = self.env.amp_observation_space
+                        info['paired_observation_space'] = self.env.amp_observation_space
+
+                    if self.env.num_states > 0:
+                        info['state_space'] = self.env.state_space
+                        print(info['action_space'], info['observation_space'], info['state_space'])
+                    else:
+                        print(info['action_space'], info['observation_space'])
+
+                    return info
+
+                elif goal_type == "football":
+                    raise NotImplementedError
 
         else:
             info = {}

@@ -772,7 +772,8 @@ def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf,
     agent_root_pos[:,-1] = 0.0
     target_pos = target_pos.clone()
     target_pos[:,-1] = 0.0
-    pos_error = torch.norm(target_pos - agent_root_pos, p=2, dim=1)
+    relative_target_pos = target_pos - agent_root_pos
+    pos_error = torch.norm(relative_target_pos, p=2, dim=1)
     pos_error_thresh = 0.25
 
     reset = torch.where(pos_error <= pos_error_thresh, torch.ones_like(reset_buf), reset)

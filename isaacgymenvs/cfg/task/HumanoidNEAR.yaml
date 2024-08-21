@@ -30,7 +30,7 @@ env:
   enableEarlyTermination: True
 
   # A list of environment assets to add. If not given or an empty dict is provided, then no env assets are added
-  envAssets: ["football"]
+  envAssets: ["flagpole"]
 
   # animation files to learn from
   # these motions should use hyperparameters from HumanoidAMPPPO.yaml

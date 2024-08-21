@@ -44,7 +44,15 @@ class NEARAgent(a2c_continuous.A2CAgent):
         config = params['config']
 
         # If using temporal feature in the state vector, create the environment first and then augment the env_info to account for extra dims
+        env_assets = config['near_config']['data']['env_params'].get('envAssets', [])
+        if env_assets != []:
+            self._goal_conditioning = True
+            self.goal_type = env_assets[0]
+        else:
+            self._goal_conditioning = False
+
         if config['near_config']['model']['encode_temporal_feature']:
+            assert self._goal_conditioning == False, "Goal conditioning loading while using temporal features is currently not implemented"
             print("Using Temporal Features")
             env_config = config.get('env_config', {})
             num_actors = config['num_actors']
@@ -56,10 +64,21 @@ class NEARAgent(a2c_continuous.A2CAgent):
             self.env_info = vec_env.get_env_info(temporal_feature=True, temporal_emb_dim=temporal_emb_dim)
             params['config']['env_info'] = self.env_info
 
+        if self._goal_conditioning:
+            assert config['near_config']['model']['encode_temporal_feature'] == False, "Goal conditioning while loading while using temporal features is currently not implemented"
+            print("Setting up goal conditioning")
+            env_config = config.get('env_config', {})
+            num_actors = config['num_actors']
+            env_name = config['env_name']
+
+            vec_env = vecenv.create_vec_env(env_name, num_actors, **env_config)
+            self.env_info = vec_env.get_env_info(goal_conditioning=True, goal_type=self.goal_type)
+            params['config']['env_info'] = self.env_info
+
         super().__init__(base_name, params)
 
         # Set the self.vec_env attribute
-        if config['near_config']['model']['encode_temporal_feature']:
+        if config['near_config']['model']['encode_temporal_feature'] or self._goal_conditioning:
             self.vec_env = vec_env
 
 
@@ -536,9 +555,14 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
             # Append temporal feature to observations if needed
             if self._encode_temporal_feature:
-                # progress0 = torch.unsqueeze(self.vec_env.env.progress_buf/self._max_episode_length, -1)
                 progress0 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
                 self.obs['obs'] = torch.cat((progress0, self.obs['obs']), -1)
+            
+            # Append goal feature to observations if needed
+            if self._goal_conditioning:
+                goal_features0 = self.vec_env.env.get_goal_features()
+                self.obs['obs'] = torch.cat((goal_features0, self.obs['obs']), -1)
+
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
             if self.use_action_masks:
@@ -665,6 +689,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
             if self._encode_temporal_feature:
                 progress0 = self.embed(self.vec_env.env.progress_buf/self._max_episode_length)
                 self.run_obses['obs'] = torch.cat((progress0, self.run_obses['obs']), -1)
+
+            # Append goal feature to observations if needed
+            if self._goal_conditioning:
+                goal_features0 = self.vec_env.env.get_goal_features()
+                self.run_obses['obs'] = torch.cat((goal_features0, self.run_obses['obs']), -1)
 
             if self.use_action_masks:
                 masks = self.vec_env.get_action_masks()
