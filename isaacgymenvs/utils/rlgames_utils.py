@@ -307,8 +307,8 @@ class RLGPUEnv(vecenv.IVecEnv):
                 if goal_type == "box":
                     info = {}
                     info['action_space'] = self.env.action_space
-                    # Increase the observation space dims by 2 (x,y pos of box) to account for the added temporal feature
-                    info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + 2) * -np.Inf, np.ones(self.env.num_obs + 2) * np.Inf)
+                    # Increase the observation space dims by 3 (x,y pos of box and has_punched) to account for the added temporal feature
+                    info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + 3) * -np.Inf, np.ones(self.env.num_obs + 3) * np.Inf)
 
                     if hasattr(self.env, "amp_observation_space"):
                         info['amp_observation_space'] = self.env.amp_observation_space

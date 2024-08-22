@@ -385,6 +385,8 @@ class HumanoidAMP(HumanoidAMPBase):
             actor_ids_int32 = actor_ids.to(dtype=torch.int32)
             self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._all_root_states), 
                                                         gymtorch.unwrap_tensor(actor_ids_int32), len(actor_ids_int32))
+
+            self.reset_additional_actor_state(list(self.additional_actor_handles.keys()), env_ids)
         
         return
 
@@ -476,7 +478,7 @@ class HumanoidAMP(HumanoidAMPBase):
             elif goal_type == "football":
                 raise NotImplementedError
             elif goal_type == "box":
-                self.rew_buf[:] = compute_humanoid_target_punching_reward(self._rigid_body_pos, self._rigid_body_vel, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'])
+                self.rew_buf[:] = compute_humanoid_target_punching_reward(self._rigid_body_pos, self._rigid_body_vel, self._additional_actor_rigid_body_pos, self.additional_actor_state, self.body_ids_dict)
 
 
         else:
@@ -564,7 +566,9 @@ class HumanoidAMP(HumanoidAMPBase):
             target_pos[:,-1] = 0.0
 
             relative_target_pos = target_pos - agent_root_pos
-            return relative_target_pos[:,:-1]
+            additional_actor_state = self.additional_actor_state.float()
+
+            return torch.cat([relative_target_pos[:,:-1],additional_actor_state.unsqueeze(1)], dim=-1)
 
         elif goal_type == "football":
             raise NotImplementedError
@@ -669,15 +673,21 @@ def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_bo
 
 
 @torch.jit.script
-def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_body_vel, target_pos, root_body_id):
-    # type: (Tensor, Tensor, Tensor, int) -> Tensor
+def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_body_vel, target_pos, target_punched, body_ids_dict):
+    # type: (Tensor, Tensor, Tensor, Tensor, Dict[str, int]) -> Tensor
 
+    root_body_id = body_ids_dict["pelvis"]
+    punching_body_id = body_ids_dict["left_hand"]
     agent_root_pos = agent_rigid_body_pos.clone()[:, root_body_id, :]
     agent_root_pos[:,-1] = 0.0
+    agent_punching_body_pos = agent_rigid_body_pos.clone()[:, punching_body_id, :]
+    agent_punching_body_pos[:,-1] = 0.0
     target_pos = target_pos.clone()
     target_pos[:,-1] = 0.0
     agent_root_body_vel = agent_rigid_body_vel.clone()[:, root_body_id, :]
     agent_root_body_vel[:,-1] = 0.0
+    agent_punching_body_vel = agent_rigid_body_vel.clone()[:, punching_body_id, :]
+    agent_punching_body_vel[:,-1] = 0.0
     # agent_root_body_vel = agent_root_body_vel.norm(p=2, dim=1)
 
     pos_error = target_pos - agent_root_pos
@@ -685,9 +695,17 @@ def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_bo
     root_to_target_unit_vector = (pos_error.mT/pos_error_norm).mT
     agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)
     heading_error = 1.0 - agent_vel_in_unit_vector_direction
+    punching_body_vel_in_unit_vector_direction = torch.sum(agent_punching_body_vel * root_to_target_unit_vector, dim=1)
+    punching_body_pos_error = target_pos - agent_punching_body_pos
+    punching_body_pos_error_norm = punching_body_pos_error.norm(p=2, dim=1)
 
-    reward = 0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
-    reward[pos_error_norm <= 1.00] += 0.5
+
+    reward_near = 0.3*(0.2*torch.exp(-2*punching_body_pos_error_norm**2) + 0.8*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1)) + 0.3
+    reward_far = 0.3*(0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
+    reward_far[target_punched] = 1.0
+    reward_near[target_punched] = 1.0
+    near_mask = (~target_punched) & (pos_error_norm < 1.375)
+    reward = torch.where(near_mask, reward_near, reward_far)
 
     return reward
 

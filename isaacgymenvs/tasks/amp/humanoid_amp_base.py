@@ -141,10 +141,12 @@ class HumanoidAMPBase(VecTask):
         self._rigid_body_rot = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:self.humanoid_num_bodies, 3:7]
         self._rigid_body_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:self.humanoid_num_bodies, 7:10]
         self._rigid_body_ang_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,:self.humanoid_num_bodies, 10:13]
-        self._contact_forces = gymtorch.wrap_tensor(contact_force_tensor).view(self.num_envs, self.num_bodies, 3)[:,:self.humanoid_num_bodies,:]
+        self.all_contact_forces = gymtorch.wrap_tensor(contact_force_tensor)
+        self._contact_forces = self.all_contact_forces.view(self.num_envs, self.num_bodies, 3)[:,:self.humanoid_num_bodies,:]
 
         self._additional_actor_rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,self.humanoid_num_bodies:self.num_bodies, 0:3].squeeze()
-        
+        self._additional_actor_contact_forces = self.all_contact_forces.view(self.num_envs, self.num_bodies, 3)[...,self.humanoid_num_bodies:self.num_bodies,:].squeeze()
+
         self._terminate_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
         
         if self.viewer != None:
@@ -408,6 +410,9 @@ class HumanoidAMPBase(VecTask):
         self.gym.refresh_force_sensor_tensor(self.sim)
         self.gym.refresh_dof_force_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
+
+        if self.env_assets:
+            self.refresh_additional_actor_state()
         return
 
     def _compute_observations(self, env_ids=None):
@@ -592,7 +597,7 @@ class HumanoidAMPBase(VecTask):
 
 
     def get_additional_actor_start_poses(self, additional_actor_name, num_instances):
-        """ Return a list of start poses for the actors based on some initialisation logic
+        """ Return a list of start poses for the actors based on some initialisation logic. Also set up any states for the actors
         """
 
         if additional_actor_name == "football":
@@ -614,7 +619,7 @@ class HumanoidAMPBase(VecTask):
             assert num_instances == 1, "There can only be one flagpole asset. Change the code in humanoid_amp_base to change this"
 
             # Initialise the asset at some random point away from the agent with z = 0
-            start_p = np.random.uniform(low=0.2, high=0.5, size=3)
+            start_p = np.random.uniform(low=2.0, high=3.0, size=3)
             start_p[-1] = 0.0
             actor_start_pose = gymapi.Transform()
             actor_start_pose.p = gymapi.Vec3(*list(start_p))
@@ -627,13 +632,49 @@ class HumanoidAMPBase(VecTask):
             assert num_instances == 1, "There can only be one box asset. Change the code in humanoid_amp_base to change this"
 
             # Initialise the asset at some random point away from the agent with z = 0
-            start_p = np.random.uniform(low=0.2, high=0.5, size=3)
+            start_p = np.random.uniform(low=2.0, high=2.0, size=3)
             start_p[-1] = 1.02
             actor_start_pose = gymapi.Transform()
             actor_start_pose.p = gymapi.Vec3(*list(start_p))
             actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+            self.additional_actor_state = torch.full((self.num_envs*(self.num_actors_per_env-1),), False).to('cuda:0')
 
             return [actor_start_pose]
+
+    def reset_additional_actor_state(self, additional_actor_name, additional_actor_ids):
+        if additional_actor_name[0] in ["football", "flagpole"]:
+            pass
+        elif additional_actor_name[0] == "box":
+            self.additional_actor_state[additional_actor_ids] = False
+    
+    def refresh_additional_actor_state(self):
+        if list(self.additional_actor_handles.keys())[0] in ["football", "flagpole"]:
+            pass
+        elif list(self.additional_actor_handles.keys())[0] == "box":
+            # The box has been punched if the punching hand and the box both have non zero forces and if the root body is not below the reset threshold
+            if not hasattr(self, "non_punching_bodies"):
+                non_punching_bodies = [self.body_ids_dict[body_name] for body_name in POSSIBLE_BODY_NAMES if body_name not in ["left_hand"]]
+                self.non_punching_bodies = to_torch(sorted(non_punching_bodies), device=self.device, dtype=torch.long) 
+            
+            # List of envs where the punching body has non zero contact forces 
+            masked_contact_buf = self._contact_forces.clone()
+            masked_contact_buf[:, self.non_punching_bodies, :] = 0
+            punching_body_contact = torch.any(masked_contact_buf > 0.5, dim=-1)
+            punching_body_contact = torch.any(punching_body_contact, dim=-1)
+
+            # List of envs where the box has non zero contact forces
+            masked_additional_actor_contact_buf = self._additional_actor_contact_forces.clone()
+            masked_additional_actor_contact_buf[:, -1] = 0 # Ignore z axis forces to discount gravity induced normal force
+            box_contact = torch.any(masked_additional_actor_contact_buf>0.5, dim=-1)
+
+            # List of envs where the body height is above a threshold
+            root_body_height = self._rigid_body_pos[:, self.body_ids_dict["pelvis"], 2]
+            not_fallen = root_body_height > self._termination_height
+            not_fallen = torch.any(not_fallen, dim=-1)
+
+            has_punched = torch.logical_and(torch.logical_and(punching_body_contact, box_contact), not_fallen)
+            self.additional_actor_state[:] = has_punched.to('cuda:0')
+
 
     def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids, agent_pos):
         """ Return a list of reset poses for the actors. Outputs a tensor of shape [num_env_ids*num_instances, 3]
@@ -652,7 +693,7 @@ class HumanoidAMPBase(VecTask):
 
             # Initialise the asset in a band defined by a min and max radius relative to the agent with z = 0.0
             min_dist = 1.5
-            max_dist = 6.0
+            max_dist = 4.0
             half_arc_theta = 120
 
             directions = torch.randn(num_instances*num_env_ids, 2)
@@ -869,15 +910,16 @@ def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf,
     
     reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
 
+    # Reset it agent too far away from box
+
     agent_root_pos = rigid_body_pos.clone()[:, root_body_id, :]
     agent_root_pos[:,-1] = 0.0
     target_pos = target_pos.clone()
     target_pos[:,-1] = 0.0
     relative_target_pos = target_pos - agent_root_pos
     pos_error = torch.norm(relative_target_pos, p=2, dim=1)
-    min_pos_error_thresh = 1.0
-    max_pos_error_thresh = 8.0
+    max_pos_error_thresh = 6.0
 
-    reset = torch.where(((pos_error <= min_pos_error_thresh) | (pos_error >= max_pos_error_thresh)), torch.ones_like(reset_buf), reset)
+    reset = torch.where((pos_error >= max_pos_error_thresh), torch.ones_like(reset_buf), reset)
 
     return reset, terminated
