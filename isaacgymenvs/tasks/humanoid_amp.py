@@ -475,6 +475,9 @@ class HumanoidAMP(HumanoidAMPBase):
                 self.rew_buf[:] = compute_humanoid_target_reaching_reward(self._rigid_body_pos, self._rigid_body_vel, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'])
             elif goal_type == "football":
                 raise NotImplementedError
+            elif goal_type == "box":
+                self.rew_buf[:] = compute_humanoid_target_punching_reward(self._rigid_body_pos, self._rigid_body_vel, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'])
+
 
         else:
             reward_buffers = []
@@ -540,6 +543,18 @@ class HumanoidAMP(HumanoidAMPBase):
     def get_goal_features(self):
         goal_type = list(self.additional_actor_handles.keys())[0]
         if goal_type == "flagpole":
+            agent_rigid_body_pos = self._rigid_body_pos.clone()
+            target_pos = self._additional_actor_rigid_body_pos.clone()
+            root_body_id = self.body_ids_dict['pelvis']
+            
+            agent_root_pos = agent_rigid_body_pos[:, root_body_id, :]
+            agent_root_pos[:,-1] = 0.0
+            target_pos[:,-1] = 0.0
+
+            relative_target_pos = target_pos - agent_root_pos
+            return relative_target_pos[:,:-1]
+
+        elif goal_type == "box":
             agent_rigid_body_pos = self._rigid_body_pos.clone()
             target_pos = self._additional_actor_rigid_body_pos.clone()
             root_body_id = self.body_ids_dict['pelvis']
@@ -631,6 +646,30 @@ def compute_humanoid_height_reward(rigid_body_pos, root_body_id):
 
 @torch.jit.script
 def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_body_vel, target_pos, root_body_id):
+    # type: (Tensor, Tensor, Tensor, int) -> Tensor
+
+    agent_root_pos = agent_rigid_body_pos.clone()[:, root_body_id, :]
+    agent_root_pos[:,-1] = 0.0
+    target_pos = target_pos.clone()
+    target_pos[:,-1] = 0.0
+    agent_root_body_vel = agent_rigid_body_vel.clone()[:, root_body_id, :]
+    agent_root_body_vel[:,-1] = 0.0
+    # agent_root_body_vel = agent_root_body_vel.norm(p=2, dim=1)
+
+    pos_error = target_pos - agent_root_pos
+    pos_error_norm = pos_error.norm(p=2, dim=1)
+    root_to_target_unit_vector = (pos_error.mT/pos_error_norm).mT
+    agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)
+    heading_error = 1.0 - agent_vel_in_unit_vector_direction
+
+    reward = 0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
+    reward[pos_error_norm <= 1.00] += 0.5
+
+    return reward
+
+
+@torch.jit.script
+def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_body_vel, target_pos, root_body_id):
     # type: (Tensor, Tensor, Tensor, int) -> Tensor
 
     agent_root_pos = agent_rigid_body_pos.clone()[:, root_body_id, :]

@@ -47,7 +47,8 @@ NUM_ACTIONS = 28
 
 ADDITIONAL_ACTORS = {
     "football": {"file": "amp/soccerball.urdf", "num_instances":1, "texture":"amp/meshes/soccer_ball.png"},
-    "flagpole": {"file": "amp/flagpole.urdf", "num_instances":1, "colour": gymapi.Vec3(0.078, 0.671, 0.114)}
+    "flagpole": {"file": "amp/flagpole.urdf", "num_instances":1, "colour": gymapi.Vec3(0.078, 0.671, 0.114)},
+    "box": {"file": "amp/box.urdf", "num_instances":1, "colour": gymapi.Vec3(0.078, 0.671, 0.114)} #"texture":"amp/meshes/cardboard.png"
     }
 
 
@@ -309,7 +310,6 @@ class HumanoidAMPBase(VecTask):
                         elif "colour" in list(ADDITIONAL_ACTORS[additional_actor_name].keys()):
                             self.gym.set_rigid_body_color(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, random_colour) #self.additional_actor_visual[additional_actor_name]["colour"]
 
-
             if (self._pd_control):
                 dof_prop = self.gym.get_asset_dof_properties(humanoid_asset)
                 dof_prop["driveMode"] = gymapi.DOF_MODE_POS
@@ -385,6 +385,12 @@ class HumanoidAMPBase(VecTask):
                                                         self._enable_early_termination, self._termination_height, self.body_ids_dict['pelvis'])
             elif goal_type == "football":
                 raise NotImplementedError
+            elif goal_type == "box":
+                self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_target_punching_reset(self.reset_buf, self.progress_buf,
+                                                        self._contact_forces, self._contact_body_ids,
+                                                        self._rigid_body_pos, self._additional_actor_rigid_body_pos, self.max_episode_length,
+                                                        self._enable_early_termination, self._termination_height, self.body_ids_dict['pelvis'])
+
         else:
             self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(self.reset_buf, self.progress_buf,
                                                     self._contact_forces, self._contact_body_ids,
@@ -577,6 +583,12 @@ class HumanoidAMPBase(VecTask):
             asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
             return asset_options
 
+        elif additional_actor_name == "box":
+            asset_options = gymapi.AssetOptions()
+            # asset_options.fix_base_link = True
+            asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+            return asset_options
+
 
 
     def get_additional_actor_start_poses(self, additional_actor_name, num_instances):
@@ -610,6 +622,19 @@ class HumanoidAMPBase(VecTask):
 
             return [actor_start_pose]
 
+
+        elif additional_actor_name == "box":
+            assert num_instances == 1, "There can only be one box asset. Change the code in humanoid_amp_base to change this"
+
+            # Initialise the asset at some random point away from the agent with z = 0
+            start_p = np.random.uniform(low=0.2, high=0.5, size=3)
+            start_p[-1] = 1.02
+            actor_start_pose = gymapi.Transform()
+            actor_start_pose.p = gymapi.Vec3(*list(start_p))
+            actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
+            return [actor_start_pose]
+
     def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids, agent_pos):
         """ Return a list of reset poses for the actors. Outputs a tensor of shape [num_env_ids*num_instances, 3]
         """
@@ -620,6 +645,25 @@ class HumanoidAMPBase(VecTask):
             max_dist = 1.0
             reset_poses = torch.FloatTensor(num_instances*num_env_ids, 3).uniform_(min_dist, max_dist)   
             reset_poses[:,-1] = 0.15         
+            return reset_poses
+
+        elif additional_actor_name[0] == "box":
+            assert num_instances == 1, "There can only be one box asset. Change the code in humanoid_amp_base to change this"
+
+            # Initialise the asset in a band defined by a min and max radius relative to the agent with z = 0.0
+            min_dist = 1.5
+            max_dist = 6.0
+            half_arc_theta = 120
+
+            directions = torch.randn(num_instances*num_env_ids, 2)
+            norms = torch.norm(directions, dim=1, keepdim=True) 
+            unit_vectors = directions/norms  # Normalize to get points on the unit sphere
+            radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
+            reset_poses = unit_vectors * radii[:, None]
+            reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
+            reset_poses -= agent_pos[:, :-1] # Translate reset pos relative to the agent
+            reset_poses = torch.cat([reset_poses, torch.full((reset_poses.shape[0], 1), 1.02).to('cuda:0', dtype=torch.float)], dim=1) 
+
             return reset_poses
 
         elif additional_actor_name[0] == "flagpole":
@@ -761,6 +805,46 @@ def compute_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_id
 
 @torch.jit.script
 def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos, target_pos,
+                           max_episode_length, enable_early_termination, termination_height, root_body_id):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, bool, float, int) -> Tuple[Tensor, Tensor]
+    terminated = torch.zeros_like(reset_buf)
+
+    if (enable_early_termination):
+        masked_contact_buf = contact_buf.clone()
+        masked_contact_buf[:, contact_body_ids, :] = 0
+        fall_contact = torch.any(masked_contact_buf > 0.1, dim=-1)
+        fall_contact = torch.any(fall_contact, dim=-1)
+
+        body_height = rigid_body_pos[..., 2]
+        fall_height = body_height < termination_height
+        fall_height[:, contact_body_ids] = False
+        fall_height = torch.any(fall_height, dim=-1)
+
+        has_fallen = torch.logical_and(fall_contact, fall_height)
+
+        # first timestep can sometimes still have nonzero contact forces
+        # so only check after first couple of steps
+        has_fallen *= (progress_buf > 1)
+        terminated = torch.where(has_fallen, torch.ones_like(reset_buf), terminated)
+    
+    reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
+
+    agent_root_pos = rigid_body_pos.clone()[:, root_body_id, :]
+    agent_root_pos[:,-1] = 0.0
+    target_pos = target_pos.clone()
+    target_pos[:,-1] = 0.0
+    relative_target_pos = target_pos - agent_root_pos
+    pos_error = torch.norm(relative_target_pos, p=2, dim=1)
+    min_pos_error_thresh = 1.0
+    max_pos_error_thresh = 8.0
+
+    reset = torch.where(((pos_error <= min_pos_error_thresh) | (pos_error >= max_pos_error_thresh)), torch.ones_like(reset_buf), reset)
+
+    return reset, terminated
+
+
+@torch.jit.script
+def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos, target_pos,
                            max_episode_length, enable_early_termination, termination_height, root_body_id):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, bool, float, int) -> Tuple[Tensor, Tensor]
     terminated = torch.zeros_like(reset_buf)

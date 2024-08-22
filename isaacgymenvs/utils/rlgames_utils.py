@@ -304,6 +304,24 @@ class RLGPUEnv(vecenv.IVecEnv):
 
                     return info
 
+                if goal_type == "box":
+                    info = {}
+                    info['action_space'] = self.env.action_space
+                    # Increase the observation space dims by 2 (x,y pos of box) to account for the added temporal feature
+                    info['observation_space'] = gym.spaces.Box(np.ones(self.env.num_obs + 2) * -np.Inf, np.ones(self.env.num_obs + 2) * np.Inf)
+
+                    if hasattr(self.env, "amp_observation_space"):
+                        info['amp_observation_space'] = self.env.amp_observation_space
+                        info['paired_observation_space'] = self.env.amp_observation_space
+
+                    if self.env.num_states > 0:
+                        info['state_space'] = self.env.state_space
+                        print(info['action_space'], info['observation_space'], info['state_space'])
+                    else:
+                        print(info['action_space'], info['observation_space'])
+
+                    return info
+
                 elif goal_type == "football":
                     raise NotImplementedError
 
