@@ -54,7 +54,32 @@ from tensorboardX import SummaryWriter
 class AMPAgent(common_agent.CommonAgent):
 
     def __init__(self, base_name, params):
+
+        config = params['config']
+        env_assets = config['env_params'].get('envAssets', [])
+        if env_assets != []:
+            self._goal_conditioning = True
+            self.goal_type = env_assets[0]
+        else:
+            self._goal_conditioning = False
+
+        # If using goal conditioning in the state vector, create the environment first and then augment the env_info to change the state space
+        if self._goal_conditioning:
+            print("Setting up goal conditioning")
+            env_config = config.get('env_config', {})
+            num_actors = config['num_actors']
+            env_name = config['env_name']
+
+            vec_env = vecenv.create_vec_env(env_name, num_actors, **env_config)
+            self.env_info = vec_env.get_env_info(goal_conditioning=True, goal_type=self.goal_type)
+            params['config']['env_info'] = self.env_info
+
         super().__init__(base_name, params)
+
+        # Set the self.vec_env attribute
+        if self._goal_conditioning:
+            self.vec_env = vec_env
+            self._max_episode_length = self.vec_env.env.max_episode_length
 
         if self.normalize_value:
             self.value_mean_std = self.central_value_net.model.value_mean_std if self.has_central_value else self.model.value_mean_std
@@ -111,6 +136,12 @@ class AMPAgent(common_agent.CommonAgent):
 
         for n in range(self.horizon_length):
             self.obs, done_env_ids = self._env_reset_done()
+
+            # Append goal feature to observations if needed
+            if self._goal_conditioning:
+                goal_features0 = self.vec_env.env.get_goal_features()
+                self.obs['obs'] = torch.cat((goal_features0, self.obs['obs']), -1)
+
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
             if self.use_action_masks:
@@ -126,6 +157,11 @@ class AMPAgent(common_agent.CommonAgent):
                 self.experience_buffer.update_data('states', n, self.obs['states'])
 
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
+
+            if self._goal_conditioning:
+                goal_features1 = self.vec_env.env.get_goal_features()
+                self.obs['obs'] = torch.cat((goal_features1, self.obs['obs']), -1)
+
             shaped_rewards = self.rewards_shaper(rewards)
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
             self.experience_buffer.update_data('next_obses', n, self.obs['obs'])
@@ -219,6 +255,11 @@ class AMPAgent(common_agent.CommonAgent):
         pose_trajectory.append(self._fetch_sim_asset_poses())
 
         for n in range(max_steps):
+
+            # Append goal feature to observations if needed
+            if self._goal_conditioning:
+                goal_features0 = self.vec_env.env.get_goal_features()
+                self.run_obses['obs'] = torch.cat((goal_features0, self.run_obses['obs']), -1)
 
             if self.use_action_masks:
                 masks = self.vec_env.get_action_masks()

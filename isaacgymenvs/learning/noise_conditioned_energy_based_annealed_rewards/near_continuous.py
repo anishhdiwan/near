@@ -43,7 +43,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         """
         config = params['config']
 
-        # If using temporal feature in the state vector, create the environment first and then augment the env_info to account for extra dims
+        
         env_assets = config['near_config']['data']['env_params'].get('envAssets', [])
         if env_assets != []:
             self._goal_conditioning = True
@@ -51,6 +51,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         else:
             self._goal_conditioning = False
 
+        # If using temporal feature or goal conditioning in the state vector, create the environment first and then augment the env_info to change the state space
         if config['near_config']['model']['encode_temporal_feature']:
             assert self._goal_conditioning == False, "Goal conditioning loading while using temporal features is currently not implemented"
             print("Using Temporal Features")

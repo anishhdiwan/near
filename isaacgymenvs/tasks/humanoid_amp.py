@@ -647,8 +647,8 @@ def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_bo
     agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)
     heading_error = 1.0 - agent_vel_in_unit_vector_direction
 
-    reward = 0.4*torch.exp(-0.5*pos_error_norm**2) + 0.6*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
-    reward[pos_error_norm < 1.05] += 0.5
+    reward = 0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
+    reward[pos_error_norm <= 1.00] += 0.5
 
     return reward
 

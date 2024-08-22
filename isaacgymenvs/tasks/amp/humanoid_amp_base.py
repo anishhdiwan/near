@@ -628,14 +628,26 @@ class HumanoidAMPBase(VecTask):
             # Initialise the asset in a band defined by a min and max radius relative to the agent with z = 0.0
             min_dist = 1.5
             max_dist = 6.0
+            half_arc_theta = 120
+
             directions = torch.randn(num_instances*num_env_ids, 2)
             norms = torch.norm(directions, dim=1, keepdim=True) 
             unit_vectors = directions/norms  # Normalize to get points on the unit sphere
             radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
             reset_poses = unit_vectors * radii[:, None]
             reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
-            reset_poses += agent_pos[:, :-1] # Translate reset pos relative to the agent
-            reset_poses = torch.cat([reset_poses, torch.zeros(reset_poses.shape[0], 1).to('cuda:0', dtype=torch.float)], dim=1)    
+            reset_poses -= agent_pos[:, :-1] # Translate reset pos relative to the agent
+            reset_poses = torch.cat([reset_poses, torch.zeros(reset_poses.shape[0], 1).to('cuda:0', dtype=torch.float)], dim=1) 
+
+            # half_arc_theta_radians = torch.deg2rad(torch.tensor(half_arc_theta))
+            # angles = torch.empty(num_instances*num_env_ids).uniform_(-half_arc_theta_radians, half_arc_theta_radians)
+            # radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
+            # x = radii * torch.cos(angles)
+            # y = radii * torch.sin(angles)
+            # reset_poses = torch.stack((x, y), dim=1)
+            # reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
+            # reset_poses -= agent_pos[:, :-1] # Translate reset pos relative to the agent
+            # reset_poses = torch.cat([reset_poses, torch.zeros(reset_poses.shape[0], 1).to('cuda:0', dtype=torch.float)], dim=1) 
 
             return reset_poses
 
