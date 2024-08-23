@@ -307,6 +307,10 @@ class AMPAgent(common_agent.CommonAgent):
                 else:
                     self.total_env_learnt_rewards = env_learnt_rewards.clone() 
 
+                # Add goal reward if using goal conditioning
+                if self._goal_conditioning:
+                    self.total_env_learnt_rewards += rewards
+
                 if done_count == self.num_actors:
                     # Select a random env out of those envs that were done last
                     # env_idx = torch.argmax(self.total_env_learnt_rewards, dim=0).item()
@@ -317,6 +321,11 @@ class AMPAgent(common_agent.CommonAgent):
                     self.obs = self._env_reset_all()
                     break
 
+        if self._goal_conditioning:
+            goal_completion = self.vec_env.env.get_goal_completion()[env_idx]
+            success_rate = goal_completion.sum()/len(goal_completion)
+        else:
+            success_rate = None
 
         if isinstance(env_idx, list):
             pose_trajectory = torch.stack(pose_trajectory)
@@ -330,7 +339,7 @@ class AMPAgent(common_agent.CommonAgent):
                 idx_trajectories.append(idx_pose_trajectory)
                 idx_root_trajectories.append(idx_root_trajectory)
 
-            return idx_trajectories, idx_root_trajectories
+            return idx_trajectories, idx_root_trajectories, success_rate
 
         else:
             pose_trajectory = torch.stack(pose_trajectory)
@@ -339,7 +348,7 @@ class AMPAgent(common_agent.CommonAgent):
             root_trajectory = pose_trajectory[:, self.sim_asset_root_body_id, :]
             pose_trajectory = to_relative_pose(pose_trajectory, self.sim_asset_root_body_id)
 
-            return pose_trajectory, root_trajectory
+            return pose_trajectory, root_trajectory, success_rate
 
 
     def prepare_dataset(self, batch_dict):
@@ -836,7 +845,9 @@ class AMPAgent(common_agent.CommonAgent):
         """Compute performance metrics
         """
         self.set_eval()
-        agent_pose_trajectories, agent_root_trajectories = self.run_policy()
+        agent_pose_trajectories, agent_root_trajectories, success_rate = self.run_policy()
+        if self._goal_conditioning:
+            self.writer.add_scalar('goal_success_rate/step', success_rate, frame)
         if not isinstance(agent_pose_trajectories, list):
             agent_pose_trajectories = [agent_pose_trajectories]
             agent_root_trajectories = [agent_root_trajectories]

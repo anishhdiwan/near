@@ -77,6 +77,7 @@ class HumanoidAMP(HumanoidAMPBase):
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
 
         motion_file = cfg['env'].get('motion_file', "amp_humanoid_backflip.npy")
+        self.motion_style = os.path.splitext(motion_file)[0]
 
         # First try to find motions in the main assets folder. Then try in the dataset directory
         motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/amp/motions', motion_file)
@@ -700,14 +701,15 @@ def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_bo
     punching_body_pos_error_norm = punching_body_pos_error.norm(p=2, dim=1)
 
 
-    reward_near = 0.3*(0.2*torch.exp(-2*punching_body_pos_error_norm**2) + 0.8*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1)) + 0.3
+    reward_near = 0.3*(0.2*torch.exp(-2*punching_body_pos_error_norm**2) + 0.8*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1))
     reward_far = 0.3*(0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
     reward_far[target_punched] = 1.0
     reward_near[target_punched] = 1.0
     near_mask = (~target_punched) & (pos_error_norm < 1.375)
-    reward = torch.where(near_mask, reward_near, reward_far)
+    # reward = torch.where(near_mask, reward_near, reward_far)
+    reward_far[near_mask] += reward_near[near_mask]
 
-    return reward
+    return reward_far
 
 
 
