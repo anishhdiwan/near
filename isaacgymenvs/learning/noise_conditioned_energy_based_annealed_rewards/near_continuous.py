@@ -24,7 +24,7 @@ from omegaconf import OmegaConf
 # from . import amp_datasets as amp_datasets
 
 from tensorboardX import SummaryWriter
-from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
+from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb, ComposedEnergyNet
 from learning.motion_ncsn.models.ema import EMAHelper
 from utils.ncsn_utils import dict2namespace, LastKMovingAvg, get_series_derivative, to_relative_pose, sparc
 
@@ -88,17 +88,9 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         # Standardization
         if self._normalize_energynet_input:
-            ## TESTING ONLY: Swiss-Roll ##
-            # self._energynet_input_norm = RunningMeanStd(torch.ones(config['near_config']['model']['in_dim']).shape).to(self.ppo_device)
-            ## TESTING ONLY ##
-
             self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
-
-            # Since the running mean and std are pre-computed on the demo data, only eval is needed here
-
             energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.ppo_device)
             self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
-
             self._energynet_input_norm.eval()
         
         # Fetch demo trajectories for computing eval metrics
@@ -209,20 +201,27 @@ class NEARAgent(a2c_continuous.A2CAgent):
         # energynet_config = dict2namespace(energynet_config)
         energynet_config = OmegaConf.create(energynet_config)
 
-        eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
-        energynet = SimpleNet(energynet_config, in_dim=self._paired_observation_space.shape[0]).to(self.ppo_device)
-        energynet = torch.nn.DataParallel(energynet)
-        energynet.load_state_dict(eb_model_states[0])
+        if isinstance(self._eb_model_checkpoint, dict):
+            # Use multiple composed energy functions
+            self._energynet = ComposedEnergyNet(config=energynet_config, checkpoints=self._eb_model_checkpoint,
+                            device=self.ppo_device, in_dim=self._paired_observation_space.shape[0], 
+                            use_ema=self._use_ema, ema_rate=self._ema_rate, scale_energies=True, env=self.vec_env.env)
+            
+        else:
+            eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
+            energynet = SimpleNet(energynet_config, in_dim=self._paired_observation_space.shape[0]).to(self.ppo_device)
+            energynet = torch.nn.DataParallel(energynet)
+            energynet.load_state_dict(eb_model_states[0])
 
-        if self._use_ema:
-            print("Using EMA model weights")
-            ema_helper = EMAHelper(mu=self._ema_rate)
-            ema_helper.register(energynet)
-            ema_helper.load_state_dict(eb_model_states[-1])
-            ema_helper.ema(energynet)
+            if self._use_ema:
+                print("Using EMA model weights")
+                ema_helper = EMAHelper(mu=self._ema_rate)
+                ema_helper.register(energynet)
+                ema_helper.load_state_dict(eb_model_states[-1])
+                ema_helper.ema(energynet)
 
-        self._energynet = energynet
-        self._energynet.eval()
+            self._energynet = energynet
+            self._energynet.eval()
 
 
     def _build_buffers(self):
@@ -277,10 +276,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         Args:
             rewards (torch.Tensor): Rewards to transform
         """
-
-        # rewards = (0.0001/(1 + rewards**2)) + (torch.exp(-torch.abs(rewards)))
-        # rewards = -torch.log(1/(1 + torch.exp(rewards)))
-
+        
         rewards = rewards + sum(self._reward_offsets)
 
         # Keep track of the energy as learning progresses
@@ -321,11 +317,9 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         sigmas = self._get_ncsn_sigmas()
         # Tensor of noise level to condition the energynet
-        if self._ncsnv2:
-            labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
-        else:
-            labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
-            # labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * c # c ranges from [0,L-1]
+        # if self._ncsnv2:
+        labels = torch.ones(paired_obs.shape[0], device=paired_obs.device, dtype=torch.long) * c # c ranges from [0,L-1]
+        # labels = torch.ones(paired_obs.shape[0], device=paired_obs.device) * c # c ranges from [0,L-1]
         used_sigmas = sigmas[labels].view(paired_obs.shape[0], *([1] * len(paired_obs.shape[1:])))
         perturbation_levels = {'labels':labels, 'used_sigmas':used_sigmas}
 
