@@ -201,11 +201,13 @@ def main(retarget_data_path, data_path, data_dir, visualise_src_tgt, visualise):
     source_tpose = SkeletonState.from_file(retarget_data["source_tpose"])
     if visualise_src_tgt:
         print("Plotting the source pose")
+        print(source_tpose.skeleton_tree.node_names)
         plot_skeleton_state(source_tpose)
 
     target_tpose = SkeletonState.from_file(retarget_data["target_tpose"])
     if visualise_src_tgt:
         print("Plotting the target pose")
+        print(target_tpose.skeleton_tree.node_names)
         plot_skeleton_state(target_tpose)
 
     # parse data from retarget config

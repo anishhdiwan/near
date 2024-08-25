@@ -1264,6 +1264,9 @@ class SkeletonMotion(SkeletonState):
         fps=120,
         root_joint="",
         root_trans_index=0,
+        additional_rotation = False,
+        additional_rotation_val = [ 0, -0.7071068, 0, 0.7071068 ],
+        view_only=False,
         file_name="tpose",
         *args,
         **kwargs,
@@ -1317,9 +1320,9 @@ class SkeletonMotion(SkeletonState):
 
         
         # Apply additional rotation to align the tpose in the actual direction of the motion
-        additional_rotation = False
+        additional_rotation = additional_rotation
         # Quaternion rotation according to the axes of the tpose. Use https://www.andre-gaschler.com/rotationconverter/ 
-        additional_rotation_val = [ 0, -0.7071068, 0, 0.7071068 ]
+        additional_rotation_val = additional_rotation_val
         rotation_to_target_skeleton = torch.tensor(additional_rotation_val)
         if additional_rotation:
             new_local_rotation = skeleton_state.local_rotation.clone()
@@ -1334,8 +1337,8 @@ class SkeletonMotion(SkeletonState):
                 is_local=True,
             )
 
-
-        skeleton_state.to_file(f"data/{file_name}.npy")
+        if not view_only:
+            skeleton_state.to_file(f"data/{file_name}.npy")
         plot_skeleton_state(skeleton_state)
 
     @staticmethod

@@ -12,7 +12,7 @@ home = str(Path.home())
 # fbx data path
 data_path = home + "/thesis_background/Datasets/CMU_humanoid_fbx/"
 data_index = pd.read_csv(data_path + "cmu_mocap_task_index.csv")
-task_name = ['bow']
+task_name = ['waving']
 task_index = data_index.loc[data_index['task'].isin(task_name)]
 task_index['motion_file'] = data_path + "CMU_fbx/" + task_index['motion_index'] + ".fbx"
 motion_files = task_index['motion_file'].to_list()
@@ -30,5 +30,8 @@ SkeletonMotion.tpose_from_fbx(
     fbx_file_path=fbx_file,
     root_joint="Hips",
     fps=60,
-    file_name="some_tpose"
+    file_name="some tpose",
+    additional_rotation=True,
+    additional_rotation_val = [ 0, -0.7071068, 0, 0.7071068 ],
+    view_only=True,
 )
