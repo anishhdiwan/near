@@ -723,11 +723,22 @@ class HumanoidAMPBase(VecTask):
             assert num_instances == 1, "There can only be one box asset. Change the code in humanoid_amp_base to change this"
 
             # Initialise the asset in a band defined by a min and max radius relative to the agent with z = 0.0
-            directions = torch.randn(num_instances*num_env_ids, 2)
-            norms = torch.norm(directions, dim=1, keepdim=True) 
-            unit_vectors = directions/norms  # Normalize to get points on the unit sphere
+            # directions = torch.randn(num_instances*num_env_ids, 2)
+            # norms = torch.norm(directions, dim=1, keepdim=True) 
+            # unit_vectors = directions/norms  # Normalize to get points on the unit sphere
+            # radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
+            # reset_poses = unit_vectors * radii[:, None]
+
+            theta_min = 45
+            theta_max = 10
+            theta_min = torch.deg2rad(torch.tensor(theta_min))
+            theta_max = torch.deg2rad(torch.tensor(theta_max))
+            angles = torch.empty(num_instances*num_env_ids).uniform_(-theta_min, theta_max)
             radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
-            reset_poses = unit_vectors * radii[:, None]
+            x = radii * torch.cos(angles)
+            y = radii * torch.sin(angles)
+            reset_poses = torch.stack((x, y), dim=1)
+
             reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
             reset_poses += agent_pos[:, :-1] # Translate reset pos relative to the agent
             reset_poses = torch.cat([reset_poses, torch.full((reset_poses.shape[0], 1), 1.02).to('cuda:0', dtype=torch.float)], dim=1) 

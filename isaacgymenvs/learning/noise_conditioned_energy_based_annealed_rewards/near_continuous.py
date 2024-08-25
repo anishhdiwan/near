@@ -88,10 +88,15 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         # Standardization
         if self._normalize_energynet_input:
-            self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
-            energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.ppo_device)
-            self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
-            self._energynet_input_norm.eval()
+            if self._composed_energy_function:
+                # Normalisation is handled in the energy network when using composed energies
+                self._energynet_input_norm = torch.nn.Identity()
+
+            else:
+                self._energynet_input_norm = RunningMeanStd(self._paired_observation_space.shape).to(self.ppo_device)
+                energynet_input_norm_states = torch.load(self._energynet_input_norm_checkpoint, map_location=self.ppo_device)
+                self._energynet_input_norm.load_state_dict(energynet_input_norm_states)
+                self._energynet_input_norm.eval()
         
         # Fetch demo trajectories for computing eval metrics
         self._fetch_demo_dataset()
@@ -112,6 +117,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
         self.perf_metrics_freq = config['near_config']['inference'].get('perf_metrics_freq', 0)
         self._paired_observation_space = self.env_info['paired_observation_space']
         self._eb_model_checkpoint = config['near_config']['inference']['eb_model_checkpoint']
+        if isinstance(self._eb_model_checkpoint, dict):
+            self._composed_energy_function = True
+            self._num_energy_functions = len(self._eb_model_checkpoint)
+        else:
+            self._composed_energy_function = False
         self._c = config['near_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
         if self._c == -1:
             # When c=-1, noise level annealing is used.
@@ -201,10 +211,10 @@ class NEARAgent(a2c_continuous.A2CAgent):
         # energynet_config = dict2namespace(energynet_config)
         energynet_config = OmegaConf.create(energynet_config)
 
-        if isinstance(self._eb_model_checkpoint, dict):
+        if self._composed_energy_function:
             # Use multiple composed energy functions
-            self._energynet = ComposedEnergyNet(config=energynet_config, checkpoints=self._eb_model_checkpoint,
-                            device=self.ppo_device, in_dim=self._paired_observation_space.shape[0], 
+            self._energynet = ComposedEnergyNet(config=energynet_config, checkpoints=self._eb_model_checkpoint, normalisation_checkpoints=self._energynet_input_norm_checkpoint,
+                            device=self.ppo_device, in_dim_space=self._paired_observation_space.shape, 
                             use_ema=self._use_ema, ema_rate=self._ema_rate, scale_energies=True, env=self.vec_env.env)
             
         else:
@@ -233,6 +243,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
         batch_shape = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['paired_obs'] = torch.zeros(batch_shape + self._paired_observation_space.shape,
                                                                     device=self.ppo_device)
+
+        if self._composed_energy_function:
+            self.experience_buffer.tensor_dict['energy_function_composition'] = torch.zeros(batch_shape + tuple([self._num_energy_functions]),
+                                                                    device=self.ppo_device)
+
         
 
     def _env_reset_done(self):
@@ -255,15 +270,15 @@ class NEARAgent(a2c_continuous.A2CAgent):
         return self.obs_to_tensors(obs)
 
 
-    def _calc_rewards(self, paired_obs):
+    def _calc_rewards(self, paired_obs, mb_energy_function_composition=None):
         """Calculate NEAR rewards given a sest of observation pairs
 
         Args:
             paired_obs (torch.Tensor): A pair of s-s' observations (usually extracted from the replay buffer)
+            mb_energy_function_composition (torch.Tensor): A set of energy function composition weights if using composed energy functions
         """
 
-        # energy_rew = - self._calc_energy(paired_obs)
-        energy_rew = self._transform_rewards(self._calc_energy(paired_obs))
+        energy_rew = self._transform_rewards(self._calc_energy(paired_obs, mb_energy_function_composition=mb_energy_function_composition))
         output = {
             'energy_reward': energy_rew
         }
@@ -294,7 +309,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         return rewards
 
 
-    def _calc_energy(self, paired_obs, c=None):
+    def _calc_energy(self, paired_obs, c=None, mb_energy_function_composition=None):
         """Run the pre-trained energy-based model to compute rewards as energies. 
         
         If a noise level is passed in then the energy for that level is returned. Else the current noise_level is used
@@ -324,7 +339,13 @@ class NEARAgent(a2c_continuous.A2CAgent):
         perturbation_levels = {'labels':labels, 'used_sigmas':used_sigmas}
 
         with torch.no_grad():
-            energy_rew = self._energynet(paired_obs, perturbation_levels)
+            if self._composed_energy_function:
+                if mb_energy_function_composition is not None:
+                    mb_energy_function_composition = mb_energy_function_composition.reshape(-1, mb_energy_function_composition.shape[-1])
+                    mb_energy_function_composition = [mb_energy_function_composition[:,idx].unsqueeze(dim=1) for idx in range(mb_energy_function_composition.shape[-1])]
+                energy_rew = self._energynet(paired_obs, perturbation_levels, mb_energy_function_composition)
+            else:
+                energy_rew = self._energynet(paired_obs, perturbation_levels)
             original_shape[-1] = energy_rew.shape[-1]
             energy_rew = energy_rew.reshape(original_shape)
 
@@ -600,6 +621,12 @@ class NEARAgent(a2c_continuous.A2CAgent):
                     goal_features1 = self.vec_env.env.get_goal_features()
                     self.obs['obs'] = torch.cat((goal_features1, self.obs['obs']), -1)
 
+            if self._composed_energy_function:
+                energy_function_composition = self.compose_energy_functions()
+                self.experience_buffer.update_data('energy_function_composition', n, energy_function_composition)
+            else:
+                energy_function_composition = None
+
             shaped_rewards = self.rewards_shaper(rewards)
             if self.value_bootstrap and 'time_outs' in infos:
                 shaped_rewards += self.gamma * res_dict['values'] * self.cast_obs(infos['time_outs']).unsqueeze(1).float()
@@ -628,7 +655,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
             ## New Addition ##
             if (self.vec_env.env.viewer and (n == (self.horizon_length - 1))):
-                self._print_debug_stats(infos)
+                self._print_debug_stats(infos, energy_function_composition=energy_function_composition)
 
 
         last_values = self.get_values(self.obs)
@@ -644,7 +671,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         ## New Addition ##
         self._anneal_noise_level(paired_obs=mb_paired_obs)
-        near_rewards = self._calc_rewards(mb_paired_obs)
+        if self._composed_energy_function:
+            mb_energy_function_composition = self.experience_buffer.tensor_dict['energy_function_composition']
+        else:
+            mb_energy_function_composition = None
+        near_rewards = self._calc_rewards(mb_paired_obs, mb_energy_function_composition=mb_energy_function_composition)
         mb_rewards = self._combine_rewards(mb_rewards, near_rewards)
 
         mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
@@ -705,6 +736,11 @@ class NEARAgent(a2c_continuous.A2CAgent):
                 self.run_obses, rewards, dones, infos = self.env_step(res_dict['mus'])
             else:
                 self.run_obses, rewards, dones, infos = self.env_step(res_dict['actions'])
+
+            if self._composed_energy_function:
+                energy_function_composition = self.compose_energy_functions()
+            else:
+                energy_function_composition = None
                 
             pose_trajectory.append(self._fetch_sim_asset_poses())
 
@@ -747,9 +783,9 @@ class NEARAgent(a2c_continuous.A2CAgent):
                         infos['amp_obs'] = torch.cat((obs1, obs0), -1)
             
                 try:
-                    env_learnt_rewards = self._calc_energy(infos['paired_obs'])
+                    env_learnt_rewards = self._calc_energy(infos['paired_obs'], mb_energy_function_composition=energy_function_composition)
                 except KeyError:
-                    env_learnt_rewards = self._calc_energy(infos['amp_obs'])
+                    env_learnt_rewards = self._calc_energy(infos['amp_obs'], mb_energy_function_composition=energy_function_composition)
 
                 env_learnt_rewards[done_envs] = 0.0
                 if self.total_env_learnt_rewards is not None:
@@ -802,7 +838,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
 
 
-    def _print_debug_stats(self, infos):
+    def _print_debug_stats(self, infos, energy_function_composition=None):
         """Print training stats for debugging. Usually called at the end of every training epoch
 
         Args:
@@ -817,7 +853,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         shape = list(paired_obs.shape)
         shape.insert(0,1)
         paired_obs = paired_obs.view(shape)
-        energy_rew = self._calc_energy(paired_obs)
+        energy_rew = self._calc_energy(paired_obs, mb_energy_function_composition=energy_function_composition)
 
         print(f"Minibatch Stats - E(s_penultimate, s_last).mean(all envs): {energy_rew.mean()}")
 
@@ -1197,5 +1233,23 @@ class NEARAgent(a2c_continuous.A2CAgent):
         return sigmas
 
 
-        
-        
+    def compose_energy_functions(self):
+        """Return a list of tensors where each tensor indicates the weight assigned to an energy function.
+
+        By default returns an equal composition (None). If using a specifc task, can also return a temporal composition. Assumes the same order of energy 
+        functions as was given in the config.
+        """
+        if self._goal_conditioning:
+            if self.goal_type == "box":
+                goal_features = self.vec_env.env.get_goal_features()
+                pos_error = goal_features[:,:-1].norm(p=2, dim=1)
+                mask = pos_error < 1.375
+                locomotion_weights = (~mask).clone().to('cuda:0', dtype=torch.float)
+                punching_weights = mask.clone().to('cuda:0', dtype=torch.float)
+                energy_function_composition = [locomotion_weights.unsqueeze(dim=1), punching_weights.unsqueeze(dim=1)]
+                energy_function_composition = torch.cat(energy_function_composition, dim=1)
+                return energy_function_composition
+            else:
+                return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
+        else:
+            return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
