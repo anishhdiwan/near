@@ -129,6 +129,8 @@ params:
         ema_rate: 0.999
         # Whether to use the modifications proposed in ncsnv2
         ncsnv2: True
+        # Whether to mask some features. Options are [None, upper_body, lower_body]
+        feature_mask: None 
         
       optim:
         weight_decay: 0.0
@@ -160,6 +162,8 @@ params:
         eb_model_checkpoint: "ncsn_runs/Humanoid_SM_temporal_states_walk/nn/checkpoint.pth"
         # The running mean is used for standardization. Only used when normalize_energynet_input is true
         running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_temporal_states_walk/nn/running_mean_std.pth"
+        # Optionall provide a list of feature masks for each composed energy function
+        composed_feature_mask: None
 
 
     player:

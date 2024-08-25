@@ -43,6 +43,15 @@ DOF_OFFSETS = [0, 3, 6, 9, 10, 13, 14, 17, 18, 21, 24, 25, 28]
 NUM_OBS = 13 + 52 + 28 + 12 # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
 NUM_ACTIONS = 28
 
+NUM_FEATURES = {
+"dof_names":['abdomen', 'neck', 'right_shoulder', 'right_elbow', 'left_shoulder', 'left_elbow', 
+'right_hip', 'right_knee', 'right_ankle', 'left_hip', 'left_knee', 'left_ankle'],
+"num_features":[3, 3, 3, 1, 3, 1, 3, 1, 3, 3, 1, 3]
+}
+
+UPPER_BODY_MASK = ['neck', 'right_shoulder', 'right_elbow', 'left_shoulder', 'left_elbow']
+LOWER_BODY_MASK = ['abdomen', 'right_hip', 'right_knee', 'right_ankle', 'left_hip', 'left_knee', 'left_ankle']
+
 # Dict with actor name as key and a dict of actor params as value
 
 ADDITIONAL_ACTORS = {
@@ -330,6 +339,7 @@ class HumanoidAMPBase(VecTask):
         self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self.device)
 
         self._key_body_ids = self._build_key_body_ids_tensor(env_ptr, handle)
+        self._build_dof_ids_dict(env_ptr, handle)
         self._build_body_ids_dict(env_ptr, handle)
         self._contact_body_ids = self._build_contact_body_ids_tensor(env_ptr, handle)
         
@@ -516,6 +526,17 @@ class HumanoidAMPBase(VecTask):
                 pass
 
         self.body_ids_dict = body_ids
+
+    def _build_dof_ids_dict(self, env_ptr, actor_handle):
+        dof_ids = {}
+        for dof_name in self.gym.get_actor_dof_names(env_ptr, actor_handle):
+            try:
+                dof_id = self.gym.find_actor_dof_handle(env_ptr, actor_handle, dof_name)
+                dof_ids[dof_name] = dof_id
+            except Exception:
+                pass
+
+        self.dof_ids_dict = dof_ids
 
     def _build_contact_body_ids_tensor(self, env_ptr, actor_handle):
         body_ids = []
