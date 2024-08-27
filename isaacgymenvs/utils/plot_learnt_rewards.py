@@ -177,9 +177,11 @@ def plot_checkpoint_data(aggregated_data, algo):
     
 
     data_keys = list(aggregated_data.keys())
-    ylabels = [r"$ \texttt{mean}(D_{\theta_D}(W(\pi_{\theta_G}(s))))$", r"$\texttt{mean}(rew\_fn(D_{\theta_D}(W(\pi_{\theta_G}(s)))))$", r"$ \texttt{std}(D_{\theta_D}(W(\pi_{\theta_G}(s))))$"]
+    ylabels = [r"$ \texttt{mean}(D_{\theta_D}(W(\pi_{\theta_G}(s))))$", r"$\texttt{mean}(\texttt{rew-fn}(D_{\theta_D}(W(\pi_{\theta_G}(s)))))$", r"$ \texttt{std}(D_{\theta_D}(W(\pi_{\theta_G}(s))))$"]
     titles = ["Mean Discriminator Prediction", "Mean Discriminator Reward", "Discriminator Prediction Std."]
     checkpoint_labels = ["After 4e6 samples", "After 10e6 samples", "After 20e6 samples", "After 30e6 samples", "After 40e6 samples", "After 60e6 samples"]
+    fontsize = 18
+    plt.rcParams.update({'font.size': fontsize})
 
     for idx, data_key in enumerate(data_keys):
         data = aggregated_data[data_key]

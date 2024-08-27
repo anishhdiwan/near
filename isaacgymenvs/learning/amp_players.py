@@ -38,6 +38,7 @@ import isaacgymenvs.learning.common_player as common_player
 import os
 import copy
 import pickle
+from pathlib import Path
 
 
 class AMPPlayerContinuous(common_player.CommonPlayer):
@@ -209,71 +210,96 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         window_idx_left = int((kernel_size - 1)/2)
         window_idx_right = int((kernel_size + 1)/2)
 
-
         xs = torch.linspace(viz_min, viz_max, steps=grid_steps)
         ys = torch.linspace(viz_min, viz_max, steps=grid_steps)
         x, y = torch.meshgrid(xs, ys, indexing='xy')
 
-        grid_points = torch.cat((x.flatten().view(-1, 1),y.flatten().view(-1,1)), 1).to(device=self.device)
-        grid_points = grid_points.reshape(grid_steps,grid_steps,2)
-        disc_grid = torch.zeros(grid_steps,grid_steps,1)
-        rew_grid = torch.zeros(grid_steps,grid_steps,1)
+        cached_disc_grid = Path(f"{os.path.splitext(self.last_checkpoint)[0]}_2d_visualisation_disc.pkl")
+        if cached_disc_grid.is_file():
+            # Avoid overwriting automatically
+            with open(cached_disc_grid, 'rb') as f:
+                disc_out = pickle.load(f)
+                disc_grid = disc_out["disc_grid"]
+                rew_grid = disc_out["rew_grid"]
 
-        for i in range(grid_points.shape[0]):
-            for j in range(grid_points.shape[1]):
-                if i in [viz_min,viz_max] or j in [viz_min,viz_max]:
-                    pass
-                    
-                else:
-                    window = grid_points[i-window_idx_left:i+window_idx_right,j-window_idx_left:j+window_idx_right,:]
-                    grid_pt_window = torch.zeros_like(window)
-                    grid_pt_window[:,:,:] = grid_points[i,j]
+        else:
+            grid_points = torch.cat((x.flatten().view(-1, 1),y.flatten().view(-1,1)), 1).to(device=self.device)
+            grid_points = grid_points.reshape(grid_steps,grid_steps,2)
+            disc_grid = torch.zeros(grid_steps,grid_steps,1)
+            rew_grid = torch.zeros(grid_steps,grid_steps,1)
 
-                    obs_pairs = torch.cat((window, grid_pt_window), 2)
-                    obs_pairs = obs_pairs.reshape(-1,4)
+            for i in range(grid_points.shape[0]):
+                for j in range(grid_points.shape[1]):
+                    if i in [viz_min,viz_max] or j in [viz_min,viz_max]:
+                        pass
+                        
+                    else:
+                        window = grid_points[i-window_idx_left:i+window_idx_right,j-window_idx_left:j+window_idx_right,:]
+                        grid_pt_window = torch.zeros_like(window)
+                        grid_pt_window[:,:,:] = grid_points[i,j]
 
-                    disc_pred = self._eval_disc(obs_pairs.to(self.device))
-                    amp_rewards = self._calc_amp_rewards(obs_pairs.to(self.device))['disc_rewards']
+                        obs_pairs = torch.cat((window, grid_pt_window), 2)
+                        obs_pairs = obs_pairs.reshape(-1,4)
 
-                    mean_amp_rew = torch.mean(amp_rewards).item()
-                    mean_disc_pred = torch.mean(disc_pred).item()
-                    disc_grid[i,j] = mean_disc_pred
-                    rew_grid[i,j] = mean_amp_rew
+                        disc_pred = self._eval_disc(obs_pairs.to(self.device))
+                        amp_rewards = self._calc_amp_rewards(obs_pairs.to(self.device))['disc_rewards']
 
-        disc_grid = disc_grid.reshape(-1,x.shape[0])
-        rew_grid = rew_grid.reshape(-1,x.shape[0])
+                        mean_amp_rew = torch.mean(amp_rewards).item()
+                        mean_disc_pred = torch.mean(disc_pred).item()
+                        disc_grid[i,j] = mean_disc_pred
+                        rew_grid[i,j] = mean_amp_rew
 
-        disc_grid = disc_grid[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
-        rew_grid = rew_grid[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
+            disc_grid = disc_grid.reshape(-1,x.shape[0])
+            rew_grid = rew_grid.reshape(-1,x.shape[0])
+
+            disc_grid = disc_grid[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
+            rew_grid = rew_grid[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
+
+            with open(cached_disc_grid, 'wb') as handle:
+                pickle.dump({"disc_grid": disc_grid, "rew_grid": rew_grid}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                
+
         x = x[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
         y = y[kernel_size+1 : -kernel_size-1, kernel_size+1 : -kernel_size-1]
 
-        label = "500k Samples"
+        fontsize = 20
+        plt.rcParams.update({'font.size': fontsize})
+        label = "4.5 e5 Samples"
         plt.figure(figsize=(8, 6))
         mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), disc_grid.cpu().detach().numpy(), cmap ='bone')
-        plt.gca().invert_yaxis()
         plt.xlabel("env - x")
         plt.ylabel("env - y")
         plt.title(f"Maze Env disc(s,s') | Mean disc pred in agent's reachable set")
         plt.colorbar(mesh)
         plt.locator_params(axis='x', nbins=6)
         plt.locator_params(axis='y', nbins=6)
-        # plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#42d4f4')
+        # plt.gca().set_xticks([])
+        # plt.gca().set_yticks([])
+        plt.gca().set_aspect('equal')
+        plt.gca().set_xlim(left=0, right=512)
+        plt.gca().set_ylim(bottom=0, top=512)
+        plt.gca().invert_yaxis()
+        # plt.text(260, 90, label, fontsize = fontsize, fontweight='bold', color='#42d4f4')
         plt.tight_layout()
-        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_pred_{label}.png", format="png", bbox_inches="tight", dpi=300)
-        # plt.show()
+        # plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_pred_{label}.png", format="png", bbox_inches="tight", dpi=300)
+        plt.show()
 
 
         plt.figure(figsize=(8, 6))
         mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), rew_grid.cpu().detach().numpy(), cmap ='bone')
-        plt.gca().invert_yaxis()
         plt.xlabel("env - x")
         plt.ylabel("env - y")
         plt.title(f"Maze Env amp_reward(s,s') | Mean amp reward in agent's reachable set")
         plt.colorbar(mesh)
         plt.locator_params(axis='x', nbins=6)
         plt.locator_params(axis='y', nbins=6)
-        # plt.text(350, 90, label, fontsize = 15, fontweight='bold', color='#42d4f4')
+        # plt.gca().set_xticks([])
+        # plt.gca().set_yticks([])
+        plt.gca().set_aspect('equal')
+        plt.gca().set_xlim(left=0, right=512)
+        plt.gca().set_ylim(bottom=0, top=512)
+        plt.gca().invert_yaxis()
+        # plt.text(260, 90, label, fontsize = fontsize, fontweight='bold', color='#42d4f4')
         plt.tight_layout()
-        plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_rew.png", format="png", bbox_inches="tight", dpi=300)
-        # plt.show()
+        # plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_rew_{label}.png", format="png", bbox_inches="tight", dpi=300)
+        plt.show()
