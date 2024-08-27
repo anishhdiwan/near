@@ -40,12 +40,14 @@ if __name__ == "__main__":
     trial_labels = ["After 0.5e6 samples", "After 2e6 samples", "After 5e6 samples"]
     scalars = [['disc_expt_mean_pred', 'disc_expt_std_pred'], ['disc_expt_mean_rew', 'disc_expt_std_rew']]
     titles = ["Discriminator Predictions", "Discriminator Reward"]
-    ylabels = [r"$D_{\theta_D}(W(\pi_{\theta_G}(s)))$", r"$rew\_fn(D_{\theta_D}(W(\pi_{\theta_G}(s))))$"]
+    ylabels = [r"$D_{\theta_D}(W(\pi_{\theta_G}(s)))$", r"$\texttt{rew-fn}(D_{\theta_D}(W(\pi_{\theta_G}(s))))$"]
 
     std_interval = 1.0
 
     exp_scalars, exp_steps = get_saved_scalars(events_dir, trial_names)
 
+    fontsize = 16
+    plt.rcParams.update({'font.size': fontsize})
     for ind, scalar in enumerate(scalars):
         mean_key = scalar[0]
         std_key = scalar[1]

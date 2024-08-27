@@ -71,8 +71,14 @@ if __name__ == "__main__":
     trial_labels = ["After 0.5e6 samples", "After 2e6 samples", "After 5e6 samples"]
     scalars = ["disc_experiment/disc_combined_acc/iter", "disc_experiment/disc_loss_least_sq/iter", "disc_experiment/grad_disc_obs/iter"]
     # xlabels = ["Training Iterations"]
-    titles = [r"Discriminator's Accuracy (on both $p_G$ and $p_D$)", r"Discriminator's Error", r"Grad. Disc()"]
-    ylabels = ["Accuracy", "Cross-Entropy", r"$ norm(\nabla_x D(x)) $"]
+    titles = [r"Discriminator Accuracy (on both $p_G$ and $p_D$)", r"Discriminator Error", r"Grad. Disc()"]
+    ylabels = ["Accuracy", "Cross-Entropy", r"$\left\lVert(\nabla_x D(x))\right\rVert_2$"]
+
+    fontsize = 16
+    plt.rcParams.update({'font.size': fontsize})
+    # params= {'text.latex.preamble' : [r'\usepackage{amsmath}']}
+    # plt.rcParams.update(params)
+    plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
 
     exp_dfs = []
     for trial in trial_names:
@@ -117,7 +123,7 @@ if __name__ == "__main__":
             plt.ylabel(ylabels[idx])
             plt.title(titles[idx])
             if scalar == "disc_experiment/disc_combined_acc/iter":
-                plt.legend(loc=8)
+                plt.legend(loc=(0.08, 0.05))
             else:
                 plt.legend()
 
