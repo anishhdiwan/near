@@ -43,6 +43,8 @@ Colours = [
     '#800000'
 ]
 
+line_colour = '#e6194B'
+
 
 def get_scalars_from_dfs(scalar, trial_dfs):
     # Returns a list of np  arrays, of the scalar from each trial and a np array of steps
@@ -64,7 +66,7 @@ if __name__ == "__main__":
     # event_file = "./ncsn_runs/temp_runs/"
     event_file = "../../NEAR_experiments/plot_runs_temp/"
     
-    df_path = Path(os.path.join(PARENT_DIR_PATH, "../../NEAR_experiments/plot_runs_df_extended_experiments.pkl"))
+    df_path = Path(os.path.join(PARENT_DIR_PATH, "../../NEAR_experiments/plot_runs_df.pkl"))
     if df_path.is_file():
         df = pd.read_pickle(df_path)
     else:
@@ -75,9 +77,12 @@ if __name__ == "__main__":
 
     ###### INPUTS #######
     
-    TASK_NAME = "mummy_walk"
+    TASK_NAME = "single_left_punch"
     PLOT_SUBPLOTS = False
     seeds = [42, 700, 8125, 97, 3538]
+
+    fontsize = 20
+    plt.rcParams.update({'font.size': fontsize})
 
     experiment_lables = {
         # r"NEAR":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}/summaries" for seed in seeds],
@@ -95,8 +100,8 @@ if __name__ == "__main__":
         }
     expert_values = expert_values[TASK_NAME]
 
-    title = f"Humanoid {TASK_NAME.replace('_', ' ').title()}"
-    # title = f"Humanoid {TASK_NAME.replace('_', ' ').replace('single', '').title()}"
+    # title = f"Humanoid {TASK_NAME.replace('_', ' ').title()}"
+    title = f"Humanoid {TASK_NAME.replace('_', ' ').replace('single', '').title()}"
     ###### INPUTS #######
     
     scalars = [
@@ -119,7 +124,7 @@ if __name__ == "__main__":
         # "Root Body Velocity",
         # "Spectral Arc Length (SPARC)",
         "Mini-batch Energy Return",
-        r"Perturbation Level ($\in [0,49]$)"
+        r"Perturbation Level $\in [0,49]$"
         ]
 
     no_annotate = ["episode_lengths/step", "minibatch_combined_reward/step", "minibatch_energy/step", "ncsn_perturbation_level/step"]
@@ -203,9 +208,9 @@ if __name__ == "__main__":
                 ax.set_ylabel(scalar_labels[idx])
                 # ax.set_title(title)
                 if scalar in list(expert_values.keys()):
-                    ax.axhline(y=expert_values[scalar], color='#f032e6', linestyle='-', linewidth=1.5, label="Expert's Value")
+                    ax.axhline(y=expert_values[scalar], color=line_colour, linestyle='-', linewidth=1.5, label="Expert's Value")
                     if annotate:
-                        ax.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color='#f032e6')
+                        ax.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color=line_colour)
 
                 if annotate:
                     ax_annotations = annotations[ax]
@@ -226,19 +231,32 @@ if __name__ == "__main__":
             plt.title(title)
 
             if scalar in list(expert_values.keys()):
-                plt.axhline(y=expert_values[scalar], color='#f032e6', linestyle='-', linewidth=1.5, label="Expert's Value")
+                plt.axhline(y=expert_values[scalar], color=line_colour, linestyle='-', linewidth=1.5, label="Expert's Value")
                 if annotate:
-                    plt.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color='#f032e6')
+                    plt.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color=line_colour)
 
             if annotate:
                 if len(annotations) > 0:
                     for offset_idx, text in enumerate(sorted(list(annotations.keys()), key=float)):
                         offset = float(offset_idx+1)*0.1*plt.gca().get_ylim()[1]
-                        # offset = [-float(1)*0.1*plt.gca().get_ylim()[0], float(1)*0.1*plt.gca().get_ylim()[0]][offset_idx]
+                        # offset = [-float(1)*0.1*plt.gca().get_ylim()[1], float(1)*0.1*plt.gca().get_ylim()[1]][offset_idx]
                         plt.annotate(round(text,2), xy=annotations[text][0], xytext=(1.002*plt.gca().get_xlim()[1],  annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=annotations[text][1]))
 
             plt.legend()
 
         plt.tight_layout()
-        plt.show()
+        figname = f"{TASK_NAME.replace(' ', '_').replace('-', '_')}_{scalar_labels[idx].replace(' ', '_').replace('-', '_')}"
+        
+        if scalar == "minibatch_energy/step":
+            plt.gca().ticklabel_format(axis='y', scilimits=[0, 0])
+
+        figpath = Path(f"/home/anishdiwan/thesis_background/IsaacGymEnvs/isaacgymenvs/exp_plots_temp/{figname}.pdf")
+        if figpath.is_file():
+            # Avoid overwriting automatically
+            pass
+        else:
+            plt.savefig(figpath, bbox_inches="tight", format="pdf")
+        
+        # plt.show()
+        plt.cla()
 

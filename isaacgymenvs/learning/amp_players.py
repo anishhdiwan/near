@@ -264,9 +264,9 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
 
         fontsize = 20
         plt.rcParams.update({'font.size': fontsize})
-        label = "4.5 e5 Samples"
+        # label = "5.0 e5 Samples"
         plt.figure(figsize=(8, 6))
-        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), disc_grid.cpu().detach().numpy(), cmap ='bone')
+        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), disc_grid.cpu().detach().numpy(), cmap='RdBu')
         plt.xlabel("env - x")
         plt.ylabel("env - y")
         plt.title(f"Maze Env disc(s,s') | Mean disc pred in agent's reachable set")
@@ -279,14 +279,14 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.gca().set_xlim(left=0, right=512)
         plt.gca().set_ylim(bottom=0, top=512)
         plt.gca().invert_yaxis()
-        # plt.text(260, 90, label, fontsize = fontsize, fontweight='bold', color='#42d4f4')
+        # plt.text(260, 90, label, fontsize = fontsize, fontweight='bold', color='#000000', backgroundcolor='white')
         plt.tight_layout()
         # plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_pred_{label}.png", format="png", bbox_inches="tight", dpi=300)
         plt.show()
 
 
         plt.figure(figsize=(8, 6))
-        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), rew_grid.cpu().detach().numpy(), cmap ='bone')
+        mesh = plt.pcolormesh(x.cpu().cpu().detach().numpy(), y.cpu().detach().numpy(), rew_grid.cpu().detach().numpy(), cmap ='Blues')
         plt.xlabel("env - x")
         plt.ylabel("env - y")
         plt.title(f"Maze Env amp_reward(s,s') | Mean amp reward in agent's reachable set")
@@ -299,7 +299,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         plt.gca().set_xlim(left=0, right=512)
         plt.gca().set_ylim(bottom=0, top=512)
         plt.gca().invert_yaxis()
-        # plt.text(260, 90, label, fontsize = fontsize, fontweight='bold', color='#42d4f4')
+        # plt.text(260, 90, label, fontsize = fontsize, fontweight='bold', color='#000000', backgroundcolor='white')
         plt.tight_layout()
         # plt.savefig(f"{os.path.splitext(self.last_checkpoint)[0]}_disc_rew_{label}.png", format="png", bbox_inches="tight", dpi=300)
         plt.show()
