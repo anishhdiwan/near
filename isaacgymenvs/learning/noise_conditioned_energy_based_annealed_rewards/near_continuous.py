@@ -1253,5 +1253,5 @@ class NEARAgent(a2c_continuous.A2CAgent):
                 return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
         else:
             # return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
-            return torch.cat([torch.full((self.num_actors, 1), 1.0), 
-                            torch.full((self.num_actors, 1), 0.0)], dim=1).to('cuda:0', dtype=torch.float)
+            return torch.cat([torch.full((self.num_actors, 1), 0.75), 
+                            torch.full((self.num_actors, 1), 0.25)], dim=1).to('cuda:0', dtype=torch.float)
