@@ -12,7 +12,13 @@ PARENT_DIR_PATH = os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(PARENT_DIR_PATH)
 
 
-from experiment_plotter import Colours
+from experiment_plotter import Colours, line_colour
+
+Colours = [
+    '#000000', '#42d4f4', '#4363d8', '#f58231', '#000075',
+    '#3cb44b', '#911eb4', '#469990', '#f032e6', '#9A6324', '#808000',
+    '#800000', '#e6194B'
+]
 
 
 def get_scalars_from_dfs(scalar, trial_dfs):
@@ -35,7 +41,7 @@ if __name__ == "__main__":
     # event_file = "./ncsn_runs/temp_runs/"
     event_file = "../../NEAR_experiments/plot_runs_temp/"
     
-    df_path = Path(os.path.join(PARENT_DIR_PATH, "../../NEAR_experiments/plot_runs_df.pkl"))
+    df_path = Path(os.path.join(PARENT_DIR_PATH, "../../NEAR_experiments/ablations_plot_runs_df.pkl"))
     if df_path.is_file():
         df = pd.read_pickle(df_path)
     else:
@@ -47,15 +53,27 @@ if __name__ == "__main__":
     ###### INPUTS #######
     
     TASK_NAME = "crane_pose"
-    PLOT_SUBPLOTS = True
+    ABLATION_TYPE = "annealing" # "annealing" or "task_reward"
+    PLOT_SUBPLOTS = False
     seeds = [42, 700, 8125, 97, 3538]
 
+    fontsize = 29
+    plt.rcParams.update({'font.size': fontsize})
+
+    # experiment_lables = {
+    #     r"NCSN-v2 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}" for seed in seeds],
+    #     r"NCSN-v2 $\vert$ Annealing $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_05_{seed}" for seed in seeds],
+    #     r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_10_{seed}" for seed in seeds],
+    #     r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_05_{seed}" for seed in seeds],
+    #     # r"NCSN-v1 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_False_w_style_10_{seed}" for seed in seeds],
+    # }
+
     experiment_lables = {
-        r"NCSN-v2 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}" for seed in seeds],
-        r"NCSN-v2 $\vert$ Annealing $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_05_{seed}" for seed in seeds],
-        r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_10_{seed}" for seed in seeds],
-        r"NCSN-v2 $\vert$ $\sigma_5 $ $\vert$ $0.5 e_{\theta} + 0.5 r^{task}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_05_{seed}" for seed in seeds],
-        # r"NCSN-v1 $\vert$ Annealing $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_False_w_style_10_{seed}" for seed in seeds],
+        r"anneal $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_10_{seed}" for seed in seeds],
+        r"anneal $\vert$ $\tilde{r}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_True_w_style_05_{seed}" for seed in seeds],
+        r"$\sigma_5 $ $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_10_{seed}" for seed in seeds],
+        r"$\sigma_5 $ $\vert$ $\tilde{r}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_5_True_w_style_05_{seed}" for seed in seeds],
+        # r"ncsn-v1 $\vert$ anneal $\vert$ $e_{\theta}$":[f"ABLATION_HumanoidNEAR_{TASK_NAME}_-1_False_w_style_10_{seed}" for seed in seeds],
     }
 
     expert_values = {
@@ -65,7 +83,8 @@ if __name__ == "__main__":
         }
     expert_values = expert_values[TASK_NAME]
 
-    title = f"Humanoid {TASK_NAME.replace('_', ' ').title()} - NCSN Ablation"
+    # title = f"Humanoid {TASK_NAME.replace('_', ' ').title()} - {ABLATION_TYPE.replace('_', ' ').title()} Ablation"
+    title = f"Humanoid {TASK_NAME.replace('_', ' ').title()} Ablation"
     ###### INPUTS #######
     
     scalars = [
@@ -95,9 +114,12 @@ if __name__ == "__main__":
         subplt_idx = 0
         annotate = True
         if PLOT_SUBPLOTS:
-            fig, (ax1, ax2) = plt.subplots(2)
+            fig, (ax1, ax2) = plt.subplots(2, sharex=True, sharey=True, figsize=(8,6))
+            fig.add_subplot(111, frameon=False)
+            plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
             annotations = {ax1:{}, ax2:{}}
         else:
+            plt.figure(figsize=(12,6))
             annotations = {}
 
         for exp_label, trial_names in experiment_lables.items():
@@ -117,9 +139,15 @@ if __name__ == "__main__":
             linestyle = '-'
             hatch = None   
 
-            if PLOT_SUBPLOTS:         
-                # Ablate Task Reward
-                colours = {0:0, 1:1, 2:0, 3:1}
+            if PLOT_SUBPLOTS:       
+                if ABLATION_TYPE == "annealing":
+                    # Ablate Annealing
+                    colours = {0:0, 1:0, 2:1, 3:1}
+                    condition = subplt_idx%2 == 0
+                elif ABLATION_TYPE == "task_reward":
+                    # Ablate Task Reward
+                    colours = {0:0, 1:1, 2:0, 3:1}
+                    condition = subplt_idx < 2
 
                 # Ablate Annealing
                 # colours = {0:0, 1:0, 2:1, 3:1}
@@ -130,7 +158,7 @@ if __name__ == "__main__":
                 # if subplt_idx%2 == 0:
                 
                 # Ablate Task Reward
-                if subplt_idx < 2:
+                if condition:
                     ax1.plot(exp_steps, mean_scalar, color=Colours[colour_idx], linewidth=1.5, label=exp_label, linestyle=linestyle)
                     ax1.fill_between(exp_steps, min_interval, max_interval, alpha=0.2, color=Colours[colour_idx], hatch=hatch)
 
@@ -160,24 +188,32 @@ if __name__ == "__main__":
 
         if PLOT_SUBPLOTS:
             for ax in (ax1, ax2):
-                ax.set_xlabel('Training Samples')
-                ax.set_ylabel(scalar_labels[idx])
+                # ax.set_xlabel('Training Samples')
+                # ax.set_ylabel(scalar_labels[idx])
+                plt.xlabel("Training Samples")
+                plt.ylabel(scalar_labels[idx], labelpad=20)
                 # ax.set_title(title)
                 if scalar in list(expert_values.keys()):
-                    ax.axhline(y=expert_values[scalar], color='#f032e6', linestyle='-', linewidth=1.5, label="Expert's Value")
+                    ax.axhline(y=expert_values[scalar], color=line_colour, linestyle='-', linewidth=1.5, label="Expert's Value")
                     if annotate:
-                        ax.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color='#f032e6')
+                        ax.annotate(f'{expert_values[scalar]}', xy=(ax.get_xlim()[1], expert_values[scalar]), xytext=(1.001*ax.get_xlim()[1], expert_values[scalar]), color=line_colour)
 
                 if annotate:
                     ax_annotations = annotations[ax]
                     if len(ax_annotations) > 0:
                         wiggle_const = 0
                         for offset_idx, text in enumerate(sorted(list(ax_annotations.keys()), key=float)):
-                            # offset = float(offset_idx+1+wiggle_const)*0.1*plt.gca().get_ylim()[1]
-                            offset = [float(1)*0.1*plt.gca().get_ylim()[0], -float(1)*0.1*plt.gca().get_ylim()[0]][offset_idx]
-                            ax.annotate(round(text,2), xy=ax_annotations[text][0], xytext=(1.002*plt.gca().get_xlim()[1],  ax_annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=ax_annotations[text][1]))
+                            offset = float(offset_idx+1+wiggle_const)*0.1*ax.get_ylim()[1]
+                            # offset = [float(1)*0.1*ax.ax[0], -float(1)*0.1*ax.get_ylim()[0]][offset_idx]
+                            ax.annotate(round(text,2), xy=ax_annotations[text][0], xytext=(1.002*ax.get_xlim()[1],  ax_annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=ax_annotations[text][1]))
 
-                ax.legend()
+                # ax.legend()
+                if scalar == "mean_dtw_pose_error/step":
+                    ncols=1
+                else:
+                    ncols=2
+                ax.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left",
+                mode="expand", borderaxespad=0, ncols=ncols)
             
             fig.suptitle(title)
         
@@ -187,19 +223,42 @@ if __name__ == "__main__":
             plt.title(title)
 
             if scalar in list(expert_values.keys()):
-                plt.axhline(y=expert_values[scalar], color='#f032e6', linestyle='-', linewidth=1.5, label="Expert's Value")
+                plt.axhline(y=expert_values[scalar], color=line_colour, linestyle='-', linewidth=1.5, label="Expert's Value")
                 if annotate:
-                    plt.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color='#f032e6')
+                    plt.annotate(f'{expert_values[scalar]}', xy=(plt.gca().get_xlim()[1], expert_values[scalar]), xytext=(1.001*plt.gca().get_xlim()[1], expert_values[scalar]), color=line_colour)
 
             if annotate:
                 if len(annotations) > 0:
-                    for offset_idx, text in enumerate(sorted(list(annotations.keys()), key=float)):
-                        offset = float(offset_idx+1)*0.1*plt.gca().get_ylim()[1]
-                        # offset = [float(1)*0.25*plt.gca().get_ylim()[1], float(1)*0.2*plt.gca().get_ylim()[1]][offset_idx]
-                        plt.annotate(round(text,2), xy=annotations[text][0], xytext=(1.002*plt.gca().get_xlim()[1],  annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=annotations[text][1]))
+                    ax = plt.gca()
+                    for offset_idx, text in enumerate(sorted(list(annotations.keys()), key=float, reverse=False)):
+                        val=0.1
+                        # val = [-0.05, 0.08, 0.13, 0.16][offset_idx]
+                        # val = [-0.1, 0.1][offset_idx]
+                        offset = float(offset_idx+1)*val*plt.gca().get_ylim()[1]
+                        # offset = [
+                        #     -float(1)*0.05*ax.get_ylim()[0], 
+                        #     float(1)*0.1*ax.get_ylim()[0],
+                        #     float(1)*0.2*ax.get_ylim()[0], 
+                        #     float(1)*0.4*ax.get_ylim()[0],
+                        # ][offset_idx]
+                        plt.annotate(round(text,2), xy=annotations[text][0], xytext=(1.002*ax.get_xlim()[1],  annotations[text][0][1]+offset), arrowprops=dict(arrowstyle='->', color=annotations[text][1]))
 
-            plt.legend()
-
+            plt.legend(ncols=1)
+            # plt.legend(bbox_to_anchor=(0.5, 0.0), loc="lower center",
+            # mode="expand", borderaxespad=0, ncols=2)
+        
         plt.tight_layout()
-        plt.show()
+        # figname = f"Ablation_{TASK_NAME.replace(' ', '_').replace('-', '_')}_{ABLATION_TYPE}_{scalar_labels[idx].replace(' ', '_').replace('-', '_')}"
+        # figname = f"Ablation_ncsn_{TASK_NAME.replace(' ', '_').replace('-', '_')}_{scalar_labels[idx].replace(' ', '_').replace('-', '_')}"
+        figname = f"Ablation_{TASK_NAME.replace(' ', '_').replace('-', '_')}_{scalar_labels[idx].replace(' ', '_').replace('-', '_')}"
+
+        figpath = Path(f"/home/anishdiwan/thesis_background/IsaacGymEnvs/isaacgymenvs/ablation_plots_temp/{figname}.pdf")
+        if figpath.is_file():
+            # Avoid overwriting automatically
+            pass
+        else:
+            plt.savefig(figpath, bbox_inches="tight", format="pdf")
+        
+        # plt.show()
+        plt.cla()
 
