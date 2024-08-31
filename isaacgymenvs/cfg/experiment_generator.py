@@ -15,11 +15,11 @@ sys.path.append(FILE_PATH)
 
 algos = [
     "HumanoidNEAR", 
-    "HumanoidAMP"
+    # "HumanoidAMP"
 ]
 
 motions = [
-    # "amp_humanoid_walk.yaml",
+    "amp_humanoid_walk.yaml",
     # "amp_humanoid_run.yaml",
     # "amp_humanoid_crane_pose.yaml",
     # "amp_humanoid_single_left_punch.yaml",
@@ -27,13 +27,16 @@ motions = [
     # "amp_humanoid_bow.yaml",
     # "amp_humanoid_marching.yaml",
     # "amp_humanoid_tai_chi.yaml",
-    # "amp_humanoid_mummy_walk.yaml",
+    "amp_humanoid_mummy_walk.yaml",
     # "amp_humanoid_single_cartwheel.yaml",
-    "amp_humanoid_spin_kick.yaml",
+    # "amp_humanoid_spin_kick.yaml",
 ]
 
+exp_type = 'flagpole'
+
 task_specific_cfg = {
-    "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    # "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_walk.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets='['{exp_type}']'",
     "amp_humanoid_run.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_crane_pose.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_single_left_punch.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
@@ -41,8 +44,9 @@ task_specific_cfg = {
     "amp_humanoid_zombie_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_bow.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_marching.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
-    "amp_humanoid_mummy_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
-    "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    # "amp_humanoid_mummy_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_mummy_walk.yaml":f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets='['{exp_type}']'",
+    "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ",
     "amp_humanoid_spin_kick.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.stateInit=WeightedRandom ++task.env.episodeLength=100",
 }
 
@@ -105,7 +109,7 @@ def generate_train_commands():
             for motion in motions:
                 for seed in seeds:
                     if not motion == "amp_humanoid_single_cartwheel.yaml":
-                        base_cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
+                        base_cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{exp_type.upper()}_{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
                     else:
                         base_cmd = [f"task={algo}Hands train={algo}PPO ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]                        
 
@@ -113,16 +117,22 @@ def generate_train_commands():
                         ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
                         
                         ncsn_dir = base_cmd[1]
+                        w_task = 0.3
+                        w_style = 0.7
                         eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
                         running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
                         rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
-                        + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={base_cmd[1]}"
+                        + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={base_cmd[1]}" \
+                        + f"++train.params.config.near_config.inference.task_reward_w={w_task} ++train.params.config.near_config.inference.energy_reward_w={w_style}"
 
                         pending_cmds.append([ncsn_cmd, rl_cmd, False, False, False])
                         counter += 1
                     elif algo == "HumanoidAMP":
                         ncsn_cmd = ""
-                        rl_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {amp_task_specific_cfg[motion]}"
+                        task_reward_w = 0.3
+                        disc_reward_w = 0.7
+                        rl_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {amp_task_specific_cfg[motion]}" \
+                        + f"++train.params.config.task_reward_w={task_reward_w} ++train.params.config.disc_reward_w={disc_reward_w}"
 
                         pending_cmds.append([ncsn_cmd, rl_cmd, False, False, False])
                         counter += 1

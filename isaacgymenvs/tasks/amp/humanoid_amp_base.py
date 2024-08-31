@@ -723,8 +723,8 @@ class HumanoidAMPBase(VecTask):
                 min_dist = 3.0
                 max_dist = 8.0
             else:
-                min_dist = 1.5
-                max_dist = 6.0
+                min_dist = 3.0
+                max_dist = 5.0
         elif additional_actor_name[0] == "box":
             if self.motion_style == "amp_humanoid_run":
                 min_dist = 3.0
@@ -769,15 +769,28 @@ class HumanoidAMPBase(VecTask):
         elif additional_actor_name[0] == "flagpole":
             assert num_instances == 1, "There can only be one flagpole asset. Change the code in humanoid_amp_base to change this"
 
-            # Initialise the asset in a band defined by a min and max radius relative to the agent with z = 0.0
-            directions = torch.randn(num_instances*num_env_ids, 2)
-            norms = torch.norm(directions, dim=1, keepdim=True) 
-            unit_vectors = directions/norms  # Normalize to get points on the unit sphere
+            theta_min = 45
+            theta_max = 45
+            theta_min = torch.deg2rad(torch.tensor(theta_min))
+            theta_max = torch.deg2rad(torch.tensor(theta_max))
+            angles = torch.empty(num_instances*num_env_ids).uniform_(-theta_min, theta_max)
             radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
-            reset_poses = unit_vectors * radii[:, None]
+            x = radii * torch.cos(angles)
+            y = radii * torch.sin(angles)
+            reset_poses = torch.stack((x, y), dim=1)
             reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
             reset_poses += agent_pos[:, :-1] # Translate reset pos relative to the agent
             reset_poses = torch.cat([reset_poses, torch.zeros(reset_poses.shape[0], 1).to('cuda:0', dtype=torch.float)], dim=1) 
+
+            # Initialise the asset in a band defined by a min and max radius relative to the agent with z = 0.0
+            # directions = torch.randn(num_instances*num_env_ids, 2)
+            # norms = torch.norm(directions, dim=1, keepdim=True) 
+            # unit_vectors = directions/norms  # Normalize to get points on the unit sphere
+            # radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
+            # reset_poses = unit_vectors * radii[:, None]
+            # reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
+            # reset_poses += agent_pos[:, :-1] # Translate reset pos relative to the agent
+            # reset_poses = torch.cat([reset_poses, torch.zeros(reset_poses.shape[0], 1).to('cuda:0', dtype=torch.float)], dim=1) 
 
             return reset_poses
 
@@ -922,11 +935,11 @@ def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf,
     relative_target_pos = target_pos - agent_root_pos
     pos_error = torch.norm(relative_target_pos, p=2, dim=1)
     if motion_style == "humanoid_amp_run":
-        min_pos_error_thresh = 1.0
+        min_pos_error_thresh = 1.5
         max_pos_error_thresh = 15.0
     else:
-        min_pos_error_thresh = 1.0
-        max_pos_error_thresh = 8.0
+        min_pos_error_thresh = 1.5
+        max_pos_error_thresh = 6.0
 
     reset = torch.where(((pos_error <= min_pos_error_thresh) | (pos_error >= max_pos_error_thresh)), torch.ones_like(reset_buf), reset)
 

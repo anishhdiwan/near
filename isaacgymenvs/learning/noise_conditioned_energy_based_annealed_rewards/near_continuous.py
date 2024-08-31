@@ -809,6 +809,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         if self._goal_conditioning:
             goal_completion = self.vec_env.env.get_goal_completion()[env_idx]
+            # goal_completion = self.vec_env.env.get_goal_completion()
             success_rate = goal_completion.sum()/len(goal_completion)
         else:
             success_rate = None

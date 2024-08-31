@@ -109,8 +109,8 @@ The learnt rewards can also be composed with global task objectives or another l
 **Goal Conditioning**
 ```bash
 # For goal-conditioned RL there are currently two options [target reaching, and punching a box]. These can be specifed with the following optional params (task rewards are automatically added and can be weighted using near_config.inference.task_reward)
-++task.env.envAssets=["flagpole"] # for target reaching or 
-++task.env.envAssets=["box"] # for target reaching + punching
+++task.env.envAssets="["flagpole"]" # for target reaching or 
+++task.env.envAssets="["box"]" # for target reaching + punching
 ```
 
 **Energy Reward Composition**
@@ -229,9 +229,9 @@ python fbx_motion_to_npy.py --task="indian dance"
 ```bash
 # Retarget motions in a data_dir. A data_dir must be provided. 
 # The save dir is assumed to be in the home dir but can also be provided with the --save_path option (note that this directory must contain the data_dir)
-# The source and target skeletons can be viewed with the --view_srg_tgt option and the source and target motions can be viewed using the --view option
+# The source and target skeletons can be viewed with the --view_src_tgt option and the source and target motions can be viewed using the --view option
 # A retarget config must be preset. It is assumed that this is present in poselib but a custom one can also be passed with the --cfg_pth option 
-python generate_retargeted_dataset.py --data_dir=cmu_jump_task --view --view_srg_tgt
+python generate_retargeted_dataset.py --data_dir=cmu_jump_task --view --view_src_tgt
 ```
 
 3. You might have to first obtain a skeleton to retarget the data. Use `generate_tpose_from_motion.py` to generate a skeleton .npy file based on which motions are retargeted.
