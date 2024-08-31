@@ -65,7 +65,7 @@ pip install -r requirements.txt
 - Before training the policy, add the path to the trained energy-based model checkpoint in the `near_cfg` part of the `train/<task-name>NEAR.yml` file.
 - With IsaacGym, by default we show a preview window, which will usually slow down training. You can use the `v` key while running to disable viewer updates and allow training to proceed faster. Hit the `v` key again to resume viewing. Use the `esc` key or close the viewer window to stop training early. Alternatively, you can train headlessly by adding the headless:True argument. 
 
-### Step 1: Training the energy-based model
+### Step 1: Training the energy-based reward function
 ```bash
 # tasks = [mazeNEAR, pushTNEAR, HumanoidNEAR]
 python train_ncsn.py task=<task-name>
@@ -76,7 +76,7 @@ python train_ncsn.py task=<task-name>
 
 ```
 
-### Step 2: Training the energy-based policy
+### Step 2: Training the RL policy
 
 ```bash
 # For CPU-based environments
@@ -100,6 +100,35 @@ python train.py task=<task-name> headless=<bool>
 # ++train.params.config.near_config.inference.energy_reward_w={w_style} 
 # ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}"
 # ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}
+```
+
+### Goal-Conditioned RL & Spatial Composition
+
+The learnt rewards can also be composed with global task objectives or another learnt style reward. For example, when the learnt energy reward for the walking motion is combined with a task reward for reaching a randomly placed target, the agent can now walk towards the target. To achieve this, the RL problem is modified to be a goal conditioned RL problem and a goal state is concatenated with the agent's state. Additionally, we also offer an option to concatenate multiple learnt energy rewards to obtain spatially composed motions like walking while doing hand gestures. Both these options are inferred from the config. 
+
+**Goal Conditioning**
+```bash
+# For goal-conditioned RL there are currently two options [target reaching, and punching a box]. These can be specifed with the following optional params (task rewards are automatically added and can be weighted using near_config.inference.task_reward)
+++task.env.envAssets=["flagpole"] # for target reaching or 
+++task.env.envAssets=["box"] # for target reaching + punching
+```
+
+**Energy Reward Composition**
+```bash
+# For composed learnt rewards there is no additional config option. Instead, composition is enabled if the energy based model is passed as a dictionary. In this case, the standardisation checkpoints must be passed as a list.
+++train.params.config.near_config.inference.eb_model_checkpoint="{"amp_humanoid_walk.yaml":"ncsn_runs/HumanoidNEAR_walk/nn/checkpoint.pth", "amp_humanoid_crane_pose.yaml":"ncsn_runs/HumanoidNEAR_crane_pose/nn/checkpoint.pth"}"
+
+++train.params.config.near_config.inference.running_mean_std_checkpoint="{"amp_humanoid_walk.yaml":"ncsn_runs/HumanoidNEAR_walk/nn/running_mean_std.pth", "amp_humanoid_crane_pose.yaml":"ncsn_runs/HumanoidNEAR_crane_pose/nn/running_mean_std.pth"}"
+
+# If the punching task is enabled with energy reward composition, then the first energy reward is assumed to be for locomotion and the second one for punching. In this case, the punching reward is only enabled when the agent is within some minimum distance to the target. In all other cases, the rewards are combined with a 3:1 ratio. 
+```
+**Optional Config Settings**
+```bash
+++task.env.localRootObs=True # To ignore the agent's heading in the state computation (necessary for target reaching)
+++train.params.config.near_config.inference.composed_feature_mask="["lower_body", "upper_body"]" # To apply a mask on the energy network's features, for example, to only use lower body features for walking and upper body features for hand motions
+
+# In case a mask is used, the energy network must also be trained with the same mask. This means that the following option is passed when training the energy function. And near_config.inference.composed_feature_mask is passed when using the trained energy function as a reward. 
+++train.params.config.near_config.model.feature_mask="upper_body". 
 ```
 
 <br><br>
