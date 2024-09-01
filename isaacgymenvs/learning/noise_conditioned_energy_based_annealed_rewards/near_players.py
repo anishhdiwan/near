@@ -11,6 +11,8 @@ from utils.ncsn_utils import dict2namespace
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb
 import time
 from isaacgymenvs.tasks.humanoid_amp import HumanoidAMP 
+import random
+import os
 
 def get_augmented_env_info(env, **kwargs):
     if "temporal_feature" in list(kwargs.keys()):
@@ -350,3 +352,63 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         else:
             print('av reward:', sum_rewards / games_played * n_game_life,
                   'av steps:', sum_steps / games_played * n_game_life)
+
+
+    def visualise_motion(self):
+        """Visualise a motion file from the dataset by repeatedly resetting the agents
+        """
+        from isaacgym import gymtorch
+        num_motions = self.env._motion_lib.num_motions()
+        num_envs = self.num_agents
+        motion_ids = np.full((num_envs), random.randrange(num_motions))
+        dt = self.config['near_config']['data']['sim_params']['dt']/10
+        motion_len = self.env._motion_lib._motion_lengths[motion_ids[0]]
+        env_ids = torch.arange(num_envs, device=self.env.reset_buf.device, dtype=self.env.reset_buf.dtype)
+        self.is_tensor_obses = True
+
+        motion_time = 0.0
+        for i in range(int(motion_len/dt)):
+            motion_time = motion_time + i*dt
+            motion_times = np.full((motion_ids.shape), motion_time)
+
+            root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
+                = self.env._motion_lib.get_motion_state(motion_ids, motion_times)
+            
+            self.env._root_states[env_ids, 0:3] = root_pos
+            self.env._root_states[env_ids, 3:7] = root_rot
+            self.env._root_states[env_ids, 7:10] = root_vel
+            self.env._root_states[env_ids, 10:13] = root_ang_vel
+            
+            self.env._dof_pos[env_ids] = dof_pos
+            self.env._dof_vel[env_ids] = dof_vel
+
+            # env_ids_int32 = env_ids.to(dtype=torch.int32)
+            env_ids_int32 = env_ids.to(dtype=torch.int32)
+            self.env.gym.set_actor_root_state_tensor_indexed(self.env.sim, gymtorch.unwrap_tensor(self.env._all_root_states), 
+                                                        gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+            self.env.gym.set_dof_state_tensor_indexed(self.env.sim, gymtorch.unwrap_tensor(self.env._dof_state),
+                                                        gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
+            self.env._refresh_sim_tensors()
+            self.env._compute_observations(env_ids)
+            self.env.obs_dict["obs"] = torch.clamp(self.env.obs_buf, -self.env.clip_obs, self.env.clip_obs).to(self.env.rl_device)
+            # action = self.get_action(self.env.obs_dict['obs'], True)
+
+            for j in range(self.env.control_freq_inv):
+                # if self.env.force_render:
+                    # self.env.render()
+                self.env.gym.simulate(self.env.sim)
+
+            # action = torch.from_numpy(self.env.action_space.sample())
+            # obses, r, done, info = self.env_step(self.env, action)
+
+            self.env.render()
+
+            if not os.path.isdir(self.env.record_frames_dir):
+                os.makedirs(self.env.record_frames_dir, exist_ok=True)
+            self.env.gym.write_viewer_image_to_file(self.env.viewer, os.path.join(self.env.record_frames_dir, f"frame_{i}.png"))
+
+            self.env.render(mode='human')
+            
+            time.sleep(self.render_sleep)
+            # time.sleep(0.01)

@@ -752,8 +752,8 @@ class HumanoidAMPBase(VecTask):
 
             theta_min = 45
             theta_max = 10
-            theta_min = torch.deg2rad(torch.tensor(theta_min))
-            theta_max = torch.deg2rad(torch.tensor(theta_max))
+            theta_min = torch.deg2rad(torch.tensor(theta_min).float())
+            theta_max = torch.deg2rad(torch.tensor(theta_max).float())
             angles = torch.empty(num_instances*num_env_ids).uniform_(-theta_min, theta_max)
             radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
             x = radii * torch.cos(angles)
@@ -771,8 +771,8 @@ class HumanoidAMPBase(VecTask):
 
             theta_min = 45
             theta_max = 45
-            theta_min = torch.deg2rad(torch.tensor(theta_min))
-            theta_max = torch.deg2rad(torch.tensor(theta_max))
+            theta_min = torch.deg2rad(torch.tensor(theta_min).float())
+            theta_max = torch.deg2rad(torch.tensor(theta_max).float())
             angles = torch.empty(num_instances*num_env_ids).uniform_(-theta_min, theta_max)
             radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
             x = radii * torch.cos(angles)
