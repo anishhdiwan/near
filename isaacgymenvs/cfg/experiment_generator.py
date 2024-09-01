@@ -36,7 +36,7 @@ exp_type = 'flagpole'
 
 task_specific_cfg = {
     # "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
-    "amp_humanoid_walk.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets='[\"{exp_type}\"]'",
+    "amp_humanoid_walk.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
     "amp_humanoid_run.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_crane_pose.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_single_left_punch.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
@@ -45,7 +45,7 @@ task_specific_cfg = {
     "amp_humanoid_bow.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_marching.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     # "amp_humanoid_mummy_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
-    "amp_humanoid_mummy_walk.yaml":f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets='[\"{exp_type}\"]'",
+    "amp_humanoid_mummy_walk.yaml":f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
     "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ",
     "amp_humanoid_spin_kick.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.stateInit=WeightedRandom ++task.env.episodeLength=100",
 }

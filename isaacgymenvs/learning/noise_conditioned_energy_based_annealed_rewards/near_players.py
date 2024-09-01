@@ -14,6 +14,8 @@ from isaacgymenvs.tasks.humanoid_amp import HumanoidAMP
 import random
 import os
 
+
+
 def get_augmented_env_info(env, **kwargs):
     if "temporal_feature" in list(kwargs.keys()):
         if kwargs["temporal_feature"] == True:
@@ -38,8 +40,59 @@ def get_augmented_env_info(env, **kwargs):
             '''
             if hasattr(env, "value_size"):    
                 result_shapes['value_size'] = env.value_size
-            print(result_shapes)
             return result_shapes
+
+    elif "goal_conditioning" in list(kwargs.keys()):
+        if kwargs["goal_conditioning"] == True:
+            assert "goal_type" in list(kwargs.keys()), "A goal type must be provided for the appropriate goal features to be passed on to the policy"
+            goal_type = kwargs["goal_type"]
+
+            if goal_type == "flagpole":
+                result_shapes = {}
+                result_shapes['action_space'] = env.action_space
+                # Increase the observation space dims by 2 (x,y pos of flagpole) to account for the added temporal feature
+                result_shapes['observation_space'] = gym.spaces.Box(np.ones(env.num_obs + 2) * -np.Inf, np.ones(env.num_obs + 2) * np.Inf)
+
+                result_shapes['agents'] = 1
+                result_shapes['value_size'] = 1
+                if hasattr(env, "get_number_of_agents"):
+                    result_shapes['agents'] = env.get_number_of_agents()
+                '''
+                if isinstance(result_shapes['observation_space'], gym.spaces.dict.Dict):
+                    result_shapes['observation_space'] = observation_space['observations']
+                
+                if isinstance(result_shapes['observation_space'], dict):
+                    result_shapes['observation_space'] = observation_space['observations']
+                    result_shapes['state_space'] = observation_space['states']
+                '''
+                if hasattr(env, "value_size"):    
+                    result_shapes['value_size'] = env.value_size
+                return result_shapes
+
+            if goal_type == "box":
+                result_shapes = {}
+                result_shapes['action_space'] = env.action_space
+                # Increase the observation space dims by 2 (x,y pos of flagpole) to account for the added temporal feature
+                result_shapes['observation_space'] = gym.spaces.Box(np.ones(env.num_obs + 3) * -np.Inf, np.ones(env.num_obs + 3) * np.Inf)
+
+                result_shapes['agents'] = 1
+                result_shapes['value_size'] = 1
+                if hasattr(env, "get_number_of_agents"):
+                    result_shapes['agents'] = env.get_number_of_agents()
+                '''
+                if isinstance(result_shapes['observation_space'], gym.spaces.dict.Dict):
+                    result_shapes['observation_space'] = observation_space['observations']
+                
+                if isinstance(result_shapes['observation_space'], dict):
+                    result_shapes['observation_space'] = observation_space['observations']
+                    result_shapes['state_space'] = observation_space['states']
+                '''
+                if hasattr(env, "value_size"):    
+                    result_shapes['value_size'] = env.value_size
+                return result_shapes
+
+            elif goal_type == "football":
+                raise NotImplementedError
 
     else:
         result_shapes = {}
@@ -73,9 +126,29 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         """
 
         config = params['config']
+        
+        env_assets = config['near_config']['data']['env_params'].get('envAssets', [])
+        if env_assets != []:
+            self._goal_conditioning = True
+            self.goal_type = env_assets[0]
+        else:
+            self._goal_conditioning = False
+
+
+        if self._goal_conditioning:
+            assert config['near_config']['model']['encode_temporal_feature'] == False, "Goal conditioning while loading while using temporal features is currently not implemented"
+            print("Setting up goal conditioning")
+
+            self.env_name = config['env_name']
+            self.env_config = config.get('env_config', {})
+            env = self.create_env()
+
+            self.env_info = get_augmented_env_info(env, goal_conditioning=True, goal_type=self.goal_type)
+            params['config']['env_info'] = self.env_info
 
         # If using temporal feature in the state vector, create the environment first and then augment the env_info to account for extra dims
         if config['near_config']['model']['encode_temporal_feature']:
+            assert self._goal_conditioning == False, "Goal conditioning loading while using temporal features is currently not implemented"
             print("Using Temporal Features")
             temporal_emb_dim = config['near_config']['model'].get('temporal_emb_dim', None)
             assert temporal_emb_dim != None, "A temporal embedding dim must be provided if encoding temporal features"
@@ -88,7 +161,7 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         super().__init__(params)
 
         # Set the self.env attribute
-        if config['near_config']['model']['encode_temporal_feature']:
+        if config['near_config']['model']['encode_temporal_feature'] or self._goal_conditioning:
             self.env = env
 
         self._task_reward_w = self.config['near_config']['inference']['task_reward_w']
@@ -284,6 +357,10 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
                 if self._encode_temporal_feature:
                     progress0 = self.embed(self.env.progress_buf/self._max_episode_length)
                     obses = torch.cat((progress0, obses), -1)
+
+                if self._goal_conditioning:
+                    goal_features0 = self.env.get_goal_features()
+                    obses = torch.cat((goal_features0, obses), -1)
                 
                 if has_masks:
                     masks = self.env.get_action_mask()

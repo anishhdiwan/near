@@ -128,7 +128,7 @@ class HumanoidAMPBase(VecTask):
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
         self._all_root_states = gymtorch.wrap_tensor(actor_root_state)
-        self._root_states = self._all_root_states.view(self.num_envs, self.num_actors_per_env, 13)[:, :1, :].squeeze()
+        self._root_states = self._all_root_states.view(self.num_envs, self.num_actors_per_env, 13)[:, :1, :].squeeze(dim=1)
         self._initial_root_states = self._root_states.clone()
         self._initial_root_states[:, 7:13] = 0
 
@@ -153,8 +153,8 @@ class HumanoidAMPBase(VecTask):
         self.all_contact_forces = gymtorch.wrap_tensor(contact_force_tensor)
         self._contact_forces = self.all_contact_forces.view(self.num_envs, self.num_bodies, 3)[:,:self.humanoid_num_bodies,:]
 
-        self._additional_actor_rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,self.humanoid_num_bodies:self.num_bodies, 0:3].squeeze()
-        self._additional_actor_contact_forces = self.all_contact_forces.view(self.num_envs, self.num_bodies, 3)[...,self.humanoid_num_bodies:self.num_bodies,:].squeeze()
+        self._additional_actor_rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[...,self.humanoid_num_bodies:self.num_bodies, 0:3].squeeze(dim=1)
+        self._additional_actor_contact_forces = self.all_contact_forces.view(self.num_envs, self.num_bodies, 3)[...,self.humanoid_num_bodies:self.num_bodies,:].squeeze(dim=1)
 
         self._terminate_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
         

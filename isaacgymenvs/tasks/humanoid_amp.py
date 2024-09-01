@@ -663,11 +663,13 @@ def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_bo
 
     pos_error = target_pos - agent_root_pos
     pos_error_norm = pos_error.norm(p=2, dim=1)
-    root_to_target_unit_vector = (pos_error.mT/pos_error_norm).mT
-    agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)
-    heading_error = 1.0 - agent_vel_in_unit_vector_direction
+    root_to_target_unit_vector = (pos_error.T/pos_error_norm).T
+    # agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)
+    normalised_agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)/agent_root_body_vel.norm(p=2, dim=1)
+    # heading_error = 1.0 - agent_vel_in_unit_vector_direction
+    heading_error = normalised_agent_vel_in_unit_vector_direction
 
-    reward = 0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
+    reward = 0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*(1 - 2/(1+torch.exp(5*heading_error))) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
     reward[pos_error_norm <= 1.00] += 0.5
 
     return reward
@@ -693,16 +695,19 @@ def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_bo
 
     pos_error = target_pos - agent_root_pos
     pos_error_norm = pos_error.norm(p=2, dim=1)
-    root_to_target_unit_vector = (pos_error.mT/pos_error_norm).mT
-    agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)
-    heading_error = 1.0 - agent_vel_in_unit_vector_direction
+    root_to_target_unit_vector = (pos_error.T/pos_error_norm).T
+    normalised_agent_vel_in_unit_vector_direction = torch.sum(agent_root_body_vel * root_to_target_unit_vector, dim=1)/agent_root_body_vel.norm(p=2, dim=1)
+    # heading_error = 1.0 - normalised_agent_vel_in_unit_vector_direction
+    heading_error = normalised_agent_vel_in_unit_vector_direction
+
+
     punching_body_vel_in_unit_vector_direction = torch.sum(agent_punching_body_vel * root_to_target_unit_vector, dim=1)
     punching_body_pos_error = target_pos - agent_punching_body_pos
     punching_body_pos_error_norm = punching_body_pos_error.norm(p=2, dim=1)
 
 
     reward_near = 0.3*(0.2*torch.exp(-2*punching_body_pos_error_norm**2) + 0.8*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1))
-    reward_far = 0.3*(0.7*torch.exp(-0.5*pos_error_norm**2) + 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
+    reward_far = 0.3*(0.7*torch.exp(-0.5*pos_error_norm**2) +  0.3*(1 - 2/(1+torch.exp(5*heading_error)))) #0.3*torch.exp(-heading_error) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
     reward_far[target_punched] = 1.0
     reward_near[target_punched] = 1.0
     near_mask = (~target_punched) & (pos_error_norm < 1.375)
