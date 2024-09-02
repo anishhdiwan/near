@@ -49,6 +49,13 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         self._normalize_amp_input = config.get('normalize_amp_input', True)
         self._disc_reward_scale = config['disc_reward_scale']
         self._print_disc_prediction = config.get('print_disc_prediction', False)
+
+        env_assets = config['env_params'].get('envAssets', [])
+        if env_assets != []:
+            self._goal_conditioning = True
+            self.goal_type = env_assets[0]
+        else:
+            self._goal_conditioning = False
         
         super().__init__(params)
         return

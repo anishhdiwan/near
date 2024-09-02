@@ -117,8 +117,8 @@ def generate_train_commands():
                         ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
                         
                         ncsn_dir = base_cmd[1]
-                        w_task = 0.3
-                        w_style = 0.7
+                        w_task = 0.4
+                        w_style = 0.6
                         eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
                         running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
                         rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
@@ -129,8 +129,8 @@ def generate_train_commands():
                         counter += 1
                     elif algo == "HumanoidAMP":
                         ncsn_cmd = ""
-                        task_reward_w = 0.3
-                        disc_reward_w = 0.7
+                        task_reward_w = 0.4
+                        disc_reward_w = 0.6
                         rl_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {amp_task_specific_cfg[motion]}" \
                         + f" ++train.params.config.task_reward_w={task_reward_w} ++train.params.config.disc_reward_w={disc_reward_w}"
 

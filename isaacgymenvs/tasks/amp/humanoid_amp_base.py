@@ -56,10 +56,16 @@ LOWER_BODY_MASK = ['abdomen', 'right_hip', 'right_knee', 'right_ankle', 'left_hi
 
 ADDITIONAL_ACTORS = {
     "football": {"file": "amp/soccerball.urdf", "num_instances":1, "texture":"amp/meshes/soccer_ball.png"},
-    "flagpole": {"file": "amp/flagpole.urdf", "num_instances":1, "colour": gymapi.Vec3(0.078, 0.671, 0.114)},
+    "flagpole": {"file": "amp/flagpole.urdf", "num_instances":1, "colour": gymapi.Vec3(204/255, 24/255, 0/255)}, 
     "box": {"file": "amp/box.urdf", "num_instances":1, "colour": gymapi.Vec3(0.078, 0.671, 0.114)} #"texture":"amp/meshes/cardboard.png"
     }
 
+
+DEMO_CHAR_COLOUR = gymapi.Vec3(17/255, 100/255, 180/255)
+LEARNT_CHAR_COLOURS = [gymapi.Vec3(10/255, 235/255, 255/255), gymapi.Vec3(255/255, 216/255, 0/255)]
+RANDOMISE_COLOURS = False
+TOP_VIEW = True
+AGENT_COLOUR = LEARNT_CHAR_COLOURS[0]
 
 KEY_BODY_NAMES = ["right_hand", "left_hand", "right_foot", "left_foot"]
 POSSIBLE_BODY_NAMES = ['pelvis', 'torso', 'head', 'right_upper_arm', 'right_lower_arm', 'right_hand',
@@ -303,10 +309,13 @@ class HumanoidAMPBase(VecTask):
             handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", i, contact_filter, 0)
             self.gym.enable_actor_dof_force_sensors(env_ptr, handle)
 
-            random_colour = gymapi.Vec3(*np.random.uniform(0.0, 1.0, 3))
+            if RANDOMISE_COLOURS:
+                colour = gymapi.Vec3(*np.random.uniform(0.0, 1.0, 3))
+            else:
+                colour = AGENT_COLOUR
             for j in range(self.humanoid_num_bodies):
                 self.gym.set_rigid_body_color(
-                    env_ptr, handle, j, gymapi.MESH_VISUAL, random_colour) #gymapi.Vec3(0.4706, 0.549, 0.6863)
+                    env_ptr, handle, j, gymapi.MESH_VISUAL, colour) #gymapi.Vec3(0.4706, 0.549, 0.6863)
 
             self.envs.append(env_ptr)
             self.humanoid_handles.append(handle)
@@ -319,7 +328,11 @@ class HumanoidAMPBase(VecTask):
                         if "texture" in list(ADDITIONAL_ACTORS[additional_actor_name].keys()):
                             self.gym.set_rigid_body_texture(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, self.additional_actor_visual[additional_actor_name]["texture"])
                         elif "colour" in list(ADDITIONAL_ACTORS[additional_actor_name].keys()):
-                            self.gym.set_rigid_body_color(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, random_colour) #self.additional_actor_visual[additional_actor_name]["colour"]
+                            if RANDOMISE_COLOURS:
+                                asset_colour = colour
+                            else:
+                                asset_colour = self.additional_actor_visual[additional_actor_name]["colour"]
+                            self.gym.set_rigid_body_color(env_ptr, additional_actor_handle, 0, gymapi.MESH_VISUAL, asset_colour)
 
             if (self._pd_control):
                 dof_prop = self.gym.get_asset_dof_properties(humanoid_asset)
@@ -556,9 +569,16 @@ class HumanoidAMPBase(VecTask):
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self._cam_prev_char_pos = self._root_states[0, 0:3].cpu().numpy()
         
-        cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
-                              self._cam_prev_char_pos[1] - 3.0, 
-                              1.0)
+        if TOP_VIEW:
+            cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
+                                self._cam_prev_char_pos[1] - 8.0, 
+                                5.0)
+        else:
+            cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
+                                  self._cam_prev_char_pos[1] - 3.0, 
+                                  1.0)
+
+
         cam_target = gymapi.Vec3(self._cam_prev_char_pos[0],
                                  self._cam_prev_char_pos[1],
                                  1.0)

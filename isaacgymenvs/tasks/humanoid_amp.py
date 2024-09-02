@@ -671,7 +671,7 @@ def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_bo
 
     desired_velocity = 2.0
     # Minimise squared positional error, minimise heading error, minimise squared errror of velocity norm with some desired velocity.
-    reward = 0.6*torch.exp(-0.5*pos_error_norm**2) + 0.2*(1 - 2/(1+torch.exp(5*heading_error))) + 0.2*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
+    reward = 0.6*torch.exp(-0.5*pos_error_norm**2) + 0.3*(1 - 2/(1+torch.exp(5*heading_error))) + 0.1*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
     reward[pos_error_norm <= 1.00] += 0.5
 
     return reward

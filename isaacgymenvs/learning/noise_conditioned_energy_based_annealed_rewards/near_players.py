@@ -303,11 +303,13 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
         """Run a set number of games by executing the learnt policy. Also print out cumulative rewards
 
         """
+        # self.visualise_motion()
+        # quit()
         n_games = self.games_num
         render = self.render_env
         n_game_life = self.n_game_life
-        # is_deterministic = self.is_deterministic
-        is_deterministic = True
+        is_deterministic = self.is_deterministic
+        # is_deterministic = True
         sum_rewards = 0
         sum_steps = 0
         sum_game_res = 0
@@ -385,9 +387,10 @@ class NEARPlayerContinuous(players.PpoPlayerContinuous):
                 all_done_indices = done.nonzero(as_tuple=False)
                 done_indices = all_done_indices[::self.num_agents]
                 done_count = len(done_indices)
+                games_played += done_count
 
-                if done_count == 512:
-                    games_played += 1
+                if done_count > 0:
+                    # games_played += 1
                     if self.is_rnn:
                         for s in self.states:
                             s[:, all_done_indices, :] = s[:,

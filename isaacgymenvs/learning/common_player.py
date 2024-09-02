@@ -33,13 +33,33 @@ from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.common.player import BasePlayer
 from isaacgymenvs.tasks.humanoid_amp import HumanoidAMP 
+from isaacgymenvs.learning.noise_conditioned_energy_based_annealed_rewards.near_players import get_augmented_env_info
 import time
 
 
 class CommonPlayer(players.PpoPlayerContinuous):
 
     def __init__(self, params):
+        
+        config = params['config']
+        # If using goal conditioning in the state vector, create the environment first and then augment the env_info to change the state space
+        if self._goal_conditioning:
+            print("Setting up goal conditioning")
+
+            self.env_name = config['env_name']
+            self.env_config = config.get('env_config', {})
+            env = self.create_env()
+
+            self.env_info = get_augmented_env_info(env, goal_conditioning=True, goal_type=self.goal_type)
+            params['config']['env_info'] = self.env_info
+
+
         BasePlayer.__init__(self, params)
+
+        # Set the self.env attribute
+        if self._goal_conditioning:
+            self.env = env
+
         self.network = self.config['network']
 
         self.normalize_input = self.config['normalize_input']
@@ -120,6 +140,11 @@ class CommonPlayer(players.PpoPlayerContinuous):
 
             for n in range(self.max_steps):
                 # obs_dict, done_env_ids = self._env_reset_done()
+
+                # Append goal feature to observations if needed
+                if self._goal_conditioning:
+                    goal_features0 = self.env.get_goal_features()
+                    obs_dict['obs'] = torch.cat((goal_features0, obs_dict['obs']), -1)
 
                 if has_masks:
                     masks = self.env.get_action_mask()
