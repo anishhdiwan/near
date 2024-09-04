@@ -80,22 +80,26 @@ def stack_images_grid_with_labels(directory_path, labels, output_filename, r, c,
         # Add label to the top right of each image
         draw = ImageDraw.Draw(grid_image)
         text_width, text_height = draw.textsize(label, font=font)
+
+        left, top, right, bottom = draw.textbbox((x_offset + img.width - text_width - 10, y_offset + 10), label, font=font)
+        draw.rectangle((left-5, top-5, right+5, bottom+5), fill="white")
         draw.text((x_offset + img.width - text_width - 10, y_offset + 10), label, font=font, fill=font_color)
 
     # Save the grid image
     grid_image.save(os.path.join(directory_path, output_filename))
 
 # Example usage
-directory_path = './collage/crane'
-labels = ['Walking', 'Running', 'Crane_Pose', 'Left Punch', 'Mummy Style Walking', 'Spin Kick']  # List of labels corresponding to each image
-output_filename = 'policy_snapshots.png'
+directory_path = './stitch_dir/crane_instability'
+labels = ['14e6 Training Samples', '16e6 Training Samples', '18e6 Training Samples', '20e6 Training Samples']  # List of labels corresponding to each image
+# labels = ['Walking', 'Running', 'Crane_Pose', 'Left Punch', 'Mummy Style Walking', 'Spin Kick']  # List of labels corresponding to each image
+output_filename = 'AMP_crane_policy_instability.png'
 
 # Specify number of rows and columns
-r, c = 3, 2  # For example, 2 rows and 3 columns
+r, c = 2, 2  # For example, 2 rows and 3 columns
 
 # Modify the settings as needed
 stack_images_grid_with_labels(directory_path, labels, output_filename, r, c, 
-                              space_between=15, font_color="white", 
+                              space_between=15, font_color="black", 
                               font_size=80, bold=True)
 
 

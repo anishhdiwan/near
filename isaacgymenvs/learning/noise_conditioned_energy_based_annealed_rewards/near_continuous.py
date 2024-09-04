@@ -1244,7 +1244,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
             if self.goal_type == "box":
                 goal_features = self.vec_env.env.get_goal_features()
                 pos_error = goal_features[:,:-1].norm(p=2, dim=1)
-                mask = pos_error < 1.375
+                mask = pos_error < 1.5
                 locomotion_weights = (~mask).clone().to('cuda:0', dtype=torch.float)
                 punching_weights = mask.clone().to('cuda:0', dtype=torch.float)
                 energy_function_composition = [locomotion_weights.unsqueeze(dim=1), punching_weights.unsqueeze(dim=1)]

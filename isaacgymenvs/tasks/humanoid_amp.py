@@ -686,6 +686,7 @@ def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_bo
     agent_root_pos = agent_rigid_body_pos.clone()[:, root_body_id, :]
     agent_root_pos[:,-1] = 0.0
     agent_punching_body_pos = agent_rigid_body_pos.clone()[:, punching_body_id, :]
+    agent_punch_height = agent_punching_body_pos[:,-1].clone()
     agent_punching_body_pos[:,-1] = 0.0
     target_pos = target_pos.clone()
     target_pos[:,-1] = 0.0
@@ -708,14 +709,16 @@ def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_bo
     punching_body_pos_error_norm = punching_body_pos_error.norm(p=2, dim=1)
 
     desired_velocity = 2.0
-
-    reward_near = 0.3*(0.2*torch.exp(-2*punching_body_pos_error_norm**2) + 0.8*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1))
-    reward_far = 0.3*(0.6*torch.exp(-0.5*pos_error_norm**2) +  0.2*(1 - 2/(1+torch.exp(5*heading_error))) + 0.2*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2)) #0.3*torch.exp(-heading_error) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
+    desired_punch_height = 1.2
+    
+    reward_near = 0.3*torch.exp(-2*punching_body_pos_error_norm**2) + 0.4*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1) + 0.3*(1 - (agent_punch_height - desired_punch_height)**2)
+    reward_far = 0.6*torch.exp(-0.5*pos_error_norm**2) + 0.3*(1 - 2/(1+torch.exp(5*heading_error))) + 0.1*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2) #0.3*torch.exp(-heading_error) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
     reward_far[target_punched] = 1.0
     reward_near[target_punched] = 1.0
-    near_mask = (~target_punched) & (pos_error_norm < 1.375)
+    near_mask = (~target_punched) & (pos_error_norm < 1.5)
     # reward = torch.where(near_mask, reward_near, reward_far)
-    reward_far[near_mask] += reward_near[near_mask]
+    # reward_far[near_mask] += reward_near[near_mask]
+    reward_far[near_mask] = reward_near[near_mask]
 
     return reward_far
 

@@ -115,7 +115,7 @@ The learnt rewards can also be composed with global task objectives or another l
 
 **Energy Reward Composition**
 ```bash
-# For composed learnt rewards there is no additional config option. Instead, composition is enabled if the energy based model is passed as a dictionary. In this case, the standardisation checkpoints must be passed as a list.
+# For composed learnt rewards there is no additional config option. Instead, composition is enabled if the energy based model is passed as a dictionary. In this case, the standardisation checkpoints must also be passed as a dict.
 ++train.params.config.near_config.inference.eb_model_checkpoint="{"amp_humanoid_walk.yaml":"ncsn_runs/HumanoidNEAR_walk/nn/checkpoint.pth", "amp_humanoid_crane_pose.yaml":"ncsn_runs/HumanoidNEAR_crane_pose/nn/checkpoint.pth"}"
 
 ++train.params.config.near_config.inference.running_mean_std_checkpoint="{"amp_humanoid_walk.yaml":"ncsn_runs/HumanoidNEAR_walk/nn/running_mean_std.pth", "amp_humanoid_crane_pose.yaml":"ncsn_runs/HumanoidNEAR_crane_pose/nn/running_mean_std.pth"}"

@@ -1,0 +1,5 @@
+motions:
+- file: amp_cmu_strike_task/amp_cmu_144_13.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_cmu_144_14.npy
+  weight: 1.0

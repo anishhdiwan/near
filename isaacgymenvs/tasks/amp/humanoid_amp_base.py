@@ -57,14 +57,16 @@ LOWER_BODY_MASK = ['abdomen', 'right_hip', 'right_knee', 'right_ankle', 'left_hi
 ADDITIONAL_ACTORS = {
     "football": {"file": "amp/soccerball.urdf", "num_instances":1, "texture":"amp/meshes/soccer_ball.png"},
     "flagpole": {"file": "amp/flagpole.urdf", "num_instances":1, "colour": gymapi.Vec3(204/255, 24/255, 0/255)}, 
-    "box": {"file": "amp/box.urdf", "num_instances":1, "colour": gymapi.Vec3(0.078, 0.671, 0.114)} #"texture":"amp/meshes/cardboard.png"
+    "box": {"file": "amp/box.urdf", "num_instances":1, "colour": gymapi.Vec3(0.8, 0.8, 0.8)} #"texture":"amp/meshes/cardboard.png"
     }
 
 
-DEMO_CHAR_COLOUR = gymapi.Vec3(17/255, 100/255, 180/255)
+DEMO_CHAR_COLOUR = gymapi.Vec3(154/255, 205/255, 50/255)
 LEARNT_CHAR_COLOURS = [gymapi.Vec3(10/255, 235/255, 255/255), gymapi.Vec3(255/255, 216/255, 0/255)]
-RANDOMISE_COLOURS = False
-TOP_VIEW = True
+RANDOMISE_COLOURS = True
+TOP_VIEW = False
+PAN_CAMERA = False
+PAN_SPEED = -0.025
 AGENT_COLOUR = LEARNT_CHAR_COLOURS[0]
 
 KEY_BODY_NAMES = ["right_hand", "left_hand", "right_foot", "left_foot"]
@@ -413,7 +415,7 @@ class HumanoidAMPBase(VecTask):
             elif goal_type == "box":
                 self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_target_punching_reset(self.reset_buf, self.progress_buf,
                                                         self._contact_forces, self._contact_body_ids,
-                                                        self._rigid_body_pos, self._additional_actor_rigid_body_pos, self.max_episode_length,
+                                                        self._rigid_body_pos, self._additional_actor_rigid_body_pos, self.additional_actor_state, self.max_episode_length,
                                                         self._enable_early_termination, self._termination_height, self.body_ids_dict['pelvis'], self.motion_style)
 
         else:
@@ -568,15 +570,15 @@ class HumanoidAMPBase(VecTask):
     def _init_camera(self):
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self._cam_prev_char_pos = self._root_states[0, 0:3].cpu().numpy()
-        
+
         if TOP_VIEW:
             cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
                                 self._cam_prev_char_pos[1] - 8.0, 
                                 5.0)
         else:
             cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
-                                  self._cam_prev_char_pos[1] - 3.0, 
-                                  1.0)
+                                  self._cam_prev_char_pos[1] - 4.0, 
+                                  2.0)
 
 
         cam_target = gymapi.Vec3(self._cam_prev_char_pos[0],
@@ -591,6 +593,13 @@ class HumanoidAMPBase(VecTask):
         
         cam_trans = self.gym.get_viewer_camera_transform(self.viewer, None)
         cam_pos = np.array([cam_trans.p.x, cam_trans.p.y, cam_trans.p.z])
+
+        if PAN_CAMERA:
+            if self.control_steps < 25:
+                pass
+            else:
+                cam_pos += np.array([-PAN_SPEED*(cam_pos[1]-char_root_pos[1])/4, PAN_SPEED*(cam_pos[0]-char_root_pos[0])/4, 0.0])
+
         cam_delta = cam_pos - self._cam_prev_char_pos
 
         new_cam_target = gymapi.Vec3(char_root_pos[0], char_root_pos[1], 1.0)
@@ -674,7 +683,7 @@ class HumanoidAMPBase(VecTask):
 
             # Initialise the asset at some random point away from the agent with z = 0
             start_p = np.random.uniform(low=2.0, high=2.0, size=3)
-            start_p[-1] = 1.02
+            start_p[-1] = 1.001
             actor_start_pose = gymapi.Transform()
             actor_start_pose.p = gymapi.Vec3(*list(start_p))
             actor_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
@@ -709,8 +718,13 @@ class HumanoidAMPBase(VecTask):
             box_contact = torch.any(masked_additional_actor_contact_buf>0.5, dim=-1)
 
             # List of envs where the body height is above a threshold
-            root_body_height = self._rigid_body_pos[:, self.body_ids_dict["pelvis"], 2]
-            not_fallen = root_body_height > self._termination_height
+            # root_body_height = self._rigid_body_pos[:, self.body_ids_dict["pelvis"], 2]
+            # not_fallen = root_body_height > self._termination_height
+            # not_fallen = torch.any(not_fallen, dim=-1)
+
+            # Considered to have fallen if the hand is below some threshold
+            punching_body_height = self._rigid_body_pos[:, self.body_ids_dict["left_hand"], 2]
+            not_fallen = punching_body_height > 0.75
             not_fallen = torch.any(not_fallen, dim=-1)
 
             has_punched = torch.logical_and(torch.logical_and(punching_body_contact, box_contact), not_fallen)
@@ -750,8 +764,8 @@ class HumanoidAMPBase(VecTask):
                 min_dist = 3.0
                 max_dist = 8.0
             else:
-                min_dist = 2.5
-                max_dist = 5.0
+                min_dist = 1.2
+                max_dist = 4.0
 
 
         if additional_actor_name[0] == "football":
@@ -771,7 +785,7 @@ class HumanoidAMPBase(VecTask):
             # reset_poses = unit_vectors * radii[:, None]
 
             theta_min = 45
-            theta_max = 10
+            theta_max = 45
             theta_min = torch.deg2rad(torch.tensor(theta_min).float())
             theta_max = torch.deg2rad(torch.tensor(theta_max).float())
             angles = torch.empty(num_instances*num_env_ids).uniform_(-theta_min, theta_max)
@@ -782,7 +796,7 @@ class HumanoidAMPBase(VecTask):
 
             reset_poses = reset_poses.to('cuda:0', dtype=torch.float)
             reset_poses += agent_pos[:, :-1] # Translate reset pos relative to the agent
-            reset_poses = torch.cat([reset_poses, torch.full((reset_poses.shape[0], 1), 1.02).to('cuda:0', dtype=torch.float)], dim=1) 
+            reset_poses = torch.cat([reset_poses, torch.full((reset_poses.shape[0], 1), 1.001).to('cuda:0', dtype=torch.float)], dim=1) 
 
             return reset_poses
 
@@ -967,9 +981,9 @@ def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf,
 
 
 @torch.jit.script
-def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos, target_pos,
+def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos, target_pos, has_punched,
                            max_episode_length, enable_early_termination, termination_height, root_body_id, motion_style):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, bool, float, int, str) -> Tuple[Tensor, Tensor]
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, bool, float, int, str) -> Tuple[Tensor, Tensor]
     terminated = torch.zeros_like(reset_buf)
 
     if (enable_early_termination):
@@ -993,7 +1007,6 @@ def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf,
     reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
 
     # Reset it agent too far away from box
-
     agent_root_pos = rigid_body_pos.clone()[:, root_body_id, :]
     agent_root_pos[:,-1] = 0.0
     target_pos = target_pos.clone()
@@ -1003,9 +1016,12 @@ def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf,
     if motion_style == "humanoid_amp_run":
         max_pos_error_thresh = 15.0
     else:
-        max_pos_error_thresh = 8.0
-
+        max_pos_error_thresh = 5.0
 
     reset = torch.where((pos_error >= max_pos_error_thresh), torch.ones_like(reset_buf), reset)
+
+    # Reset if the target has been punched
+    has_punched = has_punched.clone()
+    reset = torch.where(has_punched, torch.ones_like(reset_buf), reset)
 
     return reset, terminated
