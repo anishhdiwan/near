@@ -30,6 +30,7 @@ from enum import Enum
 import numpy as np
 import torch
 import os
+import random
 
 from gym import spaces
 
@@ -172,6 +173,19 @@ class HumanoidAMP(HumanoidAMPBase):
         return
 
     def _reset_actors(self, env_ids):
+
+        # Pick a random motion lib if multiple motion libs exist
+        try:
+            if self._randomise_init_motions:
+                self._current_motion_style = random.choices(list(self._reference_motion_libs.keys()), [0.7, 0.3])[0]
+                self._motion_lib = self._reference_motion_libs[self._current_motion_style]
+            else:
+                self._current_motion_style = self.motion_style
+        except AttributeError as e:
+            self._current_motion_style = self.motion_style
+            pass
+
+
         if (self._state_init == HumanoidAMP.StateInit.Default):
             self._reset_default(env_ids)
         elif (self._state_init == HumanoidAMP.StateInit.Start
@@ -374,7 +388,7 @@ class HumanoidAMP(HumanoidAMPBase):
 
         # Reset assets
         if self.env_assets:
-            actor_root_pos = self.get_additional_actor_reset_poses(list(self.additional_actor_handles.keys()), self.num_actors_per_env-1, len(humanoid_env_ids), root_pos)
+            actor_root_pos = self.get_additional_actor_reset_poses(list(self.additional_actor_handles.keys()), self.num_actors_per_env-1, len(humanoid_env_ids), root_pos, motion_style=self._current_motion_style)
             actor_root_rot = torch.zeros((self.num_actors_per_env-1)*len(humanoid_env_ids), 4)
             actor_root_rot[:,-1] = 1.0
             actor_ids = torch.cat([humanoid_env_ids+i for i in range(1,self.num_actors_per_env)])
@@ -704,21 +718,22 @@ def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_bo
     heading_error = normalised_agent_vel_in_unit_vector_direction
 
 
-    punching_body_vel_in_unit_vector_direction = torch.sum(agent_punching_body_vel * root_to_target_unit_vector, dim=1)
+    # punching_body_vel_in_unit_vector_direction = torch.sum(agent_punching_body_vel * root_to_target_unit_vector, dim=1)
+    normalised_punching_body_vel_in_unit_vector_direction = torch.sum(agent_punching_body_vel * root_to_target_unit_vector, dim=1)/agent_punching_body_vel.norm(p=2, dim=1)
     punching_body_pos_error = target_pos - agent_punching_body_pos
     punching_body_pos_error_norm = punching_body_pos_error.norm(p=2, dim=1)
 
-    desired_velocity = 2.0
+    desired_velocity = 4.0
     desired_punch_height = 1.2
+    desired_punch_velocity = 4.0
     
-    reward_near = 0.3*torch.exp(-2*punching_body_pos_error_norm**2) + 0.4*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1) + 0.3*(1 - (agent_punch_height - desired_punch_height)**2)
+    reward_near = 0.1*torch.exp(-2*punching_body_pos_error_norm**2) + 0.4*(1 - 2/(1+torch.exp(5*normalised_punching_body_vel_in_unit_vector_direction))) + 0.4*(1 - (agent_punching_body_vel.norm(p=2, dim=1) - desired_punch_velocity)**2) + 0.1*(1 - (agent_punch_height - desired_punch_height)**2) # 0.6*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1) 
     reward_far = 0.6*torch.exp(-0.5*pos_error_norm**2) + 0.3*(1 - 2/(1+torch.exp(5*heading_error))) + 0.1*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2) #0.3*torch.exp(-heading_error) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
-    reward_far[target_punched] = 1.0
-    reward_near[target_punched] = 1.0
-    near_mask = (~target_punched) & (pos_error_norm < 1.5)
+    reward_far[target_punched] = 2.0
+    reward_near[target_punched] = 2.0
+    near_mask = (~target_punched) & (pos_error_norm < 1.2)
     # reward = torch.where(near_mask, reward_near, reward_far)
-    # reward_far[near_mask] += reward_near[near_mask]
-    reward_far[near_mask] = reward_near[near_mask]
+    reward_far[near_mask] = 0.1*reward_far[near_mask] + 0.9*reward_near[near_mask]
 
     return reward_far
 

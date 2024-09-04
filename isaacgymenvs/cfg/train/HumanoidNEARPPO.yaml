@@ -164,6 +164,8 @@ params:
         running_mean_std_checkpoint: "ncsn_runs/Humanoid_SM_temporal_states_walk/nn/running_mean_std.pth"
         # Optionally provide a list of feature masks for each composed energy function. Example: [upper_body, lower_body]
         composed_feature_mask: None
+        # If set to True AND if using composed energy rewards, then reference state initialisation samples from both motions. 
+        randomise_init_motions: False
 
 
     player:

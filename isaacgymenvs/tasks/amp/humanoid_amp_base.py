@@ -103,10 +103,12 @@ class HumanoidAMPBase(VecTask):
         if self.env_assets == []:
             self.env_assets = False
         else:
-            
             global ADDITIONAL_ACTORS
             ADDITIONAL_ACTORS = dict((k, ADDITIONAL_ACTORS[k]) for k in self.env_assets if k in ADDITIONAL_ACTORS)
             self.env_assets = True
+            if "box" in ADDITIONAL_ACTORS.keys():
+                self._contact_bodies.append("left_hand")
+
     
         self.num_actors_per_env = 1
         if self.env_assets:
@@ -724,7 +726,7 @@ class HumanoidAMPBase(VecTask):
 
             # Considered to have fallen if the hand is below some threshold
             punching_body_height = self._rigid_body_pos[:, self.body_ids_dict["left_hand"], 2]
-            not_fallen = punching_body_height > 0.75
+            not_fallen = punching_body_height > 0.5
             not_fallen = torch.any(not_fallen, dim=-1)
 
             has_punched = torch.logical_and(torch.logical_and(punching_body_contact, box_contact), not_fallen)
@@ -745,27 +747,36 @@ class HumanoidAMPBase(VecTask):
         
 
 
-    def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids, agent_pos):
+    def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids, agent_pos, motion_style=None):
         """ Return a list of reset poses for the actors. Outputs a tensor of shape [num_env_ids*num_instances, 3]
         """
+        theta_min = 45
+        theta_max = 45
+
+        if motion_style is not None:
+            motion_style = os.path.splitext(motion_style)[0]
 
         if additional_actor_name[0] == "football":
             min_dist = -1.0
             max_dist = 1.0
         elif additional_actor_name[0] == "flagpole":
-            if self.motion_style == "amp_humanoid_run":
-                min_dist = 3.0
+            if motion_style == "amp_humanoid_run":
+                min_dist = 6.0
                 max_dist = 8.0
             else:
                 min_dist = 3.0
                 max_dist = 5.0
         elif additional_actor_name[0] == "box":
-            if self.motion_style == "amp_humanoid_run":
-                min_dist = 3.0
+            theta_min = theta_max = 15
+            if motion_style == "amp_humanoid_run":
+                min_dist = 6.0
                 max_dist = 8.0
+            elif motion_style in ["amp_humanoid_strike", "amp_humanoid_single_left_punch"]:
+                min_dist = 1.0
+                max_dist = 1.2
             else:
                 min_dist = 1.2
-                max_dist = 4.0
+                max_dist = 3.5
 
 
         if additional_actor_name[0] == "football":
@@ -784,8 +795,6 @@ class HumanoidAMPBase(VecTask):
             # radii = torch.empty(num_instances*num_env_ids).uniform_(min_dist, max_dist)
             # reset_poses = unit_vectors * radii[:, None]
 
-            theta_min = 45
-            theta_max = 45
             theta_min = torch.deg2rad(torch.tensor(theta_min).float())
             theta_max = torch.deg2rad(torch.tensor(theta_max).float())
             angles = torch.empty(num_instances*num_env_ids).uniform_(-theta_min, theta_max)
@@ -803,8 +812,6 @@ class HumanoidAMPBase(VecTask):
         elif additional_actor_name[0] == "flagpole":
             assert num_instances == 1, "There can only be one flagpole asset. Change the code in humanoid_amp_base to change this"
 
-            theta_min = 45
-            theta_max = 45
             theta_min = torch.deg2rad(torch.tensor(theta_min).float())
             theta_max = torch.deg2rad(torch.tensor(theta_max).float())
             angles = torch.empty(num_instances*num_env_ids).uniform_(-theta_min, theta_max)
@@ -970,7 +977,7 @@ def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf,
     pos_error = torch.norm(relative_target_pos, p=2, dim=1)
     if motion_style == "humanoid_amp_run":
         min_pos_error_thresh = 1.5
-        max_pos_error_thresh = 15.0
+        max_pos_error_thresh = 10.0
     else:
         min_pos_error_thresh = 1.5
         max_pos_error_thresh = 6.0
@@ -1010,6 +1017,7 @@ def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf,
     agent_root_pos = rigid_body_pos.clone()[:, root_body_id, :]
     agent_root_pos[:,-1] = 0.0
     target_pos = target_pos.clone()
+    target_height = target_pos[:,-1].clone()
     target_pos[:,-1] = 0.0
     relative_target_pos = target_pos - agent_root_pos
     pos_error = torch.norm(relative_target_pos, p=2, dim=1)
@@ -1021,7 +1029,11 @@ def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf,
     reset = torch.where((pos_error >= max_pos_error_thresh), torch.ones_like(reset_buf), reset)
 
     # Reset if the target has been punched
-    has_punched = has_punched.clone()
-    reset = torch.where(has_punched, torch.ones_like(reset_buf), reset)
+    # has_punched = has_punched.clone()
+    # reset = torch.where(has_punched, torch.ones_like(reset_buf), reset)
+
+    # Reset if the target has fallen down (not necessarily from punching)
+    target_fallen = target_height < 0.5
+    reset = torch.where(target_fallen, torch.ones_like(reset_buf), reset)
 
     return reset, terminated

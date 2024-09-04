@@ -120,6 +120,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
         if isinstance(self._eb_model_checkpoint, dict):
             self._composed_energy_function = True
             self._num_energy_functions = len(self._eb_model_checkpoint)
+            self._randomise_init_motions = config['near_config']['inference']['randomise_init_motions']
         else:
             self._composed_energy_function = False
         self._c = config['near_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
@@ -212,10 +213,16 @@ class NEARAgent(a2c_continuous.A2CAgent):
         energynet_config = OmegaConf.create(energynet_config)
 
         if self._composed_energy_function:
+            scale_energies = True
             # Use multiple composed energy functions
             self._energynet = ComposedEnergyNet(config=energynet_config, checkpoints=self._eb_model_checkpoint, normalisation_checkpoints=self._energynet_input_norm_checkpoint,
                             device=self.ppo_device, in_dim_space=self._paired_observation_space.shape, 
-                            use_ema=self._use_ema, ema_rate=self._ema_rate, scale_energies=True, env=self.vec_env.env)
+                            use_ema=self._use_ema, ema_rate=self._ema_rate, scale_energies=scale_energies, env=self.vec_env.env, keep_motion_libs=self._randomise_init_motions)
+
+            if self._randomise_init_motions:
+                assert scale_energies == True, "Set composed energy scaling to true"
+                self.vec_env.env._randomise_init_motions = self._randomise_init_motions
+                self.vec_env.env._reference_motion_libs = self._energynet._motion_libs
             
         else:
             eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
@@ -1244,9 +1251,15 @@ class NEARAgent(a2c_continuous.A2CAgent):
             if self.goal_type == "box":
                 goal_features = self.vec_env.env.get_goal_features()
                 pos_error = goal_features[:,:-1].norm(p=2, dim=1)
-                mask = pos_error < 1.5
-                locomotion_weights = (~mask).clone().to('cuda:0', dtype=torch.float)
-                punching_weights = mask.clone().to('cuda:0', dtype=torch.float)
+                mask = pos_error < 1.2
+
+                # locomotion_weights = (~mask).clone().to('cuda:0', dtype=torch.float)
+                # punching_weights = mask.clone().to('cuda:0', dtype=torch.float)
+
+                dominant_percentage = 0.9
+                locomotion_weights = torch.where((~mask), dominant_percentage, 1-dominant_percentage).to('cuda:0', dtype=torch.float)
+                punching_weights = torch.where((mask), dominant_percentage, 1-dominant_percentage).to('cuda:0', dtype=torch.float)
+
                 energy_function_composition = [locomotion_weights.unsqueeze(dim=1), punching_weights.unsqueeze(dim=1)]
                 energy_function_composition = torch.cat(energy_function_composition, dim=1)
                 return energy_function_composition

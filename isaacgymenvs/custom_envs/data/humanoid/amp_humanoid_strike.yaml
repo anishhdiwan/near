@@ -3,3 +3,42 @@ motions:
   weight: 1.0
 - file: amp_cmu_strike_task/amp_cmu_144_14.npy
   weight: 1.0
+
+- file: amp_cmu_strike_task/amp_9_cmu_144_13.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_8_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_10_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_9_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_18_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_19_cmu_144_13.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_17_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_5_cmu_144_13.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_7_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_6_cmu_144_13.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_6_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_5_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_1_cmu_144_13.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_11_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_19_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_0_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_21_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_1_cmu_144_14.npy
+  weight: 1.0
+- file: amp_cmu_strike_task/amp_2_cmu_144_14.npy
+  weight: 1.0
