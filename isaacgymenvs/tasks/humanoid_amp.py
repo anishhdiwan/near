@@ -37,7 +37,7 @@ from gym import spaces
 from isaacgym import gymapi
 from isaacgym import gymtorch
 
-from isaacgymenvs.tasks.amp.humanoid_amp_base import HumanoidAMPBase, dof_to_obs, compute_humanoid_reward
+from isaacgymenvs.tasks.amp.humanoid_amp_base import HumanoidAMPBase, dof_to_obs, compute_humanoid_reward, NUM_FEATURES, UPPER_BODY_MASK, LOWER_BODY_MASK
 from isaacgymenvs.tasks.amp.utils_amp import gym_util
 from isaacgymenvs.tasks.amp.utils_amp.motion_lib import MotionLib
 
@@ -177,7 +177,7 @@ class HumanoidAMP(HumanoidAMPBase):
         # Pick a random motion lib if multiple motion libs exist
         try:
             if self._randomise_init_motions:
-                self._current_motion_style = random.choices(list(self._reference_motion_libs.keys()), [0.7, 0.3])[0]
+                self._current_motion_style = random.choices(list(self._reference_motion_libs.keys()), [self._random_init_motion_ratio, 1-self._random_init_motion_ratio])[0]
                 self._motion_lib = self._reference_motion_libs[self._current_motion_style]
             else:
                 self._current_motion_style = self.motion_style
@@ -281,6 +281,34 @@ class HumanoidAMP(HumanoidAMPBase):
 
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
+        # If using feature masks, merge the reference reset motions
+        try:
+            if self._randomise_init_motions and self._composed_feature_mask:
+                motion_styles = list(self._reference_motion_libs.keys())
+                other_motion_style = motion_styles[1-motion_styles.index(self._current_motion_style)]
+                # other_motion_style = os.path.splitext(other_motion_style)[0]
+
+                other_motion_lib = self._reference_motion_libs[other_motion_style]
+                other_motion_ids = other_motion_lib.sample_motions(num_envs)
+                other_motion_times = other_motion_lib.sample_time(other_motion_ids)
+
+                motion1root_pos, motion1root_rot, motion1dof_pos, motion1root_vel, motion1root_ang_vel, motion1dof_vel, motion1key_pos \
+                    = other_motion_lib.get_motion_state(other_motion_ids, other_motion_times)
+
+                if "walk" in other_motion_style:
+                    mask = self.feature_masks_creator(NUM_FEATURES, LOWER_BODY_MASK)
+                    key_mask = torch.tensor([False, False, True, True], dtype=torch.bool)
+                else:
+                    mask = self.feature_masks_creator(NUM_FEATURES, UPPER_BODY_MASK)
+                    key_mask = torch.tensor([True, True, False, False], dtype=torch.bool)
+
+                dof_pos[:,mask] = motion1dof_pos[:,mask]
+                dof_vel[:,mask] = motion1dof_vel[:,mask]
+                key_pos[:,key_mask] = motion1key_pos[:,key_mask]
+                
+        except AttributeError as e:
+            pass
 
         self._set_env_state(env_ids=env_ids, 
                             root_pos=root_pos, 
@@ -489,7 +517,7 @@ class HumanoidAMP(HumanoidAMPBase):
         if self.env_assets:
             goal_type = list(self.additional_actor_handles.keys())[0]
             if goal_type == "flagpole":
-                self.rew_buf[:] = compute_humanoid_target_reaching_reward(self._rigid_body_pos, self._rigid_body_vel, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'])
+                self.rew_buf[:] = compute_humanoid_target_reaching_reward(self._rigid_body_pos, self._rigid_body_vel, self._additional_actor_rigid_body_pos, self.body_ids_dict['pelvis'], self.motion_style)
             elif goal_type == "football":
                 raise NotImplementedError
             elif goal_type == "box":
@@ -664,8 +692,8 @@ def compute_humanoid_height_reward(rigid_body_pos, root_body_id):
 
 
 @torch.jit.script
-def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_body_vel, target_pos, root_body_id):
-    # type: (Tensor, Tensor, Tensor, int) -> Tensor
+def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_body_vel, target_pos, root_body_id, motion_style):
+    # type: (Tensor, Tensor, Tensor, int, str) -> Tensor
 
     agent_root_pos = agent_rigid_body_pos.clone()[:, root_body_id, :]
     agent_root_pos[:,-1] = 0.0
@@ -684,9 +712,11 @@ def compute_humanoid_target_reaching_reward(agent_rigid_body_pos, agent_rigid_bo
     heading_error = normalised_agent_vel_in_unit_vector_direction
 
     desired_velocity = 2.0
+    if motion_style == "humanoid_amp_run":
+        desired_velocity = 3.5
     # Minimise squared positional error, minimise heading error, minimise squared errror of velocity norm with some desired velocity.
     reward = 0.6*torch.exp(-0.5*pos_error_norm**2) + 0.3*(1 - 2/(1+torch.exp(5*heading_error))) + 0.1*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2)
-    reward[pos_error_norm <= 1.00] += 0.5
+    reward[pos_error_norm <= 1.25] += 1.0
 
     return reward
 

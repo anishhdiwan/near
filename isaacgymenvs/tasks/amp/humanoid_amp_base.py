@@ -61,7 +61,7 @@ ADDITIONAL_ACTORS = {
     }
 
 
-DEMO_CHAR_COLOUR = gymapi.Vec3(154/255, 205/255, 50/255)
+DEMO_CHAR_COLOUR = gymapi.Vec3(141/255, 182/255, 0/255)
 LEARNT_CHAR_COLOURS = [gymapi.Vec3(10/255, 235/255, 255/255), gymapi.Vec3(255/255, 216/255, 0/255)]
 RANDOMISE_COLOURS = True
 TOP_VIEW = False
@@ -750,8 +750,8 @@ class HumanoidAMPBase(VecTask):
     def get_additional_actor_reset_poses(self, additional_actor_name, num_instances, num_env_ids, agent_pos, motion_style=None):
         """ Return a list of reset poses for the actors. Outputs a tensor of shape [num_env_ids*num_instances, 3]
         """
-        theta_min = 45
-        theta_max = 45
+        theta_min = 120
+        theta_max = 120
 
         if motion_style is not None:
             motion_style = os.path.splitext(motion_style)[0]
@@ -761,13 +761,13 @@ class HumanoidAMPBase(VecTask):
             max_dist = 1.0
         elif additional_actor_name[0] == "flagpole":
             if motion_style == "amp_humanoid_run":
-                min_dist = 6.0
-                max_dist = 8.0
+                min_dist = 5.0
+                max_dist = 10.0
             else:
-                min_dist = 3.0
-                max_dist = 5.0
+                min_dist = 2.0
+                max_dist = 6.0
         elif additional_actor_name[0] == "box":
-            theta_min = theta_max = 15
+            theta_min = theta_max = 45
             if motion_style == "amp_humanoid_run":
                 min_dist = 6.0
                 max_dist = 8.0
@@ -776,7 +776,7 @@ class HumanoidAMPBase(VecTask):
                 max_dist = 1.2
             else:
                 min_dist = 1.2
-                max_dist = 3.5
+                max_dist = 4.0
 
 
         if additional_actor_name[0] == "football":
@@ -976,11 +976,11 @@ def compute_humanoid_target_reaching_reset(reset_buf, progress_buf, contact_buf,
     relative_target_pos = target_pos - agent_root_pos
     pos_error = torch.norm(relative_target_pos, p=2, dim=1)
     if motion_style == "humanoid_amp_run":
-        min_pos_error_thresh = 1.5
-        max_pos_error_thresh = 10.0
+        min_pos_error_thresh = 1.25
+        max_pos_error_thresh = 12.0
     else:
-        min_pos_error_thresh = 1.5
-        max_pos_error_thresh = 6.0
+        min_pos_error_thresh = 1.25
+        max_pos_error_thresh = 8.0
 
     reset = torch.where(((pos_error <= min_pos_error_thresh) | (pos_error >= max_pos_error_thresh)), torch.ones_like(reset_buf), reset)
 

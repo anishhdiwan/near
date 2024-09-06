@@ -223,6 +223,14 @@ class NEARAgent(a2c_continuous.A2CAgent):
                 assert scale_energies == True, "Set composed energy scaling to true"
                 self.vec_env.env._randomise_init_motions = self._randomise_init_motions
                 self.vec_env.env._reference_motion_libs = self._energynet._motion_libs
+                self.vec_env.env._random_init_motion_ratio = self.config["near_config"]["inference"].get("random_init_motion_ratio", 0.7)
+
+                if self.config["near_config"]["inference"].get("composed_feature_mask", "None") != "None":
+                    self.vec_env.env._composed_feature_mask = True
+                    self.vec_env.env.feature_masks_creator = self._energynet.energy_networks[0].module.create_mask
+                else:
+                    self.vec_env.env._composed_feature_mask = False
+
             
         else:
             eb_model_states = torch.load(self._eb_model_checkpoint, map_location=self.ppo_device)
@@ -815,8 +823,8 @@ class NEARAgent(a2c_continuous.A2CAgent):
                     break
 
         if self._goal_conditioning:
-            goal_completion = self.vec_env.env.get_goal_completion()[env_idx]
-            # goal_completion = self.vec_env.env.get_goal_completion()
+            # goal_completion = self.vec_env.env.get_goal_completion()[env_idx]
+            goal_completion = self.vec_env.env.get_goal_completion()
             success_rate = goal_completion.sum()/len(goal_completion)
         else:
             success_rate = None
@@ -1267,5 +1275,5 @@ class NEARAgent(a2c_continuous.A2CAgent):
                 return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
         else:
             # return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
-            return torch.cat([torch.full((self.num_actors, 1), 0.75), 
-                            torch.full((self.num_actors, 1), 0.25)], dim=1).to('cuda:0', dtype=torch.float)
+            return torch.cat([torch.full((self.num_actors, 1), 0.7), 
+                            torch.full((self.num_actors, 1), 0.3)], dim=1).to('cuda:0', dtype=torch.float)

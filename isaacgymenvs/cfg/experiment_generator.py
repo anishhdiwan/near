@@ -19,15 +19,17 @@ algos = [
 ]
 
 motions = [
-    "amp_humanoid_walk.yaml",
+    # "amp_humanoid_walk.yaml",
+    "amp_humanoid_turning_walk.yaml",
     # "amp_humanoid_run.yaml",
+    "amp_humanoid_turning_run.yaml",
     # "amp_humanoid_crane_pose.yaml",
     # "amp_humanoid_single_left_punch.yaml",
     # "amp_humanoid_zombie_walk.yaml",
     # "amp_humanoid_bow.yaml",
     # "amp_humanoid_marching.yaml",
     # "amp_humanoid_tai_chi.yaml",
-    "amp_humanoid_mummy_walk.yaml",
+    # "amp_humanoid_mummy_walk.yaml",
     # "amp_humanoid_single_cartwheel.yaml",
     # "amp_humanoid_spin_kick.yaml",
 ]
@@ -35,8 +37,9 @@ motions = [
 exp_type = 'flagpole'
 
 task_specific_cfg = {
-    # "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
-    "amp_humanoid_walk.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
+    "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_turning_walk.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
+    "amp_humanoid_turning_run.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
     "amp_humanoid_run.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_crane_pose.yaml":"headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_single_left_punch.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
@@ -44,7 +47,7 @@ task_specific_cfg = {
     "amp_humanoid_zombie_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_bow.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_marching.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
-    # "amp_humanoid_mummy_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
+    "amp_humanoid_mummy_walk.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
     "amp_humanoid_mummy_walk.yaml":f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
     "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ",
     "amp_humanoid_spin_kick.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.stateInit=WeightedRandom ++task.env.episodeLength=100",
@@ -52,7 +55,9 @@ task_specific_cfg = {
 
 near_task_specific_cfg = {
     "amp_humanoid_walk.yaml": "++train.params.config.near_config.training.n_iters=150000",
-    "amp_humanoid_run.yaml": "++train.params.config.near_config.training.n_iters=120000",
+    "amp_humanoid_turning_walk.yaml": "++train.params.config.near_config.training.n_iters=150000",
+    "amp_humanoid_run.yaml": "++train.params.config.near_config.training.n_iters=150000",
+    "amp_humanoid_turning_run.yaml": "++train.params.config.near_config.training.n_iters=120000",
     "amp_humanoid_crane_pose.yaml": "++train.params.config.near_config.training.n_iters=100000",
     "amp_humanoid_single_left_punch.yaml": "++train.params.config.near_config.training.n_iters=120000",
     "amp_humanoid_tai_chi.yaml": "++train.params.config.near_config.training.n_iters=150000",
@@ -66,7 +71,9 @@ near_task_specific_cfg = {
 
 amp_task_specific_cfg = {
     "amp_humanoid_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_turning_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_run.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_turning_run.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_crane_pose.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_single_left_punch.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_tai_chi.yaml": "++train.params.config.amp_minibatch_size=4096",
@@ -117,8 +124,8 @@ def generate_train_commands():
                         ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
                         
                         ncsn_dir = base_cmd[1]
-                        w_task = 0.4
-                        w_style = 0.6
+                        w_task = 0.5
+                        w_style = 0.5
                         eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
                         running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
                         rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
@@ -129,8 +136,8 @@ def generate_train_commands():
                         counter += 1
                     elif algo == "HumanoidAMP":
                         ncsn_cmd = ""
-                        task_reward_w = 0.4
-                        disc_reward_w = 0.6
+                        task_reward_w = 0.5
+                        disc_reward_w = 0.5
                         rl_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {amp_task_specific_cfg[motion]}" \
                         + f" ++train.params.config.task_reward_w={task_reward_w} ++train.params.config.disc_reward_w={disc_reward_w}"
 
