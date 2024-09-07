@@ -166,7 +166,8 @@ params:
         composed_feature_mask: None
         # If set to True AND if using composed energy rewards, then reference state initialisation samples from both motions. 
         randomise_init_motions: False
-        random_init_motion_ratio: 1.0
+        random_init_motion_ratio: 0.5
+        random_init_motion_files: []
 
 
     player:

@@ -30,6 +30,7 @@
 import numpy as np
 import os
 import torch
+import random
 
 from isaacgym import gymtorch
 from isaacgym import gymapi
@@ -62,11 +63,12 @@ ADDITIONAL_ACTORS = {
 
 
 DEMO_CHAR_COLOUR = gymapi.Vec3(141/255, 182/255, 0/255)
-LEARNT_CHAR_COLOURS = [gymapi.Vec3(10/255, 235/255, 255/255), gymapi.Vec3(255/255, 216/255, 0/255)]
+LEARNT_CHAR_COLOURS = [gymapi.Vec3(10/255, 235/255, 255/255), gymapi.Vec3(0.4706, 0.549, 0.6863)]
 RANDOMISE_COLOURS = True
 TOP_VIEW = False
+ASSET_VIEW = False
 PAN_CAMERA = False
-PAN_SPEED = -0.025
+PAN_SPEED = -0.035
 AGENT_COLOUR = LEARNT_CHAR_COLOURS[0]
 
 KEY_BODY_NAMES = ["right_hand", "left_hand", "right_foot", "left_foot"]
@@ -108,7 +110,6 @@ class HumanoidAMPBase(VecTask):
             self.env_assets = True
             if "box" in ADDITIONAL_ACTORS.keys():
                 self._contact_bodies.append("left_hand")
-
     
         self.num_actors_per_env = 1
         if self.env_assets:
@@ -319,7 +320,7 @@ class HumanoidAMPBase(VecTask):
                 colour = AGENT_COLOUR
             for j in range(self.humanoid_num_bodies):
                 self.gym.set_rigid_body_color(
-                    env_ptr, handle, j, gymapi.MESH_VISUAL, colour) #gymapi.Vec3(0.4706, 0.549, 0.6863)
+                    env_ptr, handle, j, gymapi.MESH_VISUAL, colour)
 
             self.envs.append(env_ptr)
             self.humanoid_handles.append(handle)
@@ -575,8 +576,8 @@ class HumanoidAMPBase(VecTask):
 
         if TOP_VIEW:
             cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
-                                self._cam_prev_char_pos[1] - 8.0, 
-                                5.0)
+                                self._cam_prev_char_pos[1] - 6.0, 
+                                4.0)
         else:
             cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
                                   self._cam_prev_char_pos[1] - 4.0, 
@@ -591,7 +592,12 @@ class HumanoidAMPBase(VecTask):
 
     def _update_camera(self):
         self.gym.refresh_actor_root_state_tensor(self.sim)
-        char_root_pos = self._root_states[0, 0:3].cpu().numpy()
+
+        if ASSET_VIEW:
+            char_root_pos = self._all_root_states.view(self.num_envs, self.num_actors_per_env, 13)[:, 1, :].squeeze(dim=1)[0, 0:3].cpu().numpy()
+            char_root_pos[0] -= 4.5
+        else:
+            char_root_pos = self._root_states[0, 0:3].cpu().numpy()
         
         cam_trans = self.gym.get_viewer_camera_transform(self.viewer, None)
         cam_pos = np.array([cam_trans.p.x, cam_trans.p.y, cam_trans.p.z])
@@ -767,7 +773,7 @@ class HumanoidAMPBase(VecTask):
                 min_dist = 2.0
                 max_dist = 6.0
         elif additional_actor_name[0] == "box":
-            theta_min = theta_max = 45
+            theta_min = theta_max = 30
             if motion_style == "amp_humanoid_run":
                 min_dist = 6.0
                 max_dist = 8.0
@@ -775,8 +781,12 @@ class HumanoidAMPBase(VecTask):
                 min_dist = 1.0
                 max_dist = 1.2
             else:
-                min_dist = 1.2
-                max_dist = 4.0
+                if np.random.uniform() > 0.7:
+                    min_dist = 1.0
+                    max_dist = 1.2
+                else:
+                    min_dist = 1.2
+                    max_dist = 4.0
 
 
         if additional_actor_name[0] == "football":
@@ -1033,7 +1043,7 @@ def compute_humanoid_target_punching_reset(reset_buf, progress_buf, contact_buf,
     # reset = torch.where(has_punched, torch.ones_like(reset_buf), reset)
 
     # Reset if the target has fallen down (not necessarily from punching)
-    target_fallen = target_height < 0.5
+    target_fallen = target_height < 0.6
     reset = torch.where(target_fallen, torch.ones_like(reset_buf), reset)
 
     return reset, terminated

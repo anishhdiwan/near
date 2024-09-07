@@ -27,6 +27,7 @@ from tensorboardX import SummaryWriter
 from learning.motion_ncsn.models.motion_scorenet import SimpleNet, SinusoidalPosEmb, ComposedEnergyNet
 from learning.motion_ncsn.models.ema import EMAHelper
 from utils.ncsn_utils import dict2namespace, LastKMovingAvg, get_series_derivative, to_relative_pose, sparc
+from isaacgymenvs.tasks.amp.utils_amp.motion_lib import MotionLib
 
 # tslearn throws numpy deprecation warnings because of version mismatch. Silencing for now
 import warnings
@@ -120,9 +121,9 @@ class NEARAgent(a2c_continuous.A2CAgent):
         if isinstance(self._eb_model_checkpoint, dict):
             self._composed_energy_function = True
             self._num_energy_functions = len(self._eb_model_checkpoint)
-            self._randomise_init_motions = config['near_config']['inference']['randomise_init_motions']
         else:
             self._composed_energy_function = False
+        self._randomise_init_motions = config['near_config']['inference']['randomise_init_motions']
         self._c = config['near_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
         if self._c == -1:
             # When c=-1, noise level annealing is used.
@@ -223,7 +224,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
                 assert scale_energies == True, "Set composed energy scaling to true"
                 self.vec_env.env._randomise_init_motions = self._randomise_init_motions
                 self.vec_env.env._reference_motion_libs = self._energynet._motion_libs
-                self.vec_env.env._random_init_motion_ratio = self.config["near_config"]["inference"].get("random_init_motion_ratio", 0.7)
+                self.vec_env.env._random_init_motion_ratio = self.config["near_config"]["inference"].get("random_init_motion_ratio", 0.5)
 
                 if self.config["near_config"]["inference"].get("composed_feature_mask", "None") != "None":
                     self.vec_env.env._composed_feature_mask = True
@@ -247,6 +248,12 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
             self._energynet = energynet
             self._energynet.eval()
+
+            if self._randomise_init_motions:
+                self.vec_env.env._randomise_init_motions = self._randomise_init_motions
+                self.vec_env.env._reference_motion_libs = self._create_motion_libs(self.config["near_config"]["inference"].get("random_init_motion_files", None))
+                self.vec_env.env._random_init_motion_ratio = self.config["near_config"]["inference"].get("random_init_motion_ratio", 0.5)
+                self.vec_env.env._composed_feature_mask = False
 
 
     def _build_buffers(self):
@@ -1095,17 +1102,36 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         trajectories = [traj] where traj = [x0, x1, ..] where xi = [root_pos, joint_pos] 
         """
-        demo_trajectories, [self.demo_data_root_body_id, self.demo_data_root_body_name] = self.vec_env.env.fetch_demo_dataset()
-        
-        # Transform demo_traj to have body poses relative to the individual root pose of the body
-        root_trajectories = []
-        root_relative_demo_trajectories = []
-        for demo_traj in demo_trajectories:
-            root_trajectories.append(demo_traj[:,self.demo_data_root_body_id, :])
-            root_relative_demo_trajectories.append(to_relative_pose(demo_traj, self.demo_data_root_body_id))
-        
-        self.demo_trajectories = root_relative_demo_trajectories
-        self.demo_root_trajectories = root_trajectories
+        # Fetch multiple demo trajectories
+        if self._composed_energy_function:
+            self.demo_trajectories = {}
+            self.demo_root_trajectories = {}
+            for motion_file, motion_lib in self._energynet._motion_libs.items():
+                # Both motions must have the same root body
+                demo_trajectories, [self.demo_data_root_body_id, self.demo_data_root_body_name] = self.vec_env.env.fetch_demo_dataset(motion_lib=motion_lib)
+                
+                # Transform demo_traj to have body poses relative to the individual root pose of the body
+                root_trajectories = []
+                root_relative_demo_trajectories = []
+                for demo_traj in demo_trajectories:
+                    root_trajectories.append(demo_traj[:,self.demo_data_root_body_id, :])
+                    root_relative_demo_trajectories.append(to_relative_pose(demo_traj, self.demo_data_root_body_id))
+                
+                self.demo_trajectories[motion_file] = root_relative_demo_trajectories
+                self.demo_root_trajectories[motion_file] = root_trajectories
+
+        else:
+            demo_trajectories, [self.demo_data_root_body_id, self.demo_data_root_body_name] = self.vec_env.env.fetch_demo_dataset()
+            
+            # Transform demo_traj to have body poses relative to the individual root pose of the body
+            root_trajectories = []
+            root_relative_demo_trajectories = []
+            for demo_traj in demo_trajectories:
+                root_trajectories.append(demo_traj[:,self.demo_data_root_body_id, :])
+                root_relative_demo_trajectories.append(to_relative_pose(demo_traj, self.demo_data_root_body_id))
+            
+            self.demo_trajectories = root_relative_demo_trajectories
+            self.demo_root_trajectories = root_trajectories
 
 
     def _fetch_sim_asset_poses(self):
@@ -1135,20 +1161,64 @@ class NEARAgent(a2c_continuous.A2CAgent):
         dt = self.vec_env.env.dt
 
         # Compute pose error
-        avg_dtw_pose_error = 0
-        dtw_start_time = time.time()
-        for agent_pose_trajectory in agent_pose_trajectories:
-            dtw_pose_error = 0
-            for demo_traj in self.demo_trajectories:
-                dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
-            dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
-            avg_dtw_pose_error += dtw_pose_error
-        
-        dtw_end_time = time.time()
-        dtw_computation_performance = dtw_end_time - dtw_start_time
-        avg_dtw_pose_error = avg_dtw_pose_error/len(agent_pose_trajectories)
-        self.writer.add_scalar('mean_dtw_pose_error/step', avg_dtw_pose_error, frame)
-        self.writer.add_scalar('dtw_computation_performance/step', dtw_computation_performance, frame)
+        if self._composed_energy_function:
+            # Make a mask
+            if not hasattr(self, 'composition_masks'):
+                body_ids_dict = self.vec_env.env.body_ids_dict
+                composition_masks = {}
+                upper_body_mask = ['pelvis', 'right_thigh', 'right_shin', 'right_foot', 'left_thigh', 'left_shin', 'left_foot']
+                lower_body_mask = ['torso', 'head', 'right_upper_arm', 'right_lower_arm', 'right_hand', 'left_upper_arm', 'left_lower_arm', 'left_hand']
+                for motion_file in list(self.demo_trajectories.keys()):
+                    mask = [False] * len(body_ids_dict)
+                    for key, idx in body_ids_dict.items():
+                        if 'walk' in motion_file:
+                            mask_type = lower_body_mask
+                        else:
+                            mask_type = upper_body_mask
+
+                        if key in mask_type:
+                            mask[idx] = True
+                    mask = torch.tensor(mask, dtype=torch.bool).unsqueeze(dim=1)
+                    # For each dim
+                    mask = torch.cat([mask, mask, mask], dim=1)
+                    composition_masks[motion_file] = mask.flatten()
+                self.composition_masks = composition_masks
+
+            # Compute error
+            for motion_file, demo_trajectories in self.demo_trajectories.items():
+                avg_dtw_pose_error = 0
+                dtw_start_time = time.time()
+                for agent_pose_trajectory in agent_pose_trajectories:
+                    dtw_pose_error = 0
+                    for demo_traj in demo_trajectories:
+                        this_demo_traj = demo_traj.clone().cpu()
+                        this_agent_traj = agent_pose_trajectory.clone().cpu()
+                        this_demo_traj[:, ~self.composition_masks[motion_file]] = 0.0
+                        this_agent_traj[:, ~self.composition_masks[motion_file]] = 0.0
+                        dtw_pose_error += ts_dtw(this_demo_traj, this_agent_traj) / num_joints
+                    dtw_pose_error = dtw_pose_error/len(demo_trajectories)
+                    avg_dtw_pose_error += dtw_pose_error
+                
+                dtw_end_time = time.time()
+                dtw_computation_performance = dtw_end_time - dtw_start_time
+                avg_dtw_pose_error = avg_dtw_pose_error/len(agent_pose_trajectories)
+                self.writer.add_scalar(f'mean_dtw_pose_error_{os.path.splitext(motion_file)[0].replace("amp_humanoid", "")}/step', avg_dtw_pose_error, frame)
+                # self.writer.add_scalar('dtw_computation_performance/step', dtw_computation_performance, frame)
+        else:
+            avg_dtw_pose_error = 0
+            dtw_start_time = time.time()
+            for agent_pose_trajectory in agent_pose_trajectories:
+                dtw_pose_error = 0
+                for demo_traj in self.demo_trajectories:
+                    dtw_pose_error += ts_dtw(demo_traj.clone().cpu(), agent_pose_trajectory.clone().cpu()) / num_joints
+                dtw_pose_error = dtw_pose_error/len(self.demo_trajectories)
+                avg_dtw_pose_error += dtw_pose_error
+            
+            dtw_end_time = time.time()
+            dtw_computation_performance = dtw_end_time - dtw_start_time
+            avg_dtw_pose_error = avg_dtw_pose_error/len(agent_pose_trajectories)
+            self.writer.add_scalar('mean_dtw_pose_error/step', avg_dtw_pose_error, frame)
+            self.writer.add_scalar('dtw_computation_performance/step', dtw_computation_performance, frame)
                 
         # Compute root body statistics
         avg_vel_norm = 0
@@ -1189,39 +1259,12 @@ class NEARAgent(a2c_continuous.A2CAgent):
 
         # Compute demonstration data root body statistics
         if not hasattr(self, 'demo_root_body_stats'):
-            # Compute root body statistics
-            avg_vel_norm_demo = 0
-            avg_acc_norm_demo = 0
-            avg_jerk_norm_demo = 0
-            mean_avg_sparc_demo = 0
-            for demo_root_trajectory in self.demo_root_trajectories:
-                demo_root_velocity = get_series_derivative(demo_root_trajectory, dt)
-                demo_root_acceleration = get_series_derivative(demo_root_velocity, dt)
-                demo_root_jerk = get_series_derivative(demo_root_acceleration, dt)
-
-                # Compute spectral arc length
-                demo_velocity_profile = demo_root_velocity.cpu().numpy()
-                mean_sparc_demo = 0
-                for ax in range(demo_velocity_profile.shape[-1]):
-                    ax_sparc_spectral_arc_len_demo, _, _ = sparc(demo_velocity_profile[:,ax].squeeze(), 1/dt)
-                    mean_sparc_demo += ax_sparc_spectral_arc_len_demo
-                mean_sparc_demo = mean_sparc_demo/demo_velocity_profile.shape[-1]
-                mean_avg_sparc_demo += mean_sparc_demo
-
-                mean_vel_norm_demo = torch.mean(torch.linalg.norm(demo_root_velocity, dim=1))
-                mean_acc_norm_demo = torch.mean(torch.linalg.norm(demo_root_acceleration, dim=1))
-                mean_jerk_norm_demo = torch.mean(torch.linalg.norm(demo_root_jerk, dim=1))
-
-                avg_vel_norm_demo += mean_vel_norm_demo
-                avg_acc_norm_demo += mean_acc_norm_demo
-                avg_jerk_norm_demo += mean_jerk_norm_demo
-            
-            avg_vel_norm_demo = avg_vel_norm_demo/len(self.demo_root_trajectories)
-            avg_acc_norm_demo = avg_acc_norm_demo/len(self.demo_root_trajectories)
-            avg_jerk_norm_demo = avg_jerk_norm_demo/len(self.demo_root_trajectories)
-            mean_avg_sparc_demo = mean_avg_sparc_demo/len(self.demo_root_trajectories)
-            self.demo_root_body_stats = {'spectral_arc_len_demo': mean_avg_sparc_demo, 'avg_vel_norm_demo': avg_vel_norm_demo.item(), 'avg_acc_norm_demo': avg_acc_norm_demo.item(), 'avg_jerk_norm_demo': avg_jerk_norm_demo.item()}
-            self.writer.add_text('demo_root_body_stats', str(self.demo_root_body_stats), 0)
+            self.demo_root_body_stats = {}
+            if self._composed_energy_function:
+                for motion_file, demo_root_trajectories in self.demo_root_trajectories.items():
+                    self._compute_demo_root_body_stats(demo_root_trajectories, motion_file)
+            else:
+                self._compute_demo_root_body_stats(self.demo_root_trajectories)
 
         # Print Performance Stats
         print("-----")
@@ -1257,23 +1300,85 @@ class NEARAgent(a2c_continuous.A2CAgent):
         """
         if self._goal_conditioning:
             if self.goal_type == "box":
-                goal_features = self.vec_env.env.get_goal_features()
-                pos_error = goal_features[:,:-1].norm(p=2, dim=1)
-                mask = pos_error < 1.2
+                # goal_features = self.vec_env.env.get_goal_features()
+                # pos_error = goal_features[:,:-1].norm(p=2, dim=1)
+                # mask = pos_error < 1.2
 
-                # locomotion_weights = (~mask).clone().to('cuda:0', dtype=torch.float)
-                # punching_weights = mask.clone().to('cuda:0', dtype=torch.float)
+                # # locomotion_weights = (~mask).clone().to('cuda:0', dtype=torch.float)
+                # # punching_weights = mask.clone().to('cuda:0', dtype=torch.float)
 
-                dominant_percentage = 0.9
-                locomotion_weights = torch.where((~mask), dominant_percentage, 1-dominant_percentage).to('cuda:0', dtype=torch.float)
-                punching_weights = torch.where((mask), dominant_percentage, 1-dominant_percentage).to('cuda:0', dtype=torch.float)
+                # dominant_percentage = 0.9
+                # locomotion_weights = torch.where((~mask), dominant_percentage, 1-dominant_percentage).to('cuda:0', dtype=torch.float)
+                # punching_weights = torch.where((mask), dominant_percentage, 1-dominant_percentage).to('cuda:0', dtype=torch.float)
 
-                energy_function_composition = [locomotion_weights.unsqueeze(dim=1), punching_weights.unsqueeze(dim=1)]
-                energy_function_composition = torch.cat(energy_function_composition, dim=1)
-                return energy_function_composition
+                # energy_function_composition = [locomotion_weights.unsqueeze(dim=1), punching_weights.unsqueeze(dim=1)]
+                # energy_function_composition = torch.cat(energy_function_composition, dim=1)
+                # return energy_function_composition
+                return torch.cat([torch.full((self.num_actors, 1), 1.0), 
+                torch.full((self.num_actors, 1), 0.0)], dim=1).to('cuda:0', dtype=torch.float)
             else:
                 return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
         else:
             # return torch.full((self.num_actors, self._num_energy_functions), 1/self._num_energy_functions).to('cuda:0', dtype=torch.float)
-            return torch.cat([torch.full((self.num_actors, 1), 0.7), 
-                            torch.full((self.num_actors, 1), 0.3)], dim=1).to('cuda:0', dtype=torch.float)
+            return torch.cat([torch.full((self.num_actors, 1), 0.6), 
+                            torch.full((self.num_actors, 1), 0.4)], dim=1).to('cuda:0', dtype=torch.float)
+
+
+    def _create_motion_libs(self, motion_files):
+        """Retrun motion libraries corresponding to the provided motion files
+        """
+        assert (motion_files is not None or motion_files != []), "Please pass in motion files in the config (near_config.inference.random_init_motion_files)"
+        
+        motion_libs = {}
+        for motion_file in motion_files:
+            # First try to find motions in the main assets folder. Then try in the dataset directory
+            motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../assets/amp/motions', motion_file)
+            if os.path.exists(motion_file_path):
+                pass
+            else:
+                motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../custom_envs/data/humanoid', motion_file)
+                assert os.path.exists(motion_file_path), "Provided motion file can not be found in the assets/amp/motions or data/humanoid directories"
+
+            motion_libs[motion_file] = MotionLib(motion_file=motion_file_path, 
+                                     num_dofs=self.vec_env.env.humanoid_num_dof,
+                                     key_body_ids=self.vec_env.env._key_body_ids.cpu().numpy(), 
+                                     device=self.ppo_device)
+            
+        return motion_libs
+
+
+    def _compute_demo_root_body_stats(self, demo_root_trajectories, motion_file=''):
+        # Compute root body statistics
+        dt = self.vec_env.env.dt
+        avg_vel_norm_demo = 0
+        avg_acc_norm_demo = 0
+        avg_jerk_norm_demo = 0
+        mean_avg_sparc_demo = 0
+        for demo_root_trajectory in demo_root_trajectories:
+            demo_root_velocity = get_series_derivative(demo_root_trajectory, dt)
+            demo_root_acceleration = get_series_derivative(demo_root_velocity, dt)
+            demo_root_jerk = get_series_derivative(demo_root_acceleration, dt)
+
+            # Compute spectral arc length
+            demo_velocity_profile = demo_root_velocity.cpu().numpy()
+            mean_sparc_demo = 0
+            for ax in range(demo_velocity_profile.shape[-1]):
+                ax_sparc_spectral_arc_len_demo, _, _ = sparc(demo_velocity_profile[:,ax].squeeze(), 1/dt)
+                mean_sparc_demo += ax_sparc_spectral_arc_len_demo
+            mean_sparc_demo = mean_sparc_demo/demo_velocity_profile.shape[-1]
+            mean_avg_sparc_demo += mean_sparc_demo
+
+            mean_vel_norm_demo = torch.mean(torch.linalg.norm(demo_root_velocity, dim=1))
+            mean_acc_norm_demo = torch.mean(torch.linalg.norm(demo_root_acceleration, dim=1))
+            mean_jerk_norm_demo = torch.mean(torch.linalg.norm(demo_root_jerk, dim=1))
+
+            avg_vel_norm_demo += mean_vel_norm_demo
+            avg_acc_norm_demo += mean_acc_norm_demo
+            avg_jerk_norm_demo += mean_jerk_norm_demo
+        
+        avg_vel_norm_demo = avg_vel_norm_demo/len(demo_root_trajectories)
+        avg_acc_norm_demo = avg_acc_norm_demo/len(demo_root_trajectories)
+        avg_jerk_norm_demo = avg_jerk_norm_demo/len(demo_root_trajectories)
+        mean_avg_sparc_demo = mean_avg_sparc_demo/len(demo_root_trajectories)
+        self.demo_root_body_stats[motion_file] = {'spectral_arc_len_demo': mean_avg_sparc_demo, 'avg_vel_norm_demo': avg_vel_norm_demo.item(), 'avg_acc_norm_demo': avg_acc_norm_demo.item(), 'avg_jerk_norm_demo': avg_jerk_norm_demo.item()}
+        self.writer.add_text(f'demo_root_body_stats_{motion_file}', str(self.demo_root_body_stats[motion_file]), 0)

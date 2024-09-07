@@ -456,16 +456,19 @@ class HumanoidAMP(HumanoidAMPBase):
 
     ## New Addition ##
     ## Does not affect AMP ##
-    def fetch_demo_dataset(self):
+    def fetch_demo_dataset(self, motion_lib=None):
         """Fetch all motions as trajectories of joints
         """
 
+        if motion_lib == None:
+            motion_lib = self._motion_lib
+
         # Arrays of motion features
         dt = self.dt
-        motion_ids = np.array(range(self._motion_lib.num_motions()))
-        motion_lengths = self._motion_lib._motion_lengths[motion_ids]
-        num_frames = self._motion_lib._motion_num_frames[motion_ids]
-        num_joints = self._motion_lib._get_num_bodies()
+        motion_ids = np.array(range(motion_lib.num_motions()))
+        motion_lengths = motion_lib._motion_lengths[motion_ids]
+        num_frames = motion_lib._motion_num_frames[motion_ids]
+        num_joints = motion_lib._get_num_bodies()
 
         # List of arrays of frame indices from the motion dataset such that the frames are approximately separated by a time gap of dt
         frame_idxs = []
@@ -482,7 +485,7 @@ class HumanoidAMP(HumanoidAMPBase):
         for motion_id in motion_ids:
             frames = frame_idxs[motion_id]
             joint_pose_traj = np.empty([len(frames), num_joints, 3])
-            curr_motion = self._motion_lib._motions[motion_id]
+            curr_motion = motion_lib._motions[motion_id]
             joint_pose_traj = curr_motion.global_translation[frames]
             joint_pose_trajectories.append(joint_pose_traj)
 
@@ -753,17 +756,18 @@ def compute_humanoid_target_punching_reward(agent_rigid_body_pos, agent_rigid_bo
     punching_body_pos_error = target_pos - agent_punching_body_pos
     punching_body_pos_error_norm = punching_body_pos_error.norm(p=2, dim=1)
 
-    desired_velocity = 4.0
-    desired_punch_height = 1.2
+    desired_velocity = 2.0
+    desired_punch_height = 1.4
     desired_punch_velocity = 4.0
     
-    reward_near = 0.1*torch.exp(-2*punching_body_pos_error_norm**2) + 0.4*(1 - 2/(1+torch.exp(5*normalised_punching_body_vel_in_unit_vector_direction))) + 0.4*(1 - (agent_punching_body_vel.norm(p=2, dim=1) - desired_punch_velocity)**2) + 0.1*(1 - (agent_punch_height - desired_punch_height)**2) # 0.6*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1) 
-    reward_far = 0.6*torch.exp(-0.5*pos_error_norm**2) + 0.3*(1 - 2/(1+torch.exp(5*heading_error))) + 0.1*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2) #0.3*torch.exp(-heading_error) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
-    reward_far[target_punched] = 2.0
-    reward_near[target_punched] = 2.0
+    reward_near = 0.3 + 0.3*(0.1*torch.exp(-2*punching_body_pos_error_norm**2) + 0.4*(1 - 2/(1+torch.exp(5*normalised_punching_body_vel_in_unit_vector_direction))) + 0.3*(1 - (agent_punching_body_vel.norm(p=2, dim=1) - desired_punch_velocity)**2) + 0.2*(1 - (agent_punch_height - desired_punch_height)**2)) # 0.6*torch.clamp(0.667*punching_body_vel_in_unit_vector_direction ,0,1) 
+    reward_far = 0.3*(0.6*torch.exp(-0.5*pos_error_norm**2) + 0.3*(1 - 2/(1+torch.exp(5*heading_error))) + 0.1*(1 - (agent_root_body_vel.norm(p=2, dim=1) - desired_velocity)**2)) #0.3*torch.exp(-heading_error) # 0.3*torch.exp(-(torch.maximum(torch.zeros_like(heading_error), heading_error))**2))
+    reward_far[target_punched] = 1.0
+    reward_near[target_punched] = 1.0
     near_mask = (~target_punched) & (pos_error_norm < 1.2)
     # reward = torch.where(near_mask, reward_near, reward_far)
-    reward_far[near_mask] = 0.1*reward_far[near_mask] + 0.9*reward_near[near_mask]
+    # reward_far[near_mask] = 0.1*reward_far[near_mask] + 0.9*reward_near[near_mask]
+    reward_far[near_mask] = reward_near[near_mask]
 
     return reward_far
 
