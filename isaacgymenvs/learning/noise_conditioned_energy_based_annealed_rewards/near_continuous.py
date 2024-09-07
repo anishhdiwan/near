@@ -123,7 +123,7 @@ class NEARAgent(a2c_continuous.A2CAgent):
             self._num_energy_functions = len(self._eb_model_checkpoint)
         else:
             self._composed_energy_function = False
-        self._randomise_init_motions = config['near_config']['inference']['randomise_init_motions']
+        self._randomise_init_motions = config['near_config']['inference'].get('randomise_init_motions', False)
         self._c = config['near_config']['inference']['sigma_level'] # c ranges from [0,L-1] or is equal to -1
         if self._c == -1:
             # When c=-1, noise level annealing is used.

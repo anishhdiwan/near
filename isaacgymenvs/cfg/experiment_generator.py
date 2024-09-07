@@ -52,7 +52,7 @@ task_specific_cfg = {
     "amp_humanoid_mummy_walk.yaml":f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
     "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ",
     "amp_humanoid_spin_kick.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.stateInit=WeightedRandom ++task.env.episodeLength=100",
-    "amp_humanoid_locate_and_strike.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"] ++train.params.config.near_config.inference.randomise_init_motions=True +train.params.config.near_config.inference.random_init_motion_files=[\"amp_humanoid_walk.yaml\", \"amp_humanoid_single_left_punch.yaml\"]",
+    "amp_humanoid_locate_and_strike.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
 }
 
 near_task_specific_cfg = {
@@ -125,6 +125,9 @@ def generate_train_commands():
                         base_cmd = [f"task={algo}Hands train={algo}PPO ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]                        
 
                     if algo == "HumanoidNEAR":    
+                        if motion == "amp_humanoid_locate_and_strike.yaml":
+                            base_cmd[0] += " ++train.params.config.near_config.inference.randomise_init_motions=True +train.params.config.near_config.inference.random_init_motion_files=[amp_humanoid_walk.yaml,amp_humanoid_single_left_punch.yaml]"
+
                         ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
                         
                         ncsn_dir = base_cmd[1]
@@ -142,6 +145,10 @@ def generate_train_commands():
                         ncsn_cmd = ""
                         task_reward_w = 0.5
                         disc_reward_w = 0.5
+
+                        if motion == "amp_humanoid_locate_and_strike.yaml":
+                            base_cmd[0] += " ++train.params.config.randomise_init_motions=True +train.params.config.random_init_motion_files=[amp_humanoid_walk.yaml,amp_humanoid_single_left_punch.yaml]"
+
                         rl_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {amp_task_specific_cfg[motion]}" \
                         + f" ++train.params.config.task_reward_w={task_reward_w} ++train.params.config.disc_reward_w={disc_reward_w}"
 

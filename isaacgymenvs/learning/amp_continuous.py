@@ -42,12 +42,13 @@ from torch import optim
 import torch 
 from torch import nn
 import random
+import os
 
 import isaacgymenvs.learning.replay_buffer as replay_buffer
 import isaacgymenvs.learning.common_agent as common_agent 
 from utils.ncsn_utils import get_series_derivative, to_relative_pose, sparc
 from tslearn.metrics import dtw as ts_dtw
-
+from isaacgymenvs.tasks.amp.utils_amp.motion_lib import MotionLib
 from tensorboardX import SummaryWriter
 
 
@@ -80,6 +81,12 @@ class AMPAgent(common_agent.CommonAgent):
         if self._goal_conditioning:
             self.vec_env = vec_env
             self._max_episode_length = self.vec_env.env.max_episode_length
+
+        if self._randomise_init_motions:
+            self.vec_env.env._randomise_init_motions = self._randomise_init_motions
+            self.vec_env.env._reference_motion_libs = self._create_motion_libs(config.get("random_init_motion_files", []))
+            self.vec_env.env._random_init_motion_ratio = config.get("random_init_motion_ratio", 0.5)
+            self.vec_env.env._composed_feature_mask = False
 
         if self.normalize_value:
             self.value_mean_std = self.central_value_net.model.value_mean_std if self.has_central_value else self.model.value_mean_std
@@ -614,6 +621,7 @@ class AMPAgent(common_agent.CommonAgent):
         if self.disc_experiment:
             self.disc_expt_policy_training = config.get('disc_expt_policy_training', 2e6)
         self.pause_policy_updates = False
+        self._randomise_init_motions = config.get('randomise_init_motions', False)
 
         try:
             self._max_episode_length = self.vec_env.env.max_episode_length
@@ -1083,6 +1091,28 @@ class AMPAgent(common_agent.CommonAgent):
         plt.ylabel('Discriminator prediction')
         plt.show()
 
+
+    def _create_motion_libs(self, motion_files):
+        """Retrun motion libraries corresponding to the provided motion files
+        """
+        assert (motion_files is not None or motion_files != []), "Please pass in motion files in the config (near_config.inference.random_init_motion_files)"
+        
+        motion_libs = {}
+        for motion_file in motion_files:
+            # First try to find motions in the main assets folder. Then try in the dataset directory
+            motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/amp/motions', motion_file)
+            if os.path.exists(motion_file_path):
+                pass
+            else:
+                motion_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../custom_envs/data/humanoid', motion_file)
+                assert os.path.exists(motion_file_path), "Provided motion file can not be found in the assets/amp/motions or data/humanoid directories"
+
+            motion_libs[motion_file] = MotionLib(motion_file=motion_file_path, 
+                                     num_dofs=self.vec_env.env.humanoid_num_dof,
+                                     key_body_ids=self.vec_env.env._key_body_ids.cpu().numpy(), 
+                                     device=self.ppo_device)
+            
+        return motion_libs
 
 
 

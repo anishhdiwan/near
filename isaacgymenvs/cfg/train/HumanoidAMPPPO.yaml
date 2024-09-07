@@ -101,6 +101,9 @@ params:
     # Pause training after a certain number of steps to conduct experiments on the discriminator. DO NOT SET TO TRUE for regular runs
     disc_experiment: False
     disc_expt_policy_training: 2e6
+    randomise_init_motions: False
+    random_init_motion_ratio: 0.5
+    random_init_motion_files: []
     
     player:
       # Set visualise_disc_landscape to false to run policy
