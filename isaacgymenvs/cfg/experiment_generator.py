@@ -20,9 +20,9 @@ algos = [
 
 motions = [
     # "amp_humanoid_walk.yaml",
-    "amp_humanoid_turning_walk.yaml",
+    # "amp_humanoid_turning_walk.yaml",
     # "amp_humanoid_run.yaml",
-    "amp_humanoid_turning_run.yaml",
+    # "amp_humanoid_turning_run.yaml",
     # "amp_humanoid_crane_pose.yaml",
     # "amp_humanoid_single_left_punch.yaml",
     # "amp_humanoid_zombie_walk.yaml",
@@ -32,9 +32,10 @@ motions = [
     # "amp_humanoid_mummy_walk.yaml",
     # "amp_humanoid_single_cartwheel.yaml",
     # "amp_humanoid_spin_kick.yaml",
+    "amp_humanoid_locate_and_strike.yaml"
 ]
 
-exp_type = 'flagpole'
+exp_type = 'box'
 
 task_specific_cfg = {
     "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
@@ -51,6 +52,7 @@ task_specific_cfg = {
     "amp_humanoid_mummy_walk.yaml":f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
     "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ",
     "amp_humanoid_spin_kick.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.stateInit=WeightedRandom ++task.env.episodeLength=100",
+    "amp_humanoid_locate_and_strike.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"] ++train.params.config.near_config.inference.randomise_init_motions=True +train.params.config.near_config.inference.random_init_motion_files=[\"amp_humanoid_walk.yaml\", \"amp_humanoid_single_left_punch.yaml\"]",
 }
 
 near_task_specific_cfg = {
@@ -67,6 +69,7 @@ near_task_specific_cfg = {
     "amp_humanoid_mummy_walk.yaml": "++train.params.config.near_config.training.n_iters=80000",
     "amp_humanoid_single_cartwheel.yaml": "++train.params.config.near_config.training.n_iters=80000",
     "amp_humanoid_spin_kick.yaml": "++train.params.config.near_config.training.n_iters=120000",
+    "amp_humanoid_locate_and_strike.yaml": "++train.params.config.near_config.training.n_iters=120000",
 }
 
 amp_task_specific_cfg = {
@@ -83,6 +86,7 @@ amp_task_specific_cfg = {
     "amp_humanoid_mummy_walk.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_single_cartwheel.yaml": "++train.params.config.amp_minibatch_size=4096",
     "amp_humanoid_spin_kick.yaml": "++train.params.config.amp_minibatch_size=4096",
+    "amp_humanoid_locate_and_strike.yaml": "++train.params.config.amp_minibatch_size=4096",
 }
 
 
