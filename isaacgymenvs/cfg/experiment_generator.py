@@ -32,10 +32,11 @@ motions = [
     # "amp_humanoid_mummy_walk.yaml",
     # "amp_humanoid_single_cartwheel.yaml",
     # "amp_humanoid_spin_kick.yaml",
-    "amp_humanoid_locate_and_strike.yaml"
+    # "amp_humanoid_locate_and_strike.yaml",
+    "amp_humanoid_walk_and_wave"
 ]
 
-exp_type = 'box'
+exp_type = ''
 
 task_specific_cfg = {
     "amp_humanoid_walk.yaml": "headless=True max_iterations=60e6 num_envs=4096 ++train.params.config.minibatch_size=8192",
@@ -53,6 +54,7 @@ task_specific_cfg = {
     "amp_humanoid_single_cartwheel.yaml":"headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ",
     "amp_humanoid_spin_kick.yaml":"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.stateInit=WeightedRandom ++task.env.episodeLength=100",
     "amp_humanoid_locate_and_strike.yaml": f"headless=True max_iterations=100e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True ++task.env.envAssets=[\"{exp_type}\"]",
+    "amp_humanoid_walk_and_wave": "headless=True max_iterations=80e6 num_envs=4096 ++train.params.config.minibatch_size=8192 ++task.env.localRootObs=True",
 }
 
 near_task_specific_cfg = {
@@ -70,6 +72,9 @@ near_task_specific_cfg = {
     "amp_humanoid_single_cartwheel.yaml": "++train.params.config.near_config.training.n_iters=80000",
     "amp_humanoid_spin_kick.yaml": "++train.params.config.near_config.training.n_iters=120000",
     "amp_humanoid_locate_and_strike.yaml": "++train.params.config.near_config.training.n_iters=120000",
+    "amp_humanoid_walk_and_wave": {"amp_humanoid_walk.yaml": "++train.params.config.near_config.training.n_iters=150000 ++train.params.config.near_config.model.feature_mask=lower_body",
+                                   "amp_humanoid_hello.yaml": "++train.params.config.near_config.training.n_iters=80000 ++train.params.config.near_config.model.feature_mask=upper_body", 
+                                },
 }
 
 amp_task_specific_cfg = {
@@ -119,28 +124,59 @@ def generate_train_commands():
         for algo in algos:
             for motion in motions:
                 for seed in seeds:
-                    if not motion == "amp_humanoid_single_cartwheel.yaml":
-                        base_cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{exp_type.upper()}_{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
+                    if motion == "amp_humanoid_single_cartwheel.yaml":
+                        base_cmd = [f"task={algo}Hands train={algo}PPO ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
+                    elif motion == "amp_humanoid_walk_and_wave":
+                        base_cmd = [f"task={algo} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
                     else:
-                        base_cmd = [f"task={algo}Hands train={algo}PPO ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]                        
+                        base_cmd = [f"task={algo} ++task.env.motion_file={motion} seed={seed} {task_specific_cfg[motion]}", f"{exp_type.upper()}_{algo}_{os.path.splitext(motion)[0].replace('amp_humanoid_', '')}_{seed}"]
 
                     if algo == "HumanoidNEAR":    
-                        if motion == "amp_humanoid_locate_and_strike.yaml":
-                            base_cmd[0] += " ++train.params.config.near_config.inference.randomise_init_motions=True +train.params.config.near_config.inference.random_init_motion_files=[amp_humanoid_walk.yaml,amp_humanoid_single_left_punch.yaml]"
+                        if motion == "amp_humanoid_walk_and_wave":
+                            base_cmd[0] += " ++train.params.config.near_config.inference.randomise_init_motions=True ++train.params.config.near_config.inference.random_init_motion_ratio=1.0"
 
-                        ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
-                        
-                        ncsn_dir = base_cmd[1]
-                        w_task = 0.5
-                        w_style = 0.5
-                        eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
-                        running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
-                        rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
-                        + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={base_cmd[1]}" \
-                        + f" ++train.params.config.near_config.inference.task_reward_w={w_task} ++train.params.config.near_config.inference.energy_reward_w={w_style}"
+                            ncsn_cmds = []
+                            eb_model_checkpoint = {}
+                            running_mean_std_checkpoint = {}
+                            for motion_file, cfg in near_task_specific_cfg[motion].items():
+                                experiment_name = f"{base_cmd[1]}_{os.path.splitext(motion_file)[0].replace('amp_humanoid_', '')}_NCSN"
+                                ncsn_cmd = base_cmd[0] + f" experiment={experiment_name}" + f" {cfg}" + f" ++task.env.motion_file={motion_file}"
+                                ncsn_cmds.append(ncsn_cmd)
+                                eb_model_checkpoint[motion_file] = f"ncsn_runs/{experiment_name}/nn/checkpoint.pth"
+                                running_mean_std_checkpoint[motion_file] = f"ncsn_runs/{experiment_name}/nn/running_mean_std.pth"
+                            
+                            ncsn_dir = base_cmd[1]
+                            w_task = 0.0
+                            w_style = 1.0
 
-                        pending_cmds.append([ncsn_cmd, rl_cmd, False, False, False])
-                        counter += 1
+                            dict_str_checkpoints = ",".join([f"{k}:{v}" for k, v in eb_model_checkpoint.items()])
+                            dict_str_running_mean = ",".join([f"{k}:{v}" for k, v in running_mean_std_checkpoint.items()])
+
+                            rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={{ {dict_str_checkpoints} }}" \
+                            + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={{ {dict_str_running_mean} }}" + f" experiment={base_cmd[1]}" \
+                            + f" ++train.params.config.near_config.inference.task_reward_w={w_task} ++train.params.config.near_config.inference.energy_reward_w={w_style}" \
+                            + f" ++train.params.config.near_config.inference.composed_feature_mask=[lower_body,upper_body] ++task.env.motion_file=amp_humanoid_walk.yaml"
+
+                            pending_cmds.append([ncsn_cmds, rl_cmd, False, False, False])
+                            counter += 1
+
+                        else:
+                            if motion == "amp_humanoid_locate_and_strike.yaml":
+                                base_cmd[0] += " ++train.params.config.near_config.inference.randomise_init_motions=True +train.params.config.near_config.inference.random_init_motion_files=[amp_humanoid_walk.yaml,amp_humanoid_single_left_punch.yaml]"
+
+                            ncsn_cmd = base_cmd[0] + f" experiment={base_cmd[1]}" + f" {near_task_specific_cfg[motion]}"
+                            
+                            ncsn_dir = base_cmd[1]
+                            w_task = 0.5
+                            w_style = 0.5
+                            eb_model_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/checkpoint.pth"
+                            running_mean_std_checkpoint = f"ncsn_runs/{ncsn_dir}/nn/running_mean_std.pth"
+                            rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
+                            + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={base_cmd[1]}" \
+                            + f" ++train.params.config.near_config.inference.task_reward_w={w_task} ++train.params.config.near_config.inference.energy_reward_w={w_style}"
+
+                            pending_cmds.append([ncsn_cmd, rl_cmd, False, False, False])
+                            counter += 1
                     elif algo == "HumanoidAMP":
                         ncsn_cmd = ""
                         task_reward_w = 0.5
@@ -172,7 +208,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model", type=str, required=True, help="type of model to train (reinforcement learning or NCSN)")
-    parser.add_argument("-jid", "--job_idx", type=int, required=True, help="ID of the command assigned to a job")    
+    parser.add_argument("-jid", "--job_idx", type=int, required=True, help="ID of the command assigned to a job") 
+    parser.add_argument("-k", "--kth_ncsn", type=int, required=False, help="In case of composed energy function, which one to train")    
     args = parser.parse_args()
 
     # Does nothing if cmds already exist
@@ -204,6 +241,8 @@ if __name__ == "__main__":
                         job_idx = args.job_idx
                         job_cmds = cmds.loc[job_idx]
                         command_to_pass = job_cmds["ncsn_cmd"]
+                        if isinstance(command_to_pass, list):
+                            command_to_pass = command_to_pass[args.k]
                         # cmds.loc[job_idx, "job_assigned"] = True
                         # cmds.loc[job_idx, "ncsn_cmd_passed"] = True
                         # cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
