@@ -28,8 +28,8 @@ echo "Job assigned a row ID ${job_idx}"
 echo "-----------"
 
 
-ncsn_cfg0=$(python ~/near/isaacgymenvs/cfg/experiment_generator.py --model=ncsn --job_idx=${job_idx} --k=0)
-ncsn_cfg1=$(python ~/near/isaacgymenvs/cfg/experiment_generator.py --model=ncsn --job_idx=${job_idx} --k=1)
+ncsn_cfg0=$(python ~/near/isaacgymenvs/cfg/experiment_generator.py --model=ncsn --job_idx=${job_idx} --kth_ncsn=0)
+ncsn_cfg1=$(python ~/near/isaacgymenvs/cfg/experiment_generator.py --model=ncsn --job_idx=${job_idx} --kth_ncsn=1)
 # ncsn_cfg=$(echo "$ncsn_output" | jq -r '.cmd')
 # job_idx=$(echo "$ncsn_output" | jq -r '.job_idx')
 # ncsn_cfg=$(python ~/near/isaacgymenvs/utils/json_parser.py "${ncsn_output}" '.cmd')

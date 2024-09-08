@@ -242,7 +242,7 @@ if __name__ == "__main__":
                         job_cmds = cmds.loc[job_idx]
                         command_to_pass = job_cmds["ncsn_cmd"]
                         if isinstance(command_to_pass, list):
-                            command_to_pass = command_to_pass[args.k]
+                            command_to_pass = command_to_pass[args.kth_ncsn]
                         # cmds.loc[job_idx, "job_assigned"] = True
                         # cmds.loc[job_idx, "ncsn_cmd_passed"] = True
                         # cmds.to_pickle(os.path.join(FILE_PATH, "train_cmds.pkl"))
@@ -274,7 +274,7 @@ if __name__ == "__main__":
                 break
 
         except Exception as e:
-            # print(e)
+            print(e)
             sleep(1.0)
 
     
