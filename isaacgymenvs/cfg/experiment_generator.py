@@ -149,11 +149,11 @@ def generate_train_commands():
                             w_task = 0.0
                             w_style = 1.0
 
-                            dict_str_checkpoints = ",".join([f"{k}:{v}" for k, v in eb_model_checkpoint.items()])
-                            dict_str_running_mean = ",".join([f"{k}:{v}" for k, v in running_mean_std_checkpoint.items()])
+                            eb_model_checkpoint = str(eb_model_checkpoint).replace('\'', '').replace(" ", "")
+                            running_mean_std_checkpoint = str(running_mean_std_checkpoint).replace('\'', '').replace(" ", "") 
 
-                            rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={{ {dict_str_checkpoints} }}" \
-                            + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={{ {dict_str_running_mean} }}" + f" experiment={base_cmd[1]}" \
+                            rl_cmd = base_cmd[0] + f" ++train.params.config.near_config.inference.eb_model_checkpoint={eb_model_checkpoint}" \
+                            + f" ++train.params.config.near_config.inference.running_mean_std_checkpoint={running_mean_std_checkpoint}" + f" experiment={base_cmd[1]}" \
                             + f" ++train.params.config.near_config.inference.task_reward_w={w_task} ++train.params.config.near_config.inference.energy_reward_w={w_style}" \
                             + f" ++train.params.config.near_config.inference.composed_feature_mask=[lower_body,upper_body] ++task.env.motion_file=amp_humanoid_walk.yaml"
 
