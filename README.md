@@ -1,21 +1,18 @@
-# Noise-conditioned Energy-based Annealed Rewards (NEAR) - A Generative Framework for Imitation Learning from Observation
-
 <p align="center">
-  <img src="./docs/images/left_punch.gif" alt="Learnt Punching Imitation Policy" width="30%"/> 
-  <img src="./docs/images/run.gif" alt="Learnt Running Imitation Policy" width="30%"/> 
-  <img src="./docs/images/crane.gif" alt="Learnt Balancing Imitation Policy" width="30%"/> 
+  <img src="./docs/images/near_crane_pose.png" alt="Crane Pose" width="30%"/> 
+  <img src="./docs/images/near_spin_kick.png" alt="Spin Kick" width="30%"/> 
+  <img src="./docs/images/near_strike.png" alt="Punch" width="30%"/> 
 </p>
 
 <p align="center">
-  <em>Punching (left), running (middle), and martial arts crane pose (right) policies learnt using NEAR</em>
+  <em>Crane pose (left), spin kick (middle), and target strike (right) policies learnt using NEAR</em>
 </p>
 
+[[`Webpage & Videos`](https://anishhdiwan.github.io/noise-conditioned-energy-based-annealed-rewards/)] [[`Paper `]()]
 
-## About this repository
-
-This repository contains the implementation of NEAR, a state-only imitation learning algorithm based on score/energy-based generative modelling. The base version of this repository was forked from [Nvidia IsaacGym Environments](https://github.com/NVIDIA-Omniverse/IsaacGymEnvs). This fork contains the newly proposed algorithm, experiments, and reporoduction information. We also provide additional information like documentation on parts of the code and the datasets used in this research.
-
-<br><br>
+Official code release for our **ICLR 2025** paper :page_facing_up:
+## Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation
+_Diwan A.A\*, Urain J., Kober J., Peters J._
 
 
 ## Installation
@@ -279,3 +276,13 @@ Note that using a fixed seed value will only **potentially** allow for determini
 
 
 ## Citing
+To cite our paper and/or this repository in publications:
+
+```
+@inproceedings{diwan2025noise,
+  title={Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation},
+  author={Diwan, Anish Abhijit and Urain, Julen and Kober, Jens and Peters, Jan},
+  booktitle={The Thirteenth International Conference on Learning Representations},
+  year={2025},
+}
+```
