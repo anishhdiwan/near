@@ -1,3 +1,9 @@
+[[`Webpage & Videos`](https://anishhdiwan.github.io/noise-conditioned-energy-based-annealed-rewards/)] [[`Paper`]()]
+
+Official code release for our **ICLR 2025** paper :page_facing_up:
+### Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation
+_Anish Abhijit Diwan*, Julen Urain, Jens Kober, Jan Peters_
+
 <p align="center">
   <img src="./docs/images/near_crane_pose.png" alt="Crane Pose" width="30%"/> 
   <img src="./docs/images/near_spin_kick.png" alt="Spin Kick" width="30%"/> 
@@ -7,12 +13,6 @@
 <p align="center">
   <em>Crane pose (left), spin kick (middle), and target strike (right) policies learnt using NEAR</em>
 </p>
-
-[[`Webpage & Videos`](https://anishhdiwan.github.io/noise-conditioned-energy-based-annealed-rewards/)] [[`Paper `]()]
-
-Official code release for our **ICLR 2025** paper :page_facing_up:
-## Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation
-_Diwan A.A\*, Urain J., Kober J., Peters J._
 
 
 ## Installation
