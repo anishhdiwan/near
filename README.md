@@ -1,4 +1,4 @@
-[[`Webpage & Videos`](https://anishhdiwan.github.io/noise-conditioned-energy-based-annealed-rewards/)] [[`Paper`]()]
+[[`Webpage & Videos`](https://anishhdiwan.github.io/noise-conditioned-energy-based-annealed-rewards/)] [[`Paper`](https://doi.org/10.48550/arXiv.2501.14856)]
 
 Official code release for our **ICLR 2025** paper :page_facing_up:
 ### Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation
@@ -282,7 +282,7 @@ To cite our paper and/or this repository in publications:
 @inproceedings{diwan2025noise,
   title={Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation},
   author={Diwan, Anish Abhijit and Urain, Julen and Kober, Jens and Peters, Jan},
-  booktitle={The Thirteenth International Conference on Learning Representations},
+  booktitle={International Conference on Learning Representations (ICLR)},
   year={2025},
 }
 ```
