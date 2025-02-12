@@ -2,7 +2,7 @@
 
 Official code release for our **ICLR 2025** paper :page_facing_up:
 ### Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation
-_Anish Abhijit Diwan*, Julen Urain, Jan Peters, Jens Kober_
+_Anish Abhijit Diwan *, Julen Urain, Jens Kober <sup>†</sup>, Jan Peters <sup>†</sup>_
 
 <p align="center">
   <img src="./docs/images/near_crane_pose.png" alt="Crane Pose" width="30%"/> 
@@ -281,8 +281,9 @@ To cite our paper and/or this repository in publications:
 ```
 @inproceedings{diwan2025noise,
         title={Noise-conditioned Energy-based Annealed Rewards (NEAR): A Generative Framework for Imitation Learning from Observation},
-        author={Diwan, Anish Abhijit and Urain, Julen and Peters, Jan and Kober, Jens},
+        author={Diwan, Anish Abhijit and Urain, Julen and Kober, Jens and Peters, Jan},
         booktitle={International Conference on Learning Representations (ICLR)},
         year={2025},
+        note={Paper accepted. Jens Kober and Jan Peters supervised equally.}
       }
 ```
